@@ -4,7 +4,7 @@
 
 ## Overview
 
-This project implements a Retrieval-Augmented Generation (RAG) model designed to validate the use of Common Vulnerabilities and Exposures (CVEs) in security reports. The system leverages advanced natural language processing techniques to ensure that CVEs are accurately referenced and used in context within threat intelligence reports.
+This project implements a Retrieval-Augmented Generation (RAG) model designed to validate the use of Common Vulnerabilities and Exposures (CVEs) in security reports. The system leverages Metas' Llama3 to ensure that CVEs are accurately referenced and used in context within threat intelligence reports.
 
 ## Features
 
