@@ -11,6 +11,7 @@ This project implements a Retrieval-Augmented Generation (RAG) model designed to
 - **CVE Retrieval:** Retrieves relevant CVE information from a database or API.
 - **Contextual Validation:** Validates that CVEs are used correctly in the context of security reports.
 - **Report Integration:** Integrates with security reports to provide feedback on CVE usage.
+- **Recommendation CVE:** Give a recommendation of a similar CVE that does not exist the database. 
 
 ## Requirements
 
