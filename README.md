@@ -13,7 +13,7 @@ This project implements a Retrieval-Augmented Generation (RAG) model designed to
 - **Report Integration:** Integrates with security reports to provide feedback on CVE usage.
 - **Recommendation CVE:** Give a recommendation of a similar CVE that does not exist the database. 
 
-## Requirements
+## Requirements (have to update)
 
 - **Python 3.8+**
 - **PyTorch**: For model training and inference.
@@ -21,3 +21,7 @@ This project implements a Retrieval-Augmented Generation (RAG) model designed to
 - **spaCy**: For advanced text processing.
 - **pandas**: For handling data and managing reports.
 - **requests**: For interacting with APIs.
+
+
+## Video Playlist
+
