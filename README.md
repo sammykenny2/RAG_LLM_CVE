@@ -17,12 +17,20 @@ The following document goes into deeper detail on how to run the application, up
 
 ## Requirements (have to update)
 
-- **Python 3.8+**
-- **PyTorch**: For model training and inference.
-- **Transformers**: For accessing pre-trained models and tokenizers.
-- **spaCy**: For advanced text processing.
-- **pandas**: For handling data and managing reports.
-- **requests**: For interacting with APIs.
+- **Python 3.10**
+- **Accelerate**
+- **Bitsandbytes**
+- **Langchain**
+- **Sentence-transformers**
+- **Transformers**
+- **Tqdm**
+- **pytorch**      
+- **tokenizers**   
+- **torchaudio**               
+- **Torchvision**
+- **Huggingface_hub**
+- **Pandas**
+
 
 
 ## Video Playlist
