@@ -34,18 +34,20 @@ The following document goes into deeper detail on how to run the application, up
 
 
 ## Video Playlist
-For a more interactive learning experience, check out our YouTube video
-[**How to Use Our Malware CVE Rag - Overviwe and Retrieving Dabase**]([https://youtu.be/8v7BxJ0Glio?si=tkFuZnWctCKI3Io6](https://www.youtube.com/watch?v=aoz_J26HpzA)).
-[![CVE1 RAG thumbnail](assets/cve1.webp)]([https://youtu.be/8v7BxJ0Glio?si=tkFuZnWctCKI3Io6](https://www.youtube.com/watch?v=aoz_J26HpzA))
 
-[**How to Use Our Malware CVE Rag - Overviwe and Retrieving Dabase**]([https://youtu.be/8v7BxJ0Glio?si=tkFuZnWctCKI3Io6](https://www.youtube.com/watch?v=AWQRVPhzMJA)).
-[![CVE2 RAG thumbnail](assets/cve2.webp)]([[[https://youtu.be/8v7BxJ0Glio?si=tkFuZnWctCKI3Io6](https://www.youtube.com/watch?v=AWQRVPhzMJA)]([https://www.youtube.com/watch?v=aoz_J26HpzA](https://www.youtube.com/watch?v=AWQRVPhzMJA))](https://www.youtube.com/watch?v=AWQRVPhzMJA))
+For a more interactive learning experience, check out our YouTube videos:
 
-[**How to Use Our Malware CVE Rag - Overviwe and Retrieving Dabase**](https://www.youtube.com/watch?v=0aDswPXfcnI).
-[![CVE3 RAG thumbnail](assets/cve3.webp)]([[[https://youtu.be/8v7BxJ0Glio?si=tkFuZnWctCKI3Io6](https://www.youtube.com/watch?v=AWQRVPhzMJA)]([https://www.youtube.com/watch?v=aoz_J26HpzA](https://www.youtube.com/watch?v=AWQRVPhzMJA))](https://www.youtube.com/watch?v=AWQRVPhzMJA))
+1. **[How to Use Our Malware CVE Rag - Overview and Retrieving Database](https://youtu.be/8v7BxJ0Glio?si=tkFuZnWctCKI3Io6)**
+   - [![CVE1 RAG Thumbnail](assets/cve1.webp)](https://youtu.be/8v7BxJ0Glio?si=tkFuZnWctCKI3Io6)
 
-[**How to Use Our Malware CVE Rag - Overviwe and Retrieving Dabase**]https://www.youtube.com/watch?v=0aDswPXfcnI.
-[![CVE4 RAG thumbnail](assets/cve4.webp)]([[[https://youtu.be/8v7BxJ0Glio?si=tkFuZnWctCKI3Io6](https://www.youtube.com/watch?v=AWQRVPhzMJA)]([https://www.youtube.com/watch?v=aoz_J26HpzA](https://www.youtube.com/watch?v=AWQRVPhzMJA))](https://www.youtube.com/watch?v=AWQRVPhzMJA))
+2. **[How to Use Our Malware CVE Rag - Overview and Retrieving Database](https://www.youtube.com/watch?v=AWQRVPhzMJA)**
+   - [![CVE2 RAG Thumbnail](assets/cve2.webp)](https://www.youtube.com/watch?v=AWQRVPhzMJA)
+
+3. **[How to Use Our Malware CVE Rag - Overview and Retrieving Database](https://www.youtube.com/watch?v=0aDswPXfcnI)**
+   - [![CVE3 RAG Thumbnail](assets/cve3.webp)](https://www.youtube.com/watch?v=0aDswPXfcnI)
+
+4. **[How to Use Our Malware CVE Rag - Overview and Retrieving Database](https://www.youtube.com/watch?v=0aDswPXfcnI)**
+   - [![CVE4 RAG Thumbnail](assets/cve4.webp)](https://www.youtube.com/watch?v=0aDswPXfcnI)
 
 
 
