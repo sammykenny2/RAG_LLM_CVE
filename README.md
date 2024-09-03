@@ -6,7 +6,12 @@
 
 This project implements a Retrieval-Augmented Generation (RAG) model designed to validate the use of Common Vulnerabilities and Exposures (CVEs) in security reports. The system leverages Metas' Llama3 to ensure that CVEs are accurately referenced and used in context within threat intelligence reports.
 
-The following document goes into deeper detail on how to run the application, update the database, and how the program works: [Document](assets/CVE Document.pdf)
+## Documentation
+
+The following document goes into deeper detail on how to run the application, update the database, and how the program works:
+
+- [CVE Document](assets/CVE%20Document.pdf)
+
 
 ## Features
 
