@@ -34,4 +34,6 @@ The following document goes into deeper detail on how to run the application, up
 
 
 ## Video Playlist
-
+For a more interactive learning experience, check out our YouTube video
+[**How to Use Our Malware CVE Rag**](https://youtu.be/8v7BxJ0Glio?si=tkFuZnWctCKI3Io6).
+[![Malware RAG thumbnail](assets/thumbnail.png)](https://youtu.be/8v7BxJ0Glio?si=tkFuZnWctCKI3Io6)
