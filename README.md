@@ -44,7 +44,7 @@ For a more interactive learning experience, check out our YouTube videos:
    - [![CVE2 RAG Thumbnail](assets/cve2.webp)](https://www.youtube.com/watch?v=AWQRVPhzMJA)
 
 3. **[How to Use Our Malware CVE Rag - Overview and Retrieving Database](https://www.youtube.com/watch?v=0aDswPXfcnI)**
-   - [![CVE3 RAG Thumbnail](assets/cve3(1).webp)](https://www.youtube.com/watch?v=0aDswPXfcnI)
+   - [![CVE3 RAG Thumbnail](assets/cve3(2).png)](https://www.youtube.com/watch?v=0aDswPXfcnI)
 
 4. **[How to Use Our Malware CVE Rag - Overview and Retrieving Database](https://www.youtube.com/watch?v=0aDswPXfcnI)**
    - [![CVE4 RAG Thumbnail](assets/cve4.webp)](https://www.youtube.com/watch?v=0aDswPXfcnI)
