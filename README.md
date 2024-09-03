@@ -35,5 +35,18 @@ The following document goes into deeper detail on how to run the application, up
 
 ## Video Playlist
 For a more interactive learning experience, check out our YouTube video
-[**How to Use Our Malware CVE Rag**](https://youtu.be/8v7BxJ0Glio?si=tkFuZnWctCKI3Io6).
-[![Malware RAG thumbnail](assets/cve1.webp)](https://youtu.be/8v7BxJ0Glio?si=tkFuZnWctCKI3Io6)
+[**How to Use Our Malware CVE Rag - Overviwe and Retrieving Dabase**]([https://youtu.be/8v7BxJ0Glio?si=tkFuZnWctCKI3Io6](https://www.youtube.com/watch?v=aoz_J26HpzA)).
+[![CVE1 RAG thumbnail](assets/cve1.webp)]([https://youtu.be/8v7BxJ0Glio?si=tkFuZnWctCKI3Io6](https://www.youtube.com/watch?v=aoz_J26HpzA))
+
+[**How to Use Our Malware CVE Rag - Overviwe and Retrieving Dabase**]([https://youtu.be/8v7BxJ0Glio?si=tkFuZnWctCKI3Io6](https://www.youtube.com/watch?v=AWQRVPhzMJA)).
+[![CVE2 RAG thumbnail](assets/cve2.webp)]([[[https://youtu.be/8v7BxJ0Glio?si=tkFuZnWctCKI3Io6](https://www.youtube.com/watch?v=AWQRVPhzMJA)]([https://www.youtube.com/watch?v=aoz_J26HpzA](https://www.youtube.com/watch?v=AWQRVPhzMJA))](https://www.youtube.com/watch?v=AWQRVPhzMJA))
+
+[**How to Use Our Malware CVE Rag - Overviwe and Retrieving Dabase**](https://www.youtube.com/watch?v=0aDswPXfcnI).
+[![CVE3 RAG thumbnail](assets/cve3.webp)]([[[https://youtu.be/8v7BxJ0Glio?si=tkFuZnWctCKI3Io6](https://www.youtube.com/watch?v=AWQRVPhzMJA)]([https://www.youtube.com/watch?v=aoz_J26HpzA](https://www.youtube.com/watch?v=AWQRVPhzMJA))](https://www.youtube.com/watch?v=AWQRVPhzMJA))
+
+[**How to Use Our Malware CVE Rag - Overviwe and Retrieving Dabase**]https://www.youtube.com/watch?v=0aDswPXfcnI.
+[![CVE4 RAG thumbnail](assets/cve4.webp)]([[[https://youtu.be/8v7BxJ0Glio?si=tkFuZnWctCKI3Io6](https://www.youtube.com/watch?v=AWQRVPhzMJA)]([https://www.youtube.com/watch?v=aoz_J26HpzA](https://www.youtube.com/watch?v=AWQRVPhzMJA))](https://www.youtube.com/watch?v=AWQRVPhzMJA))
+
+
+
+
