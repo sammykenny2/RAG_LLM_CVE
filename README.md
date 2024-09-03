@@ -38,16 +38,25 @@ The following document goes into deeper detail on how to run the application, up
 For a more interactive learning experience, check out our YouTube videos:
 
 1. **[How to Use Our Malware CVE Rag - Overview and Retrieving Database](https://youtu.be/8v7BxJ0Glio?si=tkFuZnWctCKI3Io6)**
-   - [![CVE1 RAG Thumbnail](assets/cve1.webp)](https://youtu.be/8v7BxJ0Glio?si=tkFuZnWctCKI3Io6)
+   - <a href="https://youtu.be/8v7BxJ0Glio?si=tkFuZnWctCKI3Io6">
+       <img src="assets/cve1.webp" width="200" height="150" alt="CVE1 RAG Thumbnail">
+     </a>
 
 2. **[How to Use Our Malware CVE Rag - Overview and Retrieving Database](https://www.youtube.com/watch?v=AWQRVPhzMJA)**
-   - [![CVE2 RAG Thumbnail](assets/cve2.webp)](https://www.youtube.com/watch?v=AWQRVPhzMJA)
+   - <a href="https://www.youtube.com/watch?v=AWQRVPhzMJA">
+       <img src="assets/cve2.webp" width="200" height="150" alt="CVE2 RAG Thumbnail">
+     </a>
 
 3. **[How to Use Our Malware CVE Rag - Overview and Retrieving Database](https://www.youtube.com/watch?v=0aDswPXfcnI)**
-   - [![CVE3 RAG Thumbnail](assets/cve3(2).png)](https://www.youtube.com/watch?v=0aDswPXfcnI)
+   - <a href="https://www.youtube.com/watch?v=0aDswPXfcnI">
+       <img src="assets/cve3(2).png" width="200" height="150" alt="CVE3 RAG Thumbnail">
+     </a>
 
 4. **[How to Use Our Malware CVE Rag - Overview and Retrieving Database](https://www.youtube.com/watch?v=0aDswPXfcnI)**
-   - [![CVE4 RAG Thumbnail](assets/cve4.webp)](https://www.youtube.com/watch?v=0aDswPXfcnI)
+   - <a href="https://www.youtube.com/watch?v=0aDswPXfcnI">
+       <img src="assets/cve4.webp" width="200" height="150" alt="CVE4 RAG Thumbnail">
+     </a>
+
 
 
 
