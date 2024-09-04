@@ -42,8 +42,8 @@ The following document goes into deeper detail on how to run the application, up
 
 For a more interactive learning experience, check out our YouTube videos:
 
-1. **[How to Use Our Malware CVE Rag - Overview and Retrieving Database](https://youtu.be/8v7BxJ0Glio?si=tkFuZnWctCKI3Io6)**
-   - <a href="https://youtu.be/8v7BxJ0Glio?si=tkFuZnWctCKI3Io6">
+1. **[How to Use Our Malware CVE Rag - Overview and Retrieving Database](https://youtu.be/aoz_J26HpzA?si=muugmT7kTIW_laK1)**
+   - <a href="https://youtu.be/aoz_J26HpzA?si=muugmT7kTIW_laK1">
        <img src="assets/cve1.webp" width="300" height="225" alt="CVE1 RAG Thumbnail">
      </a>
 
@@ -52,8 +52,8 @@ For a more interactive learning experience, check out our YouTube videos:
        <img src="assets/cve2.webp" width="300" height="225" alt="CVE2 RAG Thumbnail">
      </a>
 
-3. **[How to Use Our Malware CVE Rag - Overview and Retrieving Database](https://www.youtube.com/watch?v=0aDswPXfcnI)**
-   - <a href="https://www.youtube.com/watch?v=0aDswPXfcnI">
+3. **[How to Use Our Malware CVE Rag - Overview and Retrieving Database](https://www.youtube.com/watch?v=qk_qEqDSWIg)**
+   - <a href="https://www.youtube.com/watch?v=qk_qEqDSWIg">
        <img src="assets/cve3(2).png" width="300" height="225" alt="CVE3 RAG Thumbnail">
      </a>
 
