@@ -154,10 +154,22 @@ Menu Options → Llama (with official CVE descriptions + retrieval context) → 
 - Relies on publicly available CVE metadata from MITRE/NVD
 - LLM outputs should be human-verified (hallucinations still possible despite RAG)
 
+## Implemented Optimizations
+
+### Performance Improvements
+1. ✅ **Direct regex CVE extraction**: Skips LLM entirely, uses pattern `CVE-\d{4}-\d{4,7}`
+2. ✅ **Global SentenceTransformer**: Initialized once at startup instead of per-call
+3. ✅ **Unified inference wrapper**: All `model.generate()` calls use `torch.no_grad()`
+4. ✅ **Fixed typos**: "based of" → "based on", improved prompt clarity
+
+### Memory Management
+1. ✅ **Context length limits**: Missing CVE contexts capped at 2000 chars (full mode)
+2. ✅ **Chunk-level cleanup**: `torch.cuda.empty_cache()` after each chunk in full mode
+3. ✅ **Consistent `pad_token_id`**: All generate calls include padding token
+4. ✅ **Demo/Full mode separation**: Clear memory profiles for different use cases
+
 ## Future Optimization Targets
-1. Skip LLM for CVE extraction (use direct regex on PDF text)
-2. Initialize SentenceTransformer once at startup (global variable)
-3. Add input validation for CSV file existence and format
-4. Parallelize CVE lookups (if memory permits)
-5. Add configurable parameters (page limits, token limits, retrieval top-k)
-6. Fix typos in LLM prompts ("recomend" → "recommend", "closly" → "closely")
+1. Add input validation for CSV file existence and format
+2. Parallelize CVE lookups (if memory permits)
+3. Add progress bars for long-running operations
+4. Consider batch processing for multiple PDFs

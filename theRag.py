@@ -81,6 +81,10 @@ if USE_CUDNN_OPTIMIZATIONS:
 
 llamaSug = ""
 
+# Initialize SentenceTransformer once (global) for efficiency
+device = "cuda" if torch.cuda.is_available() else "cpu"
+embedding_model = SentenceTransformer(model_name_or_path="all-mpnet-base-v2", device=device)
+
 # ============================================================================
 # Helper functions
 # ============================================================================
@@ -138,16 +142,24 @@ def generate_chunked_responses(system_prompt: str,
             {"role": "user", "content": content},
         ]
         input_ids = tokenizer.apply_chat_template(messages, add_generation_prompt=True, return_tensors="pt").to(model.device)
-        generation = model.generate(
-            input_ids,
-            max_new_tokens=max_new_tokens,
-            eos_token_id=tokenizer.eos_token_id,
-            do_sample=True,
-            temperature=0.3,
-            top_p=0.9,
-        )
+
+        # Use no_grad for memory efficiency
+        with torch.no_grad():
+            generation = model.generate(
+                input_ids,
+                max_new_tokens=max_new_tokens,
+                eos_token_id=tokenizer.eos_token_id,
+                do_sample=True,
+                temperature=0.3,
+                top_p=0.9,
+                pad_token_id=tokenizer.eos_token_id
+            )
+
         response_ids = generation[0][input_ids.shape[-1]:]
         outputs.append(tokenizer.decode(response_ids, skip_special_tokens=True))
+
+        # Clear cache after each chunk to prevent memory buildup
+        torch.cuda.empty_cache()
 
     return "\n".join(outputs)
 
@@ -216,9 +228,18 @@ userPDFName = input("Please Enter the name of the pdf that you would like to ana
 all_text = extract_text_from_pdf(userPDFName)
 
 # ============================================================================
-# CVE extraction
+# CVE extraction (optimized: direct regex instead of LLM)
 # ============================================================================
 
+def extract_cves_regex(text):
+    """Extract CVEs directly from text using regex pattern."""
+    pattern = r'CVE-\d{4}-\d{4,7}'
+    cve_matches = re.findall(pattern, text)
+    return list(set(cve_matches))
+
+cves = extract_cves_regex(all_text)
+
+# Legacy LLM-based extraction (kept for reference, not used)
 def extract_cves_llama(text, tokenizer, model):
     if DEMO_MODE:
         # Demo mode: truncate text
@@ -291,15 +312,6 @@ def extract_cves_llama(text, tokenizer, model):
 
         return "\n".join(responses)
 
-llm_output = extract_cves_llama(all_text, tokenizer, model)
-
-def extract_cves_regex(text):
-    pattern = r'CVE-\d{4}-\d{4,7}'
-    cve_matches = re.findall(pattern, text)
-    return list(set(cve_matches))
-
-cves = extract_cves_regex(llm_output)
-
 # ============================================================================
 # CVE database lookup
 # ============================================================================
@@ -370,8 +382,7 @@ def extract_cve_fields(data: dict, fallback_id: str) -> tuple[str, str, str, str
 # ============================================================================
 
 def asking_llama_for_advice(cveDesp: str) -> str:
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-
+    """Recommend similar CVE using preloaded embedding model (optimized)."""
     csv_path = 'test6.csv'
 
     # Load CSV with row limit in demo mode
@@ -386,8 +397,7 @@ def asking_llama_for_advice(cveDesp: str) -> str:
 
     text_chunks = chunk_embeddings_df.to_dict(orient="records")
 
-    embedding_model = SentenceTransformer(model_name_or_path="all-mpnet-base-v2", device=device)
-
+    # Use global embedding_model instead of creating new instance
     indices = retrieve_context(query=cveDesp, embeddings=embeddings, model=embedding_model)
 
     context_items = [text_chunks[i] for i in indices]
@@ -398,29 +408,21 @@ def asking_llama_for_advice(cveDesp: str) -> str:
         {"role": "system", "content": f""""You are a Q&A Assistant. You will be provided with relevant information about various CVEs. Based on this information, your task is to recommend the CVE number that most closely matches the description of the vulnerability.
         Provided Relevant Information: {context_str}
         """},
-        {"role": "user", "content": f""" Hello, could you recommend me a CVE that most closely resembles this chunk of text based of the relevant information that you have. Chunk of text: {cveDesp}"""},
+        {"role": "user", "content": f""" Hello, could you recommend me a CVE that most closely resembles this chunk of text based on the relevant information that you have. Chunk of text: {cveDesp}"""},
         ]
 
     input_ids = tokenizer.apply_chat_template(messages, add_generation_prompt=True, return_tensors="pt").to(model.device)
 
-    if USE_TORCH_NO_GRAD:
-        with torch.no_grad():
-            outputs = model.generate(
-                input_ids,
-                max_new_tokens=ADVICE_TOKENS,
-                eos_token_id=tokenizer.eos_token_id,
-                do_sample=True,
-                temperature=0.3,
-                top_p=0.9
-            )
-    else:
+    # Always use no_grad for inference efficiency
+    with torch.no_grad():
         outputs = model.generate(
             input_ids,
             max_new_tokens=ADVICE_TOKENS,
             eos_token_id=tokenizer.eos_token_id,
             do_sample=True,
             temperature=0.3,
-            top_p=0.9
+            top_p=0.9,
+            pad_token_id=tokenizer.eos_token_id
         )
 
     response = outputs[0][input_ids.shape[-1]:]
@@ -483,8 +485,11 @@ for cve in cves:
         # Demo mode: use truncated context
         context_text = all_text[:500]
     else:
-        # Full mode: use extract_cve_context
+        # Full mode: use extract_cve_context with length limit
         context_text = extract_cve_context(all_text, cve)
+        # Limit context to prevent memory issues (max 2000 chars)
+        if len(context_text) > 2000:
+            context_text = context_text[:2000] + "..."
 
     messages = [
         {"role": "system", "content": "You are a chat bot."},
@@ -493,24 +498,16 @@ for cve in cves:
 
     input_ids = tokenizer.apply_chat_template(messages, add_generation_prompt=True, return_tensors="pt").to(model.device)
 
-    if USE_TORCH_NO_GRAD:
-        with torch.no_grad():
-            outputs = model.generate(
-                input_ids,
-                max_new_tokens=MISSING_CVE_TOKENS,
-                eos_token_id=tokenizer.eos_token_id,
-                do_sample=True,
-                temperature=0.3,
-                top_p=0.9
-            )
-    else:
+    # Always use no_grad for inference efficiency
+    with torch.no_grad():
         outputs = model.generate(
             input_ids,
             max_new_tokens=MISSING_CVE_TOKENS,
             eos_token_id=tokenizer.eos_token_id,
             do_sample=True,
             temperature=0.3,
-            top_p=0.9
+            top_p=0.9,
+            pad_token_id=tokenizer.eos_token_id
         )
 
     response = outputs[0][input_ids.shape[-1]:]
