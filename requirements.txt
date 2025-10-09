@@ -4,7 +4,7 @@ qdrant-client
 langchain_qdrant
 PyMuPDF
 accelerate
-bitsandbytes
+# bitsandbytes - Not used in current implementation, Linux-only
 langchain
 sentence-transformers
 transformers
