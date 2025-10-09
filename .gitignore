@@ -47,20 +47,11 @@ MANIFEST
 .claude/
 
 # Project specific
-# Generated embedding database
-test6.csv
-*.csv
-
 # Generated CVE description files
 CVEDescription*.txt
 
-# Test/temporary PDFs (keep documentation PDFs tracked)
-Test.pdf
-fakeReport*.pdf
-
-# Future features (not ready for commit)
-extractCVE5.py
-theRag2.py
+# Test data directory (temporary files for testing)
+test_data/
 
 # Model cache
 .cache/
