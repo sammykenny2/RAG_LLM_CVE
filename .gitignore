@@ -1,0 +1,73 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyTorch
+*.pth
+*.pt
+*.ckpt
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Claude Code
+.claude/
+
+# Project specific
+# Generated embedding database
+test6.csv
+*.csv
+
+# Generated CVE description files
+CVEDescription*.txt
+
+# Test/temporary PDFs (keep documentation PDFs tracked)
+Test.pdf
+fakeReport*.pdf
+
+# Future features (not ready for commit)
+extractCVE5.py
+theRag2.py
+
+# Model cache
+.cache/
+*.bin
+transformers_cache/
+huggingface/
+
+# Logs
+*.log
+logs/

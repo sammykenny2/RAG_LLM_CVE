@@ -3,6 +3,7 @@ from tqdm.auto import tqdm
 import pandas as pd
 from spacy.lang.en import English
 from sentence_transformers import SentenceTransformer
+import torch
 
 def read_pdf(pdf_path):
     """Extract text from each page of the PDF and return as a list of dictionaries."""
@@ -50,7 +51,8 @@ def process_pdf(pdf_path, sentence_size, output_csv_path):
 
     # Initialize and use SentenceTransformer
     embedding_model = SentenceTransformer(model_name_or_path="all-mpnet-base-v2", device="cpu")
-    embedding_model.to("cuda")
+    if torch.cuda.is_available():
+        embedding_model.to("cuda")
 
     for item in tqdm(dic_chunks):
         item["embedding"] = embedding_model.encode(item["sentence_chunk"])

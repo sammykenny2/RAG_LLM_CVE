@@ -15,3 +15,5 @@ torchaudio
 torchvision
 huggingface_hub
 pandas
+reportlab
+spacy
