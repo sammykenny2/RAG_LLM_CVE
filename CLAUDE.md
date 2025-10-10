@@ -31,7 +31,7 @@ Use PowerShell scripts in `scripts/` directory. These scripts create isolated vi
 ```powershell
 .\scripts\setup-cpu.ps1
 ```
-Creates `venv-cpu` with PyTorch CPU version (~200MB download)
+Creates `.venv-cpu` with PyTorch CPU version (~200MB download)
 
 **CUDA 11.8** (for GTX 1660 Ti, RTX 2060-2080):
 ```powershell
@@ -40,7 +40,7 @@ Creates `venv-cpu` with PyTorch CPU version (~200MB download)
 
 .\scripts\setup-cuda118.ps1
 ```
-Creates `venv-cuda118` with PyTorch + CUDA 11.8 (~2.5GB download)
+Creates `.venv-cuda118` with PyTorch + CUDA 11.8 (~2.5GB download)
 
 **CUDA 12.1** (for RTX 3060/3070/3080/3090, RTX 4060+, recommended):
 ```powershell
@@ -49,18 +49,18 @@ Creates `venv-cuda118` with PyTorch + CUDA 11.8 (~2.5GB download)
 
 .\scripts\setup-cuda121.ps1
 ```
-Creates `venv-cuda121` with PyTorch + CUDA 12.1 (~2.5GB download)
+Creates `.venv-cuda121` with PyTorch + CUDA 12.1 (~2.5GB download)
 
 **Activating environments**:
 ```powershell
 # CPU
-.\venv-cpu\Scripts\Activate.ps1
+.\.venv-cpu\Scripts\Activate.ps1
 
 # CUDA 11.8
-.\venv-cuda118\Scripts\Activate.ps1
+.\.venv-cuda118\Scripts\Activate.ps1
 
 # CUDA 12.1
-.\venv-cuda121\Scripts\Activate.ps1
+.\.venv-cuda121\Scripts\Activate.ps1
 ```
 
 **Switching between environments**: Just deactivate current environment and activate another.
@@ -91,7 +91,7 @@ Choose based on your hardware (see Installation section above):
 ```powershell
 # Example for RTX 3060
 .\scripts\setup-cuda121.ps1
-.\venv-cuda121\Scripts\Activate.ps1
+.\.venv-cuda121\Scripts\Activate.ps1
 ```
 
 ### Step 2: Login to Hugging Face
@@ -209,9 +209,9 @@ RAG_LLM_CVE/
 │   ├── setup-cpu.ps1    # CPU-only environment
 │   ├── setup-cuda118.ps1 # CUDA 11.8 environment
 │   └── setup-cuda121.ps1 # CUDA 12.1 environment
-├── venv-cpu/            # Virtual environment (CPU, gitignored)
-├── venv-cuda118/        # Virtual environment (CUDA 11.8, gitignored)
-└── venv-cuda121/        # Virtual environment (CUDA 12.1, gitignored)
+├── .venv-cpu/           # Virtual environment (CPU, gitignored)
+├── .venv-cuda118/       # Virtual environment (CUDA 11.8, gitignored)
+└── .venv-cuda121/       # Virtual environment (CUDA 12.1, gitignored)
 ../
 ├── cvelist/
 │   └── 2024/            # v4 CVE JSON feeds (fallback)

@@ -1,5 +1,5 @@
 # Setup CPU-only environment for RAG_LLM_CVE
-# This script creates venv-cpu and installs PyTorch CPU version and all dependencies
+# This script creates .venv-cpu and installs PyTorch CPU version and all dependencies
 # Does NOT activate the environment - user must activate manually
 
 $ErrorActionPreference = "Stop"
@@ -15,7 +15,7 @@ Write-Host "Project root: $ProjectRoot" -ForegroundColor Yellow
 Write-Host ""
 
 # Check if virtual environment exists
-$VenvPath = Join-Path $ProjectRoot "venv-cpu"
+$VenvPath = Join-Path $ProjectRoot ".venv-cpu"
 
 if (Test-Path $VenvPath) {
     Write-Host "Virtual environment already exists at: $VenvPath" -ForegroundColor Green
@@ -23,7 +23,7 @@ if (Test-Path $VenvPath) {
     Write-Host ""
 } else {
     # Create virtual environment
-    Write-Host "Creating virtual environment: venv-cpu" -ForegroundColor Green
+    Write-Host "Creating virtual environment: .venv-cpu" -ForegroundColor Green
     python -m venv $VenvPath
     Write-Host ""
 }
@@ -58,6 +58,6 @@ Write-Host "Verifying PyTorch installation..." -ForegroundColor Yellow
 
 Write-Host ""
 Write-Host "To use this environment, activate it with:" -ForegroundColor Green
-Write-Host "  .\venv-cpu\Scripts\Activate.ps1" -ForegroundColor Cyan
+Write-Host "  .\.venv-cpu\Scripts\Activate.ps1" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "To deactivate later, run: deactivate" -ForegroundColor Yellow

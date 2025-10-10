@@ -1,5 +1,5 @@
 # Setup CUDA 11.8 environment for RAG_LLM_CVE
-# This script creates venv-cuda118 and installs PyTorch with CUDA 11.8 support and all dependencies
+# This script creates .venv-cuda118 and installs PyTorch with CUDA 11.8 support and all dependencies
 # Does NOT activate the environment - user must activate manually
 # Requires: NVIDIA GPU with CUDA 11.8 installed
 
@@ -21,7 +21,7 @@ Write-Host "  - cuDNN compatible with CUDA 11.8" -ForegroundColor White
 Write-Host ""
 
 # Check if virtual environment exists
-$VenvPath = Join-Path $ProjectRoot "venv-cuda118"
+$VenvPath = Join-Path $ProjectRoot ".venv-cuda118"
 
 if (Test-Path $VenvPath) {
     Write-Host "Virtual environment already exists at: $VenvPath" -ForegroundColor Green
@@ -29,7 +29,7 @@ if (Test-Path $VenvPath) {
     Write-Host ""
 } else {
     # Create virtual environment
-    Write-Host "Creating virtual environment: venv-cuda118" -ForegroundColor Green
+    Write-Host "Creating virtual environment: .venv-cuda118" -ForegroundColor Green
     python -m venv $VenvPath
     Write-Host ""
 }
@@ -73,6 +73,6 @@ if ($cudaAvailable -eq "True") {
 
 Write-Host ""
 Write-Host "To use this environment, activate it with:" -ForegroundColor Green
-Write-Host "  .\venv-cuda118\Scripts\Activate.ps1" -ForegroundColor Cyan
+Write-Host "  .\.venv-cuda118\Scripts\Activate.ps1" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "To deactivate later, run: deactivate" -ForegroundColor Yellow
