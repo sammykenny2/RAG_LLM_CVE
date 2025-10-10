@@ -16,7 +16,7 @@ RAG-based CVE validation system for security operations centers (SOCs). Validate
 - **Hardware**: Choose based on your needs
   - **CPU-only**: 8-16GB RAM (slow but works)
   - **GTX 1660 Ti (6GB)**: 10-20x faster, needs CUDA 11.8
-  - **RTX 3060+ (12GB)**: 20-40x faster, needs CUDA 12.1 (recommended)
+  - **RTX 4060+ (12GB)**: 20-40x faster, needs CUDA 12.4 (recommended)
 - Hugging Face account with Llama model access approval
 - Run `huggingface-cli login` before first use
 - External CVE JSON feeds in `../cvelist/2024` (v4 schema) and `../cvelistV5/cves/2024` (v5 schema)
@@ -33,7 +33,7 @@ Use PowerShell scripts in `scripts/` directory. These scripts create isolated vi
 ```
 Creates `.venv-cpu` with PyTorch CPU version (~200MB download)
 
-**CUDA 11.8** (for GTX 1660 Ti, RTX 2060-2080):
+**CUDA 11.8** (for GTX 1660 Ti):
 ```powershell
 # First install CUDA Toolkit 11.8:
 # https://developer.nvidia.com/cuda-11-8-0-download-archive
@@ -42,14 +42,14 @@ Creates `.venv-cpu` with PyTorch CPU version (~200MB download)
 ```
 Creates `.venv-cuda118` with PyTorch + CUDA 11.8 (~2.5GB download)
 
-**CUDA 12.1** (for RTX 3060/3070/3080/3090, RTX 4060+, recommended):
+**CUDA 12.4** (for RTX 4060+, recommended):
 ```powershell
-# First install CUDA Toolkit 12.1:
-# https://developer.nvidia.com/cuda-12-1-0-download-archive
+# First install CUDA Toolkit 12.4:
+# https://developer.nvidia.com/cuda-12-4-0-download-archive
 
-.\scripts\setup-cuda121.ps1
+.\scripts\setup-cuda124.ps1
 ```
-Creates `.venv-cuda121` with PyTorch + CUDA 12.1 (~2.5GB download)
+Creates `.venv-cuda124` with PyTorch + CUDA 12.4 (~2.5GB download)
 
 **Activating environments**:
 ```powershell
@@ -59,8 +59,8 @@ Creates `.venv-cuda121` with PyTorch + CUDA 12.1 (~2.5GB download)
 # CUDA 11.8
 .\.venv-cuda118\Scripts\Activate.ps1
 
-# CUDA 12.1
-.\.venv-cuda121\Scripts\Activate.ps1
+# CUDA 12.4
+.\.venv-cuda124\Scripts\Activate.ps1
 ```
 
 **Switching between environments**: Just deactivate current environment and activate another.
@@ -77,8 +77,8 @@ pip install torch torchvision torchaudio --index-url https://download.pytorch.or
 # CUDA 11.8
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 
-# CUDA 12.1
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+# CUDA 12.4
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
 
 # Step 2: Install dependencies
 pip install -r requirements.txt
@@ -89,9 +89,9 @@ pip install -r requirements.txt
 ### Step 1: Setup Environment
 Choose based on your hardware (see Installation section above):
 ```powershell
-# Example for RTX 3060
-.\scripts\setup-cuda121.ps1
-.\.venv-cuda121\Scripts\Activate.ps1
+# Example for RTX 4060
+.\scripts\setup-cuda124.ps1
+.\.venv-cuda124\Scripts\Activate.ps1
 ```
 
 ### Step 2: Login to Hugging Face
@@ -191,7 +191,7 @@ python theRag.py --mode=demo
 |----------|------------------------|---------------------|-----------------|
 | **CPU** (i5/i7) | 4 min | 3 min | ~7-8 min |
 | **GTX 1660 Ti** | 24 sec | 18 sec | ~1 min (**90% faster**) |
-| **RTX 3060** | 15 sec | 12 sec | ~40 sec (**95% faster**) |
+| **RTX 4060** | 15 sec | 12 sec | ~40 sec (**95% faster**) |
 
 ## File Paths & Dependencies
 
@@ -208,10 +208,10 @@ RAG_LLM_CVE/
 ├── scripts/             # Environment setup scripts
 │   ├── setup-cpu.ps1    # CPU-only environment
 │   ├── setup-cuda118.ps1 # CUDA 11.8 environment
-│   └── setup-cuda121.ps1 # CUDA 12.1 environment
+│   └── setup-cuda124.ps1 # CUDA 12.4 environment
 ├── .venv-cpu/           # Virtual environment (CPU, gitignored)
 ├── .venv-cuda118/       # Virtual environment (CUDA 11.8, gitignored)
-└── .venv-cuda121/       # Virtual environment (CUDA 12.1, gitignored)
+└── .venv-cuda124/       # Virtual environment (CUDA 12.4, gitignored)
 ../
 ├── cvelist/
 │   └── 2024/            # v4 CVE JSON feeds (fallback)

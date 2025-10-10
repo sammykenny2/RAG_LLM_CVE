@@ -1,7 +1,7 @@
-# Setup CUDA 12.1 environment for RAG_LLM_CVE
-# This script creates .venv-cuda121 and installs PyTorch with CUDA 12.1 support and all dependencies
+# Setup CUDA 12.4 environment for RAG_LLM_CVE
+# This script creates .venv-cuda124 and installs PyTorch with CUDA 12.4 support and all dependencies
 # Does NOT activate the environment - user must activate manually
-# Requires: NVIDIA GPU with CUDA 12.1+ installed
+# Requires: NVIDIA GPU with CUDA 12.4+ installed
 
 $ErrorActionPreference = "Stop"
 
@@ -9,19 +9,19 @@ $ErrorActionPreference = "Stop"
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "  RAG_LLM_CVE Environment Setup (CUDA 12.1)" -ForegroundColor Cyan
+Write-Host "  RAG_LLM_CVE Environment Setup (CUDA 12.4)" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Project root: $ProjectRoot" -ForegroundColor Yellow
 Write-Host ""
 Write-Host "Prerequisites:" -ForegroundColor Yellow
-Write-Host "  - NVIDIA GPU" -ForegroundColor White
-Write-Host "  - CUDA Toolkit 12.1+ installed" -ForegroundColor White
+Write-Host "  - NVIDIA GPU (RTX 4060+ recommended)" -ForegroundColor White
+Write-Host "  - CUDA Toolkit 12.4+ installed" -ForegroundColor White
 Write-Host "  - cuDNN compatible with CUDA 12.x" -ForegroundColor White
 Write-Host ""
 
 # Check if virtual environment exists
-$VenvPath = Join-Path $ProjectRoot ".venv-cuda121"
+$VenvPath = Join-Path $ProjectRoot ".venv-cuda124"
 
 if (Test-Path $VenvPath) {
     Write-Host "Virtual environment already exists at: $VenvPath" -ForegroundColor Green
@@ -29,7 +29,7 @@ if (Test-Path $VenvPath) {
     Write-Host ""
 } else {
     # Create virtual environment
-    Write-Host "Creating virtual environment: .venv-cuda121" -ForegroundColor Green
+    Write-Host "Creating virtual environment: .venv-cuda124" -ForegroundColor Green
     python -m venv $VenvPath
     Write-Host ""
 }
@@ -42,11 +42,11 @@ $VenvPip = Join-Path $VenvPath "Scripts\pip.exe"
 Write-Host "Upgrading pip..." -ForegroundColor Green
 & $VenvPython -m pip install --upgrade pip
 
-# Install PyTorch with CUDA 12.1
+# Install PyTorch with CUDA 12.4 support
 Write-Host ""
-Write-Host "Installing PyTorch (CUDA 12.1)..." -ForegroundColor Green
-Write-Host "This may take several minutes..." -ForegroundColor Yellow
-& $VenvPip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+Write-Host "Installing PyTorch 2.5.1 (CUDA 12.4)..." -ForegroundColor Green
+Write-Host "This may take several minutes (~2.5GB download)..." -ForegroundColor Yellow
+& $VenvPip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
 
 # Install other dependencies
 Write-Host ""
@@ -73,6 +73,6 @@ if ($cudaAvailable -eq "True") {
 
 Write-Host ""
 Write-Host "To use this environment, activate it with:" -ForegroundColor Green
-Write-Host "  .\.venv-cuda121\Scripts\Activate.ps1" -ForegroundColor Cyan
+Write-Host "  .\.venv-cuda124\Scripts\Activate.ps1" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "To deactivate later, run: deactivate" -ForegroundColor Yellow
