@@ -52,8 +52,8 @@ MANIFEST
 # Generated CVE description files
 CVEDescription*.txt
 
-# Test data directory (temporary files for testing)
-test_data/
+# Sample files directory (test reports and demo data)
+samples/
 
 # Model cache
 .cache/

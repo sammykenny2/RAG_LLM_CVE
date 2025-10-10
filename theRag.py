@@ -383,7 +383,7 @@ def extract_cve_fields(data: dict, fallback_id: str) -> tuple[str, str, str, str
 
 def asking_llama_for_advice(cveDesp: str) -> str:
     """Recommend similar CVE using preloaded embedding model (optimized)."""
-    csv_path = 'test6.csv'
+    csv_path = 'cveEmbeddings.csv'
 
     # Load CSV with row limit in demo mode
     if MAX_EMBEDDING_ROWS is not None:
