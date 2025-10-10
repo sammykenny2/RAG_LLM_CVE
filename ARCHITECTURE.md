@@ -51,11 +51,14 @@ RAG-based CVE validation system that reduces LLM hallucinations in Security Oper
 - **Run once**: Before first use of theRag.py
 
 ### Official CVE Metadata
-- **Source**: MITRE/NVD JSON feeds in `../cvelistV5/cves/2024` (v5 schema, primary) and `../cvelist/2024` (v4 schema, fallback)
+- **Source**: MITRE/NVD JSON feeds in `../cvelistV5/cves/<year>` (v5 schema) and `../cvelist/<year>` (v4 schema)
 - **Structure**: Files organized as `<year>/<prefix-xxx>/CVE-<year>-<id>.json`
   - v5 schema: `cveMetadata.cveId`, `containers.cna.affected`, `containers.cna.descriptions`
   - v4 schema: `CVE_data_meta.ID`, `affects.vendor.vendor_data`, `description.description_data`
-- **Optional Tools**: `extractCVE.py` flattens JSONs to `CVEDescription2024.txt` (for human reference only, not used by RAG)
+- **Optional Tools**: `extractCVE.py` flattens JSONs to `CVEDescription<year>.txt` (for human reference only, not used by RAG)
+  - `--schema=v5` (default): Extract from V5 only, fastest
+  - `--schema=v4`: Extract from V4 only
+  - `--schema=all`: Extract from both with deduplication (V5 priority)
 
 ## Runtime Architecture
 
@@ -64,6 +67,11 @@ RAG-based CVE validation system that reduces LLM hallucinations in Security Oper
 **Dual-Mode Design**:
 - **Demo Mode** (`--mode=demo`): Memory-optimized for limited hardware
 - **Full Mode** (default): Complete feature set with intelligent chunking
+
+**Schema Selection** (`--schema`):
+- **v5**: Use V5 schema only (fastest, requires V5 feeds)
+- **v4**: Use V4 schema only (requires V4 feeds)
+- **all** (default): Try V5 first, fallback to V4 (backward compatible)
 
 **Demo Mode Features**:
 - Processes first 10 pages of PDF only
@@ -86,7 +94,9 @@ RAG-based CVE validation system that reduces LLM hallucinations in Security Oper
 ### Execution Flow
 
 **Phase 1: Initialization** (one-time, at startup)
-1. Parse command-line arguments (`--mode=demo` or default full)
+1. Parse command-line arguments:
+   - `--mode=demo` or `--mode=full` (default)
+   - `--schema=v5|v4|all` (default: all)
 2. Load **Llama-3.2-1B-Instruct** model (~2.5GB)
    - Device: Auto-detect CUDA/CPU via `device_map="auto"`
    - Precision: FP16 (demo) or auto (full)
@@ -108,11 +118,13 @@ RAG-based CVE validation system that reduces LLM hallucinations in Security Oper
 **Phase 4: CVE Metadata Lookup** (for each extracted CVE)
 1. Parse CVE format: `CVE-<year>-<id>` → extract year and ID
 2. Format path prefix: `<id>` → `Nxxx` (e.g., `1234` → `1xxx`, `12345` → `12xxx`)
-3. **Try v5 schema first**: `../cvelistV5/cves/<year>/<prefix>/CVE-<year>-<id>.json`
-4. **Fallback to v4 schema**: `../cvelist/<year>/<prefix>/CVE-<year>-<id>.json`
-5. Extract fields (schema-aware):
+3. **Load CVE record based on schema parameter**:
+   - `--schema=v5`: Only try `../cvelistV5/cves/<year>/<prefix>/CVE-<year>-<id>.json`
+   - `--schema=v4`: Only try `../cvelist/<year>/<prefix>/CVE-<year>-<id>.json`
+   - `--schema=all` (default): Try v5 first, fallback to v4
+4. Extract fields (schema-aware):
    - `cveId`, `vendor`, `product`, `description`
-6. Build concatenated string of all found CVE descriptions
+5. Build concatenated string of all found CVE descriptions
 
 **Phase 5: Fallback for Missing CVEs** (if JSON not found)
 1. Extract context from PDF:

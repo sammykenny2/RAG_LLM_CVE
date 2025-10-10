@@ -25,9 +25,12 @@ from sentence_transformers import util, SentenceTransformer
 parser = argparse.ArgumentParser(description='CVE RAG Analysis Tool')
 parser.add_argument('--mode', choices=['demo', 'full'], default='full',
                     help='Run mode: demo (memory-optimized) or full (complete features)')
+parser.add_argument('--schema', type=str, choices=['v5', 'v4', 'all'], default='all',
+                    help='CVE schema to use: v5 (CVE 5.0 only), v4 (CVE 4.0 only), or all (v5→v4 fallback, default)')
 args = parser.parse_args()
 
 DEMO_MODE = (args.mode == 'demo')
+CVE_SCHEMA = args.schema
 
 # Mode-specific configurations
 if DEMO_MODE:
@@ -333,22 +336,39 @@ def format_second_set(second_set):
         return second_set[:2] + 'xxx'
 
 def load_cve_record(cve: str, first_set: int, second_set: str) -> dict | None:
-    """Load CVE JSON record with v5→v4 fallback."""
+    """Load CVE JSON record based on schema configuration."""
     formatted_x = format_second_set(second_set)
 
-    # Try v5 schema first
-    v5_path = f"../cvelistV5/cves/{first_set}/{formatted_x}/CVE-{first_set}-{second_set}.json"
-    if os.path.exists(v5_path):
-        with open(v5_path, 'r', encoding='utf-8') as f:
-            return json.load(f)
+    if CVE_SCHEMA == 'v5':
+        # v5 only
+        v5_path = f"../cvelistV5/cves/{first_set}/{formatted_x}/CVE-{first_set}-{second_set}.json"
+        if os.path.exists(v5_path):
+            with open(v5_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        return None
 
-    # Fallback to v4 schema
-    v4_path = f"../cvelist/{first_set}/{formatted_x}/CVE-{first_set}-{second_set}.json"
-    if os.path.exists(v4_path):
-        with open(v4_path, 'r', encoding='utf-8') as f:
-            return json.load(f)
+    elif CVE_SCHEMA == 'v4':
+        # v4 only
+        v4_path = f"../cvelist/{first_set}/{formatted_x}/CVE-{first_set}-{second_set}.json"
+        if os.path.exists(v4_path):
+            with open(v4_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        return None
 
-    return None
+    else:  # CVE_SCHEMA == 'all'
+        # Try v5 first, fallback to v4
+        v5_path = f"../cvelistV5/cves/{first_set}/{formatted_x}/CVE-{first_set}-{second_set}.json"
+        if os.path.exists(v5_path):
+            with open(v5_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+
+        # Fallback to v4 schema
+        v4_path = f"../cvelist/{first_set}/{formatted_x}/CVE-{first_set}-{second_set}.json"
+        if os.path.exists(v4_path):
+            with open(v4_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+
+        return None
 
 def extract_cve_fields(data: dict, fallback_id: str) -> tuple[str, str, str, str]:
     """Extract CVE fields from v5 or v4 schema."""

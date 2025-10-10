@@ -109,24 +109,30 @@ python localEmbedding.py
 
 ### Step 4: (Optional) Extract CVE Reference Text
 ```bash
-# Extract current year CVEs (default)
+# Extract current year from V5 (default, fastest)
 python extractCVE.py
 
-# Extract specific year
+# Extract specific year from V5
 python extractCVE.py --year=2024
 
-# Extract multiple years
-python extractCVE.py --year=2023,2024
+# Extract from V4 only
+python extractCVE.py --schema=v4
 
-# Extract all available years
-python extractCVE.py --year=all
+# Extract from both V5 and V4 (with deduplication, slower)
+python extractCVE.py --schema=all
+
+# Extract all years from both schemas
+python extractCVE.py --year=all --schema=all
 
 # Output file naming:
 # - Single year: CVEDescription2024.txt
 # - Multiple years: CVEDescription2023-2024.txt
 ```
 
-The script processes V5 schema (primary) first, then V4 schema (fallback) for each year.
+**Schema options**:
+- `--schema=v5` (default): V5 only, fastest
+- `--schema=v4`: V4 only
+- `--schema=all`: Both V5 and V4 with deduplication (V5 takes priority)
 
 ### Step 5: Analyze Threat Intelligence Reports
 ```bash
@@ -135,7 +141,20 @@ python theRag.py
 
 # Demo mode (faster, limited to 10 pages)
 python theRag.py --mode=demo
+
+# Use specific CVE schema
+python theRag.py --schema=v5      # V5 only
+python theRag.py --schema=v4      # V4 only
+python theRag.py --schema=all     # V5→V4 fallback (default)
+
+# Combine mode and schema
+python theRag.py --mode=full --schema=v5
 ```
+
+**Schema options**:
+- `--schema=v5`: V5 only (fastest, requires V5 feeds)
+- `--schema=v4`: V4 only (requires V4 feeds)
+- `--schema=all` (default): V5→V4 fallback (backward compatible)
 
 **When prompted**: Enter the PDF filename you want to analyze
 
@@ -176,9 +195,10 @@ python theRag.py --mode=demo
 - Legacy LLM-based extraction preserved in code for reference
 
 ### CVE Lookup Strategy
-1. **JSON File Lookup with v5→v4 fallback**:
-   - Primary: `../cvelistV5/cves/<year>/<prefix>/CVE-<year>-<id>.json` (v5 schema)
-   - Fallback: `../cvelist/<year>/<prefix>/CVE-<year>-<id>.json` (v4 schema)
+1. **JSON File Lookup with configurable schema**:
+   - `--schema=v5`: Only `../cvelistV5/cves/<year>/<prefix>/CVE-<year>-<id>.json` (v5 schema)
+   - `--schema=v4`: Only `../cvelist/<year>/<prefix>/CVE-<year>-<id>.json` (v4 schema)
+   - `--schema=all` (default): Try v5 first, fallback to v4 (backward compatible)
    - Auto-detects schema and extracts: `cveId`, `vendor`, `product`, `description`
 2. **Fallback for Missing CVEs**:
    - Demo mode: Uses first 500 chars of report
@@ -243,15 +263,18 @@ RAG_LLM_CVE/
 - `theRag.py` reads from:
   - User-provided PDF (via `fitz.open`)
   - `cveEmbeddings.csv` (embedding database)
-  - `../cvelistV5/cves/<year>/<prefix>/CVE-*.json` (primary)
-  - `../cvelist/<year>/<prefix>/CVE-*.json` (fallback)
+  - CVE JSON feeds (based on `--schema` parameter):
+    - `--schema=v5`: Only `../cvelistV5/cves/<year>/<prefix>/CVE-*.json`
+    - `--schema=v4`: Only `../cvelist/<year>/<prefix>/CVE-*.json`
+    - `--schema=all` (default): Try v5 first, fallback to v4
 - `localEmbedding.py` writes to:
   - User-specified CSV output path
 - `extractCVE.py` reads from:
-  - `../cvelistV5/cves/<year>/` (V5 schema, primary)
-  - `../cvelist/<year>/` (V4 schema, fallback)
-  - Supports flexible year selection: current year (default), specific year, multiple years, or all
-  - Processes both directories sequentially for each year
+  - `../cvelistV5/cves/<year>/` (V5 schema, default)
+  - `../cvelist/<year>/` (V4 schema, optional)
+  - **Schema selection** via `--schema`: v5 (default, fastest), v4, or all (with deduplication)
+  - **Year selection** via `--year`: current year (default), specific year, multiple years, or all
+  - Only `--schema=all` enables deduplication (V5 priority over V4)
 - `extractCVE.py` writes to:
   - `CVEDescription<year>.txt` (single year)
   - `CVEDescription<min>-<max>.txt` (multiple years)
