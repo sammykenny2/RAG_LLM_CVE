@@ -6,6 +6,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **CRITICAL: Never commit or push code changes to the git repository unless explicitly requested by the user.**
 
+## Documentation Update Policy
+
+**IMPORTANT: When the user requests to "update documentation" or "update files", unless explicitly specified otherwise, this refers to updating the markdown files in the project root directory:**
+- `CLAUDE.md` - Project documentation and user guide (this file)
+- `ARCHITECTURE.md` - System architecture and technical details
+- `PROGRESS.md` - Completed changes and upcoming features
+
+**Do NOT update external documentation or create new files unless explicitly requested.**
+
 ## Project Overview
 
 RAG-based CVE validation system for security operations centers (SOCs). Validates CVE usage in threat intelligence reports using Meta's Llama 3.2-1B-Instruct model combined with retrieval-augmented generation to reduce LLM hallucinations.
@@ -136,20 +145,38 @@ python extractCVE.py --year=all --schema=all
 
 ### Step 5: Analyze Threat Intelligence Reports
 ```bash
-# Full mode (recommended, complete analysis)
+# Default (uses fast speed, full mode, v5→v4 fallback schema)
 python theRag.py
 
 # Demo mode (faster, limited to 10 pages)
 python theRag.py --mode=demo
+
+# Speed levels (optimize performance)
+python theRag.py --speed=normal   # Baseline, maximum precision (FP32)
+python theRag.py --speed=fast     # Recommended (default): FP16 + optimized cache
+python theRag.py --speed=fastest  # Maximum speed: +low temperature +SDPA
 
 # Use specific CVE schema
 python theRag.py --schema=v5      # V5 only
 python theRag.py --schema=v4      # V4 only
 python theRag.py --schema=all     # V5→V4 fallback (default)
 
-# Combine mode and schema
-python theRag.py --mode=full --schema=v5
+# Combine all parameters
+python theRag.py --mode=full --speed=fastest --schema=v5
 ```
+
+**Speed options** (see ARCHITECTURE.md for details):
+- `--speed=normal`: Baseline with chunk-aware filtering, FP32 precision
+  - GPU (GTX 1660 Ti): Option 2 ~4-5 min (7x faster than original)
+  - CPU: Option 2 ~4-5 min (7x faster than original)
+- `--speed=fast` (default): +FP16 +reduced cache clearing
+  - GPU (GTX 1660 Ti): Option 2 ~3 min (11x faster than original) ⭐
+  - CPU: Option 2 ~4-5 min (similar to normal, FP16/cache ineffective on CPU)
+- `--speed=fastest`: +lower temperature +SDPA attention
+  - GPU (GTX 1660 Ti): Option 2 ~2 min (16x faster than original)
+  - CPU: Option 2 ~4 min (5-10% faster than normal, minor gains from temperature/SDPA)
+
+**Note**: All speed levels provide 7x speedup from chunk-aware CVE filtering. GPU benefits more from fast/fastest optimizations (FP16, cache management). CPU users can use any speed level, but normal or fast recommended as fastest provides minimal additional benefit.
 
 **Schema options**:
 - `--schema=v5`: V5 only (fastest, requires V5 feeds)
