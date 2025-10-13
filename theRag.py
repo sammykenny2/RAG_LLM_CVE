@@ -40,9 +40,11 @@ import fitz
 import json
 import gc
 import os
+import sys
 from pathlib import Path
 import numpy as np
 import pandas as pd
+import pickle
 from sentence_transformers import util, SentenceTransformer
 
 # ============================================================================
@@ -57,11 +59,14 @@ parser.add_argument('--schema', type=str, choices=['v5', 'v4', 'all'], default='
                     help='CVE schema to use: v5 (CVE 5.0 only), v4 (CVE 4.0 only), or all (v5→v4 fallback, default)')
 parser.add_argument('--speed', type=str, choices=['normal', 'fast', 'fastest'], default='fast',
                     help='Optimization level: normal=baseline (chunk-aware only), fast=recommended (default, +FP16), fastest=aggressive (+lower temp +SDPA)')
+parser.add_argument('--extension', type=str, choices=['csv', 'pkl', 'parquet'], default='pkl',
+                    help='Embedding file extension: csv (text), pkl (default, balanced), parquet (optimal, requires pyarrow)')
 args = parser.parse_args()
 
 DEMO_MODE = (args.mode == 'demo')
 CVE_SCHEMA = args.schema
 SPEED_LEVEL = args.speed
+EMBEDDING_EXTENSION = args.extension
 
 # Display speed level info
 speed_display = {"normal": "NORMAL (Baseline)", "fast": "FAST (Recommended)", "fastest": "FASTEST (Aggressive)"}
@@ -143,6 +148,14 @@ if USE_CUDNN_OPTIMIZATIONS:
     torch.backends.cudnn.deterministic = True
 
 llamaSug = ""
+
+# Check embedding file exists
+EMBEDDING_FILE = f"CVEEmbeddings.{EMBEDDING_EXTENSION}"
+if not os.path.exists(EMBEDDING_FILE):
+    print(f"❌ Error: {EMBEDDING_FILE} not found!")
+    print(f"💡 Generate it first with:")
+    print(f"   python localEmbedding.py --extension={EMBEDDING_EXTENSION}")
+    sys.exit(1)
 
 # Initialize SentenceTransformer once (global) for efficiency
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -472,15 +485,28 @@ def extract_cve_fields(data: dict, fallback_id: str) -> tuple[str, str, str, str
 
 def asking_llama_for_advice(cveDesp: str) -> str:
     """Recommend similar CVE using preloaded embedding model (optimized)."""
-    csv_path = 'CVEEmbeddings.csv'
+    # Load embeddings based on file extension
+    if EMBEDDING_EXTENSION == 'csv':
+        # CSV format
+        if MAX_EMBEDDING_ROWS is not None:
+            chunk_embeddings_df = pd.read_csv(EMBEDDING_FILE, nrows=MAX_EMBEDDING_ROWS)
+        else:
+            chunk_embeddings_df = pd.read_csv(EMBEDDING_FILE)
+        chunk_embeddings_df["embedding"] = chunk_embeddings_df["embedding"].apply(lambda x: np.fromstring(x.strip("[]"), sep=" "))
 
-    # Load CSV with row limit in demo mode
-    if MAX_EMBEDDING_ROWS is not None:
-        chunk_embeddings_df = pd.read_csv(csv_path, nrows=MAX_EMBEDDING_ROWS)
-    else:
-        chunk_embeddings_df = pd.read_csv(csv_path)
+    elif EMBEDDING_EXTENSION == 'pkl':
+        # Pickle format
+        with open(EMBEDDING_FILE, 'rb') as f:
+            data = pickle.load(f)
+        chunk_embeddings_df = pd.DataFrame(data)
+        if MAX_EMBEDDING_ROWS is not None:
+            chunk_embeddings_df = chunk_embeddings_df.head(MAX_EMBEDDING_ROWS)
 
-    chunk_embeddings_df["embedding"] = chunk_embeddings_df["embedding"].apply(lambda x: np.fromstring(x.strip("[]"), sep=" "))
+    elif EMBEDDING_EXTENSION == 'parquet':
+        # Parquet format
+        chunk_embeddings_df = pd.read_parquet(EMBEDDING_FILE)
+        if MAX_EMBEDDING_ROWS is not None:
+            chunk_embeddings_df = chunk_embeddings_df.head(MAX_EMBEDDING_ROWS)
 
     embeddings = torch.tensor(np.stack(chunk_embeddings_df["embedding"].tolist(), axis=0), dtype=torch.float32).to(device)
 

@@ -2,6 +2,7 @@ import os
 import json
 import argparse
 from datetime import datetime
+from tqdm import tqdm
 
 def extract_cve_info(data: dict) -> tuple[str, str, str, str] | None:
     """Extract CVE information from v5 or v4 schema.
@@ -52,7 +53,7 @@ def get_available_years(base_path: str) -> list[int]:
     return sorted(years)
 
 
-def process_cve_directory(folder_path: str, source_label: str, output_file: str, processed_cves: set):
+def process_cve_directory(folder_path: str, source_label: str, output_file: str, processed_cves: set, verbose: bool = False):
     """Process CVE files from a directory and append to output file.
 
     Args:
@@ -60,6 +61,7 @@ def process_cve_directory(folder_path: str, source_label: str, output_file: str,
         source_label: Label for logging (e.g., "V5 CVE Schema (2024)")
         output_file: Output file path
         processed_cves: Set of already processed CVE IDs (for deduplication)
+        verbose: Enable detailed logging (default: False)
 
     Returns:
         tuple: (processed_count, skipped_count)
@@ -72,44 +74,57 @@ def process_cve_directory(folder_path: str, source_label: str, output_file: str,
     skipped_count = 0
     print(f"\nProcessing {source_label} from: {folder_path}")
 
+    # Collect all files first
+    all_files = []
     for root, dirs, files in os.walk(folder_path):
         for file_name in files:
-            file_path = os.path.join(root, file_name)
+            all_files.append((root, file_name))
 
+    # Process files with progress bar or verbose output
+    file_iterator = all_files if verbose else tqdm(all_files, desc=f"  {source_label}", unit="file")
+
+    for root, file_name in file_iterator:
+        file_path = os.path.join(root, file_name)
+
+        if verbose:
             print(f"Currently reading file: {file_name}")
             print(f"Full path: {file_path}")
 
-            try:
-                with open(file_path, 'r', encoding='utf-8') as file:
-                    data = json.load(file)
+        try:
+            with open(file_path, 'r', encoding='utf-8') as file:
+                data = json.load(file)
 
-                result = extract_cve_info(data)
+            result = extract_cve_info(data)
 
-                if result:
-                    cve_number, vendor_name, product_name, description = result
+            if result:
+                cve_number, vendor_name, product_name, description = result
 
-                    # Check if already processed (V5 takes priority)
-                    if cve_number in processed_cves:
+                # Check if already processed (V5 takes priority)
+                if cve_number in processed_cves:
+                    if verbose:
                         print(f"Skipped (already processed): {cve_number}")
-                        skipped_count += 1
-                        continue
+                    skipped_count += 1
+                    continue
 
-                    text_content = (
-                        f"- CVE Number: {cve_number}, Vendor: {vendor_name}, "
-                        f"Product: {product_name}, Description: {description}\n\n"
-                    )
+                text_content = (
+                    f"- CVE Number: {cve_number}, Vendor: {vendor_name}, "
+                    f"Product: {product_name}, Description: {description}\n\n"
+                )
 
-                    with open(output_file, 'a', encoding='utf-8') as f:
-                        f.write(text_content)
+                with open(output_file, 'a', encoding='utf-8') as f:
+                    f.write(text_content)
+                    if verbose:
                         print("placed in")
 
-                    # Track processed CVE
-                    processed_cves.add(cve_number)
-                    processed_count += 1
-                else:
+                # Track processed CVE
+                processed_cves.add(cve_number)
+                processed_count += 1
+            else:
+                if verbose:
                     print(f"Unknown schema format in {file_path}")
 
-            except Exception as e:
+        except Exception as e:
+            if verbose:
                 print(f"Could not read file {file_path}: {e}")
 
     return processed_count, skipped_count
@@ -142,6 +157,11 @@ Examples:
         choices=['v5', 'v4', 'all'],
         default='v5',
         help='Schema to process: v5 (default, fastest), v4, or all (both with deduplication)'
+    )
+    parser.add_argument(
+        '--verbose', '-v',
+        action='store_true',
+        help='Enable detailed logging (default: show progress only)'
     )
     args = parser.parse_args()
 
@@ -195,20 +215,20 @@ Examples:
         if args.schema in ['v5', 'all']:
             # Process V5 schema
             if processed_cves is not None:
-                v5_count, _ = process_cve_directory(v5_folder, f"V5 CVE Schema ({year})", output_file, processed_cves)
+                v5_count, _ = process_cve_directory(v5_folder, f"V5 CVE Schema ({year})", output_file, processed_cves, args.verbose)
             else:
                 # No dedup needed for v5-only
-                v5_count, _ = process_cve_directory(v5_folder, f"V5 CVE Schema ({year})", output_file, set())
+                v5_count, _ = process_cve_directory(v5_folder, f"V5 CVE Schema ({year})", output_file, set(), args.verbose)
             total_v5_count += v5_count
 
         if args.schema in ['v4', 'all']:
             # Process V4 schema
             if processed_cves is not None:
-                v4_count, v4_skipped = process_cve_directory(v4_folder, f"V4 CVE Schema ({year})", output_file, processed_cves)
+                v4_count, v4_skipped = process_cve_directory(v4_folder, f"V4 CVE Schema ({year})", output_file, processed_cves, args.verbose)
                 total_v4_skipped += v4_skipped
             else:
                 # No dedup needed for v4-only
-                v4_count, _ = process_cve_directory(v4_folder, f"V4 CVE Schema ({year})", output_file, set())
+                v4_count, _ = process_cve_directory(v4_folder, f"V4 CVE Schema ({year})", output_file, set(), args.verbose)
             total_v4_count += v4_count
 
         # Print summary based on schema

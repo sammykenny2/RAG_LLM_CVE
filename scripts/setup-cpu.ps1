@@ -30,7 +30,6 @@ if (Test-Path $VenvPath) {
 
 # Use the venv's python directly (no activation needed)
 $VenvPython = Join-Path $VenvPath "Scripts\python.exe"
-$VenvPip = Join-Path $VenvPath "Scripts\pip.exe"
 
 # Upgrade pip
 Write-Host "Upgrading pip..." -ForegroundColor Green
@@ -39,13 +38,13 @@ Write-Host "Upgrading pip..." -ForegroundColor Green
 # Install PyTorch CPU version
 Write-Host ""
 Write-Host "Installing PyTorch (CPU-only)..." -ForegroundColor Green
-& $VenvPip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+& $VenvPython -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 
 # Install other dependencies
 Write-Host ""
 Write-Host "Installing project dependencies..." -ForegroundColor Green
 $RequirementsPath = Join-Path $ProjectRoot "requirements.txt"
-& $VenvPip install -r $RequirementsPath
+& $VenvPython -m pip install -r $RequirementsPath
 
 # Verify installation
 Write-Host ""

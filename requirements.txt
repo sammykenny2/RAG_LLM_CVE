@@ -15,5 +15,6 @@ torchaudio
 torchvision
 huggingface_hub
 pandas
+pyarrow
 reportlab
 spacy

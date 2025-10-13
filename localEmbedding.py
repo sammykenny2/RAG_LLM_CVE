@@ -4,6 +4,9 @@ import pandas as pd
 from spacy.lang.en import English
 from sentence_transformers import SentenceTransformer
 import torch
+import numpy as np
+import argparse
+import pickle
 
 def read_pdf(pdf_path):
     """Extract text from each page of the PDF and return as a list of dictionaries."""
@@ -20,8 +23,16 @@ def split(input_list, chunk_size):
     """Split a list into chunks of specified size."""
     return [input_list[i:i + chunk_size] for i in range(0, len(input_list), chunk_size)]
 
-def process_pdf(pdf_path, sentence_size, output_csv_path):
-    """Process PDF to extract text, split into chunks, generate embeddings, and save to CSV."""
+def process_pdf(pdf_path, sentence_size, output_path, batch_size, precision, extension):
+    """Process PDF to extract text, split into chunks, generate embeddings, and save to file."""
+    print(f"\n{'='*60}")
+    print(f"Configuration:")
+    print(f"  Chunk size: {sentence_size} sentences")
+    print(f"  Batch size: {batch_size}")
+    print(f"  Precision: {precision}")
+    print(f"  Output format: {extension}")
+    print(f"{'='*60}\n")
+
     texts = read_pdf(pdf_path)
 
     # Initialize spaCy
@@ -49,21 +60,100 @@ def process_pdf(pdf_path, sentence_size, output_csv_path):
     df = pd.DataFrame(chunks)
     dic_chunks = df.to_dict(orient="records")
 
-    # Initialize and use SentenceTransformer
-    embedding_model = SentenceTransformer(model_name_or_path="all-mpnet-base-v2", device="cpu")
-    if torch.cuda.is_available():
-        embedding_model.to("cuda")
+    # Initialize SentenceTransformer on correct device
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"Initializing embedding model on {device}...")
+    embedding_model = SentenceTransformer(model_name_or_path="all-mpnet-base-v2", device=device)
 
-    for item in tqdm(dic_chunks):
-        item["embedding"] = embedding_model.encode(item["sentence_chunk"])
+    # Batch encode all chunks (MUCH faster than one-by-one)
+    print(f"Generating embeddings for {len(dic_chunks)} chunks...")
+    sentence_list = [item["sentence_chunk"] for item in dic_chunks]
 
-    # Save embeddings to CSV
-    pd.DataFrame(dic_chunks).to_csv(output_csv_path, index=False)
+    # Encode all at once
+    embeddings = embedding_model.encode(
+        sentence_list,
+        batch_size=batch_size,
+        show_progress_bar=True,
+        convert_to_numpy=True
+    )
+
+    # Convert to desired precision if needed
+    if precision == 'float16':
+        embeddings = embeddings.astype(np.float16)
+        print(f"  └─ Converted embeddings to float16 (50% memory reduction)")
+
+    # Assign embeddings back to dict
+    for idx, item in enumerate(dic_chunks):
+        item["embedding"] = embeddings[idx]
+
+    # Save based on extension
+    print(f"\nSaving embeddings to {output_path}...")
+    if extension == 'csv':
+        pd.DataFrame(dic_chunks).to_csv(output_path, index=False)
+    elif extension == 'pkl':
+        with open(output_path, 'wb') as f:
+            pickle.dump(dic_chunks, f)
+    elif extension == 'parquet':
+        df_output = pd.DataFrame(dic_chunks)
+        df_output.to_parquet(output_path, compression='snappy')
+
+    print(f"✅ Generated: {output_path}")
+    print(f"💡 To use this file with theRag.py, run:")
+    print(f"   python theRag.py --extension={extension}")
 
 
 # Main execution
 if __name__ == "__main__":
-    pdf_path = input("Please enter the PDF file path with the .pdf extension: ")
-    sentence_size = 10
-    output_csv_path = input("Please enter the CSV file name to save embeddings (with .csv extension): ")
-    process_pdf(pdf_path, sentence_size, output_csv_path)
+    # Parse command-line arguments
+    parser = argparse.ArgumentParser(
+        description='Generate embeddings from PDF for RAG system',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python localEmbedding.py                              # Default (fast, pkl)
+  python localEmbedding.py --speed=normal --extension=csv   # High quality, CSV
+  python localEmbedding.py --speed=fastest --extension=parquet  # Maximum speed, smallest file
+        """
+    )
+    parser.add_argument(
+        '--speed',
+        type=str,
+        choices=['normal', 'fast', 'fastest'],
+        default='fast',
+        help='Processing speed: normal (float32, conservative), fast (float16, recommended, default), fastest (float16 + larger chunks)'
+    )
+    parser.add_argument(
+        '--extension',
+        type=str,
+        choices=['csv', 'pkl', 'parquet'],
+        default='pkl',
+        help='Output format: csv (text), pkl (default, balanced), parquet (optimal, requires pyarrow)'
+    )
+    args = parser.parse_args()
+
+    # Configure based on speed level
+    if args.speed == 'normal':
+        SENTENCE_SIZE = 10
+        BATCH_SIZE = 32
+        PRECISION = 'float32'
+        print("Running in NORMAL mode (baseline quality)")
+    elif args.speed == 'fast':
+        SENTENCE_SIZE = 10
+        BATCH_SIZE = 64
+        PRECISION = 'float16'
+        print("Running in FAST mode (recommended)")
+    else:  # fastest
+        SENTENCE_SIZE = 20
+        BATCH_SIZE = 128
+        PRECISION = 'float16'
+        print("Running in FASTEST mode (aggressive optimization)")
+
+    # Get user input
+    pdf_path = input("Please enter the PDF file path (with .pdf extension): ")
+    base_name = input("Please enter the output file name (without extension): ")
+
+    # Construct output path with extension
+    output_path = f"{base_name}.{args.extension}"
+
+    # Process PDF
+    process_pdf(pdf_path, SENTENCE_SIZE, output_path, BATCH_SIZE, PRECISION, args.extension)
