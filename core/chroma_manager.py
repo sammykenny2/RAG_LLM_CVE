@@ -46,7 +46,15 @@ class ChromaManager:
             db_path: Path to Chroma database directory (default from config)
             collection_name: Name of collection to use
         """
-        self.db_path = Path(db_path) if db_path else EMBEDDING_PATH
+        if db_path:
+            self.db_path = Path(db_path)
+        else:
+            # Use EMBEDDING_PATH + .chroma suffix for consistency
+            # EMBEDDING_PATH is base path (e.g., ./CVEEmbeddings)
+            # Chroma database should be ./CVEEmbeddings.chroma/
+            base_path = Path(EMBEDDING_PATH)
+            self.db_path = Path(f"{base_path}.chroma")
+
         self.collection_name = collection_name
         self.client = None
         self.collection = None
