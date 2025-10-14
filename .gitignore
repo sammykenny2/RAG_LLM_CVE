@@ -58,6 +58,8 @@ samples/
 # Model cache
 .cache/
 *.bin
+# Exception: Allow Chroma database files
+!CVEEmbeddings.chroma/**/*.bin
 transformers_cache/
 huggingface/
 
