@@ -120,11 +120,97 @@ python theRag.py --speed=fast --extension=chroma
 ✅ Knowledge base management (add/view sources)
 ✅ Real-time statistics and refresh
 
-### Next: Phase 2 (LangChain Implementation)
-- [ ] rag/langchain_impl.py using ConversationalRetrievalChain
-- [ ] web/webUI_v2.py with LangChain integration
-- [ ] Performance comparison: Phase 1 vs Phase 2
-- [ ] Refactor theRag.py to use core/ modules (optional)
+## [2025-10] Phase 2: LangChain Implementation
+
+### Added (LangChain RAG)
+- **rag/langchain_impl.py**: LangChain-based RAG system
+  - LangChainRAG class with automatic initialization
+  - HuggingFacePipeline wrapper for Llama model
+  - HuggingFaceEmbeddings for SentenceTransformer
+  - ConversationBufferWindowMemory (k=10 rounds, automatic management)
+  - ConversationalRetrievalChain for standardized RAG workflow
+  - Chroma vectorstore integration via LangChain
+  - query() with automatic conversation history
+  - summarize_report(), validate_cve_usage(), answer_question_about_report()
+  - process_report_for_cve_validation() for PDF processing
+  - add_document_to_kb() with automatic embedding generation
+  - get_kb_stats() and delete_source() for KB management
+
+### Added (LangChain Web UI)
+- **web/webUI_v2.py**: Gradio interface using LangChain
+  - Same Claude Projects-style layout as v1
+  - Uses LangChainRAG for backend
+  - Automatic memory management (no manual history tracking)
+  - Port 7861 (v1 uses 7860) - both can run simultaneously
+  - Clear labeling as "LangChain" version
+
+### Key Differences: Phase 1 vs Phase 2
+
+| Feature | Phase 1 (Pure Python) | Phase 2 (LangChain) |
+|---------|----------------------|---------------------|
+| **Conversation History** | Manual (deque with sliding window) | Automatic (ConversationBufferWindowMemory) |
+| **RAG Workflow** | Custom query + retrieval logic | ConversationalRetrievalChain |
+| **Embeddings** | Direct SentenceTransformer usage | HuggingFaceEmbeddings abstraction |
+| **Vector Store** | Direct Chroma client queries | LangChain Chroma wrapper |
+| **Code Complexity** | Lower-level control, more code | Higher-level abstraction, less code |
+| **Flexibility** | Full control over every step | Standardized patterns |
+| **Learning Curve** | Understand RAG internals | Understand LangChain APIs |
+| **Port** | 7860 | 7861 |
+
+### Usage Examples
+```bash
+# Phase 1 (Pure Python, port 7860)
+python web/webUI_v1.py
+
+# Phase 2 (LangChain, port 7861)
+python web/webUI_v2.py
+
+# Both can run simultaneously for A/B comparison
+```
+
+### Repository Structure (Final)
+```
+RAG_LLM_CVE/
+├── core/                  # Shared modules
+│   ├── models.py          # Llama loading
+│   ├── embeddings.py      # SentenceTransformer
+│   ├── chroma_manager.py  # Chroma CRUD
+│   ├── cve_lookup.py      # CVE parsing
+│   └── pdf_processor.py   # PDF extraction
+├── rag/                   # RAG implementations
+│   ├── pure_python.py     # Phase 1: Manual implementation
+│   └── langchain_impl.py  # Phase 2: LangChain (new)
+├── web/                   # Web interfaces
+│   ├── webUI_v1.py        # Phase 1: Pure Python
+│   └── webUI_v2.py        # Phase 2: LangChain (new)
+├── theRag.py              # CLI application (original)
+├── localEmbedding.py      # Generate embeddings
+├── addToEmbeddings.py     # Incremental updates
+├── extractCVE.py          # Export CVE descriptions
+├── config.py              # Configuration loader
+├── .env.example           # Config template
+└── FEATURE_PLAN.md        # Planning document
+```
+
+### Phase 2 Goals Achieved
+✅ LangChain RAG implementation with chains and memory
+✅ ConversationalRetrievalChain integration
+✅ Automatic conversation history management
+✅ Gradio web UI using LangChain backend
+✅ Coexistence with Phase 1 (both can run simultaneously)
+✅ Standardized LangChain patterns throughout
+✅ All imports tested and working
+
+### Performance Comparison (To Be Tested)
+- [ ] Memory usage: Phase 1 vs Phase 2
+- [ ] Response latency: Phase 1 vs Phase 2
+- [ ] Conversation quality: Phase 1 vs Phase 2
+- [ ] Code maintainability assessment
+
+### Recommendations
+- **Phase 1 (pure_python.py)**: Best for learning RAG internals, maximum control
+- **Phase 2 (langchain_impl.py)**: Best for production, standardized patterns, community support
+- **Both**: Keep both for comparison and fallback options
 
 ## [2025-01] Embedding Optimization & File Format Support
 
