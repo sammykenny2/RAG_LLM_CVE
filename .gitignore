@@ -48,7 +48,12 @@ MANIFEST
 # Claude Code
 .claude/
 
+# Environment configuration
+.env
+
 # Project specific
+# Temporary upload directory (web UI)
+temp_uploads/
 # Generated CVE description files
 CVEDescription*.txt
 

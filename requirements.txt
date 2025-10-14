@@ -19,3 +19,5 @@ pyarrow
 chromadb
 reportlab
 spacy
+python-dotenv
+gradio
