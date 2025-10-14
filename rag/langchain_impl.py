@@ -11,9 +11,8 @@ from pathlib import Path
 from langchain.chains import ConversationalRetrievalChain
 from langchain.memory import ConversationBufferWindowMemory
 from langchain.prompts import PromptTemplate
-from langchain_community.llms import HuggingFacePipeline
-from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_community.vectorstores import Chroma
+from langchain_huggingface import HuggingFacePipeline, HuggingFaceEmbeddings
+from langchain_chroma import Chroma
 
 # Transformers
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
@@ -87,9 +86,9 @@ class LangChainRAG:
         }
 
         if use_fp16:
-            model_kwargs["torch_dtype"] = torch.float16
+            model_kwargs["dtype"] = torch.float16
         else:
-            model_kwargs["torch_dtype"] = "auto"
+            model_kwargs["dtype"] = "auto"
 
         if use_sdpa:
             try:
@@ -114,7 +113,8 @@ class LangChainRAG:
             temperature=LLM_TEMPERATURE,
             top_p=LLM_TOP_P,
             do_sample=True,
-            pad_token_id=tokenizer.eos_token_id
+            pad_token_id=tokenizer.eos_token_id,
+            return_full_text=False  # Only return generated text, not prompt
         )
 
         self.llm = HuggingFacePipeline(pipeline=pipe)

@@ -21,7 +21,7 @@ import numpy as np
 
 # Import configuration
 from config import (
-    GRADIO_SERVER_PORT,
+    GRADIO_SERVER_PORT_V2,
     GRADIO_SHARE,
     GRADIO_SERVER_NAME,
     DEFAULT_SPEED,
@@ -95,7 +95,7 @@ def chat_respond(message: str, history: list):
 
     Args:
         message: User message
-        history: Gradio chat history format [[user, bot], ...]
+        history: Gradio chat history (messages format: list of dicts with 'role' and 'content')
 
     Yields:
         tuple: (empty string for input clear, updated history)
@@ -105,7 +105,8 @@ def chat_respond(message: str, history: list):
         return
 
     # Immediately show user message with "Thinking..." placeholder
-    history.append([message, "💭 Thinking..."])
+    history.append({"role": "user", "content": message})
+    history.append({"role": "assistant", "content": "💭 Thinking..."})
     yield "", history
 
     try:
@@ -113,12 +114,12 @@ def chat_respond(message: str, history: list):
         response = rag_system.query(question=message)
 
         # Update history with actual response
-        history[-1][1] = response
+        history[-1]["content"] = response
         yield "", history
 
     except Exception as e:
         error_msg = f"❌ Error: {str(e)}"
-        history[-1][1] = error_msg
+        history[-1]["content"] = error_msg
         yield "", history
 
 def upload_for_validation(file) -> str:
@@ -313,7 +314,8 @@ def create_interface():
                 chatbot = gr.Chatbot(
                     label="Chat History (Auto-managed by LangChain Memory)",
                     height=500,
-                    show_copy_button=True
+                    show_copy_button=True,
+                    type='messages'  # Use OpenAI-style message format
                 )
 
                 with gr.Row():
@@ -436,12 +438,12 @@ def main():
     demo = create_interface()
 
     print(f"\nLaunching web UI (LangChain version)...")
-    print(f"  Server: {GRADIO_SERVER_NAME}:{GRADIO_SERVER_PORT + 1}")  # +1 to avoid conflict with v1
+    print(f"  Server: {GRADIO_SERVER_NAME}:{GRADIO_SERVER_PORT_V2}")
     print(f"  Share: {GRADIO_SHARE}")
 
     demo.launch(
         server_name=GRADIO_SERVER_NAME,
-        server_port=GRADIO_SERVER_PORT + 1,  # Use different port
+        server_port=GRADIO_SERVER_PORT_V2,
         share=GRADIO_SHARE,
         inbrowser=True
     )

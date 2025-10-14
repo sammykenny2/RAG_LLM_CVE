@@ -1,23 +1,39 @@
-psycopg2-binary
-langchain_community
-qdrant-client
-langchain_qdrant
-PyMuPDF
-accelerate
-# bitsandbytes - Not used in current implementation, Linux-only
-langchain
-sentence-transformers
-transformers
-tqdm
+# Core ML frameworks
 torch
-tokenizers
-torchaudio
 torchvision
+torchaudio
+transformers
+tokenizers
+accelerate
+sentence-transformers
 huggingface_hub
+
+# LangChain (Phase 2 - V2 only)
+langchain
+langchain_community
+langchain-huggingface
+langchain-chroma
+langchain_qdrant
+
+# Vector databases
+chromadb
+qdrant-client
+
+# PDF processing
+PyMuPDF
+
+# Data processing
 pandas
 pyarrow
-chromadb
+
+# Web UI
+gradio
+
+# Utilities
+tqdm
+python-dotenv
+psycopg2-binary
 reportlab
 spacy
-python-dotenv
-gradio
+
+# bitsandbytes - Not used in current implementation, Linux-only
