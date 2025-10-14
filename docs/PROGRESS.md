@@ -102,13 +102,13 @@ RAG_LLM_CVE/
 python web/webUI_v1.py
 
 # Add PDFs to knowledge base
-python addToEmbeddings.py --source=pdf --files=report1.pdf,report2.pdf
+python cli/addToEmbeddings.py --source=pdf --files=report1.pdf,report2.pdf
 
 # Add CVE data to knowledge base
-python addToEmbeddings.py --source=cve --year=2024 --schema=v5
+python cli/addToEmbeddings.py --source=cve --year=2024 --schema=v5
 
 # Original CLI (still works)
-python theRag.py --speed=fast --extension=chroma
+python cli/theRag.py --speed=fast --extension=chroma
 ```
 
 ### Phase 1 Goals Achieved
