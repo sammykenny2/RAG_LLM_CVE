@@ -238,16 +238,16 @@ python cli/theRag.py --mode=full --speed=fastest --extension=parquet --schema=v5
 
 The project includes two web interfaces with Claude Projects-style layout:
 
-#### Phase 1: Pure Python (webUI_v1.py)
+#### Phase 1: Pure Python (webUI.py)
 ```bash
 # Launch Phase 1 web interface (port 7860)
-python web/webUI_v1.py
+python web/webUI.py
 
 # With custom configuration
-python web/webUI_v1.py --server-name=0.0.0.0 --server-port=7860
+python web/webUI.py --server-name=0.0.0.0 --server-port=7860
 
 # Share publicly (generates temporary URL)
-python web/webUI_v1.py --share
+python web/webUI.py --share
 ```
 
 **Features**:
@@ -257,10 +257,10 @@ python web/webUI_v1.py --share
 - View and manage knowledge base sources
 - Manual conversation history management (last 10 rounds)
 
-#### Phase 2: LangChain (webUI_v2.py)
+#### Phase 2: LangChain (webUILangChain.py)
 ```bash
 # Launch Phase 2 web interface (port 7861)
-python web/webUI_v2.py
+python web/webUILangChain.py
 
 # Both versions can run simultaneously for comparison
 ```
@@ -480,8 +480,8 @@ RAG_LLM_CVE/
 │   ├── pure_python.py   # Phase 1: Manual implementation
 │   └── langchain_impl.py # Phase 2: LangChain wrapper
 ├── web/                 # Web interfaces
-│   ├── webUI_v1.py      # Phase 1: Pure Python (port 7860)
-│   └── webUI_v2.py      # Phase 2: LangChain (port 7861)
+│   ├── webUI.py         # Phase 1: Pure Python (port 7860)
+│   └── webUILangChain.py # Phase 2: LangChain (port 7861)
 ├── docs/                # Documentation
 │   ├── ARCHITECTURE.md  # System architecture and technical details
 │   └── PROGRESS.md      # Completed changes and upcoming features
@@ -543,15 +543,15 @@ RAG_LLM_CVE/
   - Supports: v5/v4 schema selection, year ranges, deduplication
 
 #### Web Interfaces
-- **`web/webUI_v1.py`** (Phase 1: Pure Python):
+- **`web/webUI.py`** (Phase 1: Pure Python):
   - Uses: `rag/pure_python.py`, `core/` modules
   - Port: 7860
   - Features: Chat, validation, knowledge base management
 
-- **`web/webUI_v2.py`** (Phase 2: LangChain):
+- **`web/webUILangChain.py`** (Phase 2: LangChain):
   - Uses: `rag/langchain_impl.py`, `core/` modules
   - Port: 7861
-  - Features: Same as v1, with LangChain automatic memory
+  - Features: Same as Phase 1, with LangChain automatic memory
 
 #### Core Modules (Shared)
 - **`core/models.py`**: Llama model initialization and generation

@@ -89,8 +89,8 @@ RAG_LLM_CVE/
 │   ├── pure_python.py   # Phase 1: Manual implementation
 │   └── langchain_impl.py # Phase 2: LangChain chains
 └── web/                 # Web interfaces
-    ├── webUI_v1.py      # Phase 1: Pure Python (port 7860)
-    └── webUI_v2.py      # Phase 2: LangChain (port 7861)
+    ├── webUI.py         # Phase 1: Pure Python (port 7860)
+    └── webUILangChain.py # Phase 2: LangChain (port 7861)
 ```
 
 ### Phase 1: Pure Python Implementation
@@ -98,7 +98,7 @@ RAG_LLM_CVE/
 **Architecture**: Direct component usage with manual orchestration
 
 ```
-webUI_v1.py (Gradio)
+webUI.py (Gradio)
     ↓
 rag/pure_python.py (PureRAG class)
     ↓
@@ -124,7 +124,7 @@ core/pdf_processor.py
 **Architecture**: LangChain abstractions with automatic orchestration
 
 ```
-webUI_v2.py (Gradio)
+webUILangChain.py (Gradio)
     ↓
 rag/langchain_impl.py (LangChainRAG class)
     ↓
@@ -201,7 +201,7 @@ metadata = {
 - **Backend**: Gradio → FastAPI/Starlette → Uvicorn (ASGI server)
 - **Frontend**: Auto-generated React UI from Python code
 - **Communication**: HTTP/WebSocket for real-time updates
-- **Deployment**: Single command (`python webUI_v1.py`)
+- **Deployment**: Single command (`python webUI.py`)
 
 **Advantages**:
 - No HTML/CSS/JavaScript required
@@ -218,8 +218,8 @@ metadata = {
   - Bottom: Knowledge Base management (add/view/delete sources)
 
 **Deployment Options**:
-1. **Local**: `python web/webUI_v1.py` (http://localhost:7860)
-2. **Share Link**: `python web/webUI_v1.py --share` (https://xxx.gradio.live)
+1. **Local**: `python web/webUI.py` (http://localhost:7860)
+2. **Share Link**: `python web/webUI.py --share` (https://xxx.gradio.live)
 3. **Production**: Docker + Nginx (optional)
 
 ## Runtime Architecture

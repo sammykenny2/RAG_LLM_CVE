@@ -66,8 +66,8 @@ EMBEDDING_BATCH_SIZE = int(os.getenv('EMBEDDING_BATCH_SIZE', '64'))
 # Web UI Configuration
 # =============================================================================
 
-GRADIO_SERVER_PORT = int(os.getenv('GRADIO_SERVER_PORT', '7860'))  # Phase 1 (Pure Python)
-GRADIO_SERVER_PORT_V2 = int(os.getenv('GRADIO_SERVER_PORT_V2', '7861'))  # Phase 2 (LangChain)
+GRADIO_SERVER_PORT = int(os.getenv('GRADIO_SERVER_PORT', '7860'))  # webUI.py (Pure Python)
+GRADIO_SERVER_PORT_LANGCHAIN = int(os.getenv('GRADIO_SERVER_PORT_LANGCHAIN', '7861'))  # webUILangChain.py (LangChain)
 GRADIO_SHARE = os.getenv('GRADIO_SHARE', 'False').lower() == 'true'
 GRADIO_SERVER_NAME = os.getenv('GRADIO_SERVER_NAME', '127.0.0.1')
 MAX_FILE_UPLOAD_SIZE_MB = int(os.getenv('MAX_FILE_UPLOAD_SIZE_MB', '50'))
@@ -165,8 +165,8 @@ def print_config():
     print(f"  EMBEDDING_BATCH_SIZE: {EMBEDDING_BATCH_SIZE}")
 
     print("\nWeb UI:")
-    print(f"  GRADIO_SERVER_PORT: {GRADIO_SERVER_PORT} (V1 - Pure Python)")
-    print(f"  GRADIO_SERVER_PORT_V2: {GRADIO_SERVER_PORT_V2} (V2 - LangChain)")
+    print(f"  GRADIO_SERVER_PORT: {GRADIO_SERVER_PORT} (webUI.py)")
+    print(f"  GRADIO_SERVER_PORT_LANGCHAIN: {GRADIO_SERVER_PORT_LANGCHAIN} (webUILangChain.py)")
     print(f"  GRADIO_SHARE: {GRADIO_SHARE}")
     print(f"  GRADIO_SERVER_NAME: {GRADIO_SERVER_NAME}")
     print(f"  MAX_FILE_UPLOAD_SIZE_MB: {MAX_FILE_UPLOAD_SIZE_MB}")

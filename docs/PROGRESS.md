@@ -56,7 +56,7 @@ This file tracks completed changes and upcoming features for the project.
   - Configurable chunk size and batch size
   - Automatic metadata tagging
   - Progress bars and error handling
-- **web/webUI_v1.py**: Gradio web interface (Phase 1)
+- **web/webUI.py**: Gradio web interface (Phase 1)
   - Claude Projects-style layout (left chat + right settings/KB)
   - Conversational AI with 10-round history
   - Upload PDF for validation (summarize/validate/add to KB)
@@ -82,7 +82,7 @@ RAG_LLM_CVE/
 ├── rag/                   # RAG implementations
 │   └── pure_python.py     # Phase 1: Pure Python RAG
 ├── web/                   # Web interfaces
-│   └── webUI_v1.py        # Phase 1: Gradio UI
+│   └── webUI.py           # Phase 1: Gradio UI
 ├── theRag.py              # CLI application (original)
 ├── localEmbedding.py      # Generate embeddings
 ├── addToEmbeddings.py     # Incremental updates (new)
@@ -99,7 +99,7 @@ RAG_LLM_CVE/
 ### Usage Examples
 ```bash
 # Web UI (recommended for demos)
-python web/webUI_v1.py
+python web/webUI.py
 
 # Add PDFs to knowledge base
 python cli/addToEmbeddings.py --source=pdf --files=report1.pdf,report2.pdf
@@ -137,11 +137,11 @@ python cli/theRag.py --speed=fast --extension=chroma
   - get_kb_stats() and delete_source() for KB management
 
 ### Added (LangChain Web UI)
-- **web/webUI_v2.py**: Gradio interface using LangChain
-  - Same Claude Projects-style layout as v1
+- **web/webUILangChain.py**: Gradio interface using LangChain
+  - Same Claude Projects-style layout as Phase 1
   - Uses LangChainRAG for backend
   - Automatic memory management (no manual history tracking)
-  - Port 7861 (v1 uses 7860) - both can run simultaneously
+  - Port 7861 (Phase 1 uses 7860) - both can run simultaneously
   - Clear labeling as "LangChain" version
 
 ### Key Differences: Phase 1 vs Phase 2
@@ -160,10 +160,10 @@ python cli/theRag.py --speed=fast --extension=chroma
 ### Usage Examples
 ```bash
 # Phase 1 (Pure Python, port 7860)
-python web/webUI_v1.py
+python web/webUI.py
 
 # Phase 2 (LangChain, port 7861)
-python web/webUI_v2.py
+python web/webUILangChain.py
 
 # Both can run simultaneously for A/B comparison
 ```
@@ -181,8 +181,8 @@ RAG_LLM_CVE/
 │   ├── pure_python.py     # Phase 1: Manual implementation
 │   └── langchain_impl.py  # Phase 2: LangChain (new)
 ├── web/                   # Web interfaces
-│   ├── webUI_v1.py        # Phase 1: Pure Python
-│   └── webUI_v2.py        # Phase 2: LangChain (new)
+│   ├── webUI.py           # Phase 1: Pure Python
+│   └── webUILangChain.py  # Phase 2: LangChain (new)
 ├── theRag.py              # CLI application (original)
 ├── localEmbedding.py      # Generate embeddings
 ├── addToEmbeddings.py     # Incremental updates

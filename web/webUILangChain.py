@@ -21,7 +21,7 @@ import numpy as np
 
 # Import configuration
 from config import (
-    GRADIO_SERVER_PORT_V2,
+    GRADIO_SERVER_PORT_LANGCHAIN,
     GRADIO_SHARE,
     GRADIO_SERVER_NAME,
     DEFAULT_SPEED,
@@ -438,12 +438,12 @@ def main():
     demo = create_interface()
 
     print(f"\nLaunching web UI (LangChain version)...")
-    print(f"  Server: {GRADIO_SERVER_NAME}:{GRADIO_SERVER_PORT_V2}")
+    print(f"  Server: {GRADIO_SERVER_NAME}:{GRADIO_SERVER_PORT_LANGCHAIN}")
     print(f"  Share: {GRADIO_SHARE}")
 
     demo.launch(
         server_name=GRADIO_SERVER_NAME,
-        server_port=GRADIO_SERVER_PORT_V2,
+        server_port=GRADIO_SERVER_PORT_LANGCHAIN,
         share=GRADIO_SHARE,
         inbrowser=True
     )
