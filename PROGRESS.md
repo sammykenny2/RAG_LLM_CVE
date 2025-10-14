@@ -2,6 +2,130 @@
 
 This file tracks completed changes and upcoming features for the project.
 
+## [2025-10] Phase 1: Web UI and Knowledge Base Enhancement
+
+### Added (Core Modules)
+- **config.py**: Unified configuration system with `.env` support
+  - Path configuration (Chroma DB, CVE feeds, temp uploads)
+  - Model names (Llama, SentenceTransformer)
+  - Default parameters (speed, mode, schema, precision)
+  - RAG configuration (history length, retrieval top-k, chunk settings)
+  - Web UI configuration (port, share, server name)
+  - Validation functions and debug utilities
+- **core/models.py**: Llama model loading and management
+  - LlamaModel class with FP16, SDPA, low memory support
+  - Backward compatible utility functions
+  - Automatic device selection
+  - cleanup() for resource management
+- **core/embeddings.py**: SentenceTransformer wrapper
+  - EmbeddingModel class with batch encoding
+  - retrieve_top_k() for similarity search
+  - Precision conversion (float32/float16)
+  - Backward compatible utility functions
+- **core/chroma_manager.py**: Chroma vector database CRUD
+  - ChromaManager class for database operations
+  - add_documents() with metadata support
+  - query() with filtering
+  - delete_by_source() for source removal
+  - get_stats() and list_sources() for management
+  - Metadata schema: source_type, source_name, added_date, chunk_index, precision
+- **core/cve_lookup.py**: CVE JSON parsing (V4/V5)
+  - lookup_cve() for single CVE lookup
+  - batch_lookup_cves() for multiple CVEs
+  - extract_cves_regex() for regex extraction
+  - format_cve_description() for output formatting
+- **core/pdf_processor.py**: PDF text extraction
+  - PDFProcessor class with PyMuPDF
+  - extract_text() and extract_text_by_pages()
+  - extract_cve_context() for context windows
+
+### Added (RAG Implementation)
+- **rag/pure_python.py**: Conversation-aware RAG (Phase 1)
+  - ConversationHistory class (fixed-size deque, last 10 rounds)
+  - PureRAG class with full RAG workflow
+  - query() with history-aware context retrieval
+  - summarize_report() for executive summaries
+  - validate_cve_usage() for CVE correctness checking
+  - answer_question_about_report() for Q&A
+  - process_report_for_cve_validation() for PDF + CVE lookup
+
+### Added (Tools and Web UI)
+- **addToEmbeddings.py**: Incremental knowledge base updates
+  - Add PDFs: `--source=pdf --files=report.pdf,report2.pdf`
+  - Add CVE data: `--source=cve --year=2024 --schema=v5`
+  - Configurable chunk size and batch size
+  - Automatic metadata tagging
+  - Progress bars and error handling
+- **web/webUI_v1.py**: Gradio web interface (Phase 1)
+  - Claude Projects-style layout (left chat + right settings/KB)
+  - Conversational AI with 10-round history
+  - Upload PDF for validation (summarize/validate/add to KB)
+  - Knowledge base management (add/view/refresh)
+  - Real-time statistics display
+  - Analysis settings (speed/mode/schema dropdowns)
+  - Auto-launch browser on startup
+
+### Changed
+- **.gitignore**: Added `.env` and `temp_uploads/` exclusions
+- **requirements.txt**: Added `python-dotenv` and `gradio`
+- Repository structure: Added `core/`, `rag/`, `web/` directories
+
+### Repository Structure (Updated)
+```
+RAG_LLM_CVE/
+├── core/                  # Shared modules (Phase 1)
+│   ├── models.py          # Llama loading
+│   ├── embeddings.py      # SentenceTransformer
+│   ├── chroma_manager.py  # Chroma CRUD
+│   ├── cve_lookup.py      # CVE parsing
+│   └── pdf_processor.py   # PDF extraction
+├── rag/                   # RAG implementations
+│   └── pure_python.py     # Phase 1: Pure Python RAG
+├── web/                   # Web interfaces
+│   └── webUI_v1.py        # Phase 1: Gradio UI
+├── theRag.py              # CLI application (original)
+├── localEmbedding.py      # Generate embeddings
+├── addToEmbeddings.py     # Incremental updates (new)
+├── extractCVE.py          # Export CVE descriptions
+├── config.py              # Configuration loader (new)
+├── .env.example           # Config template (new)
+├── .env                   # Local config (gitignored)
+├── FEATURE_PLAN.md        # Planning document (new)
+├── CLAUDE.md              # User guide
+├── ARCHITECTURE.md        # Technical details
+└── PROGRESS.md            # This file
+```
+
+### Usage Examples
+```bash
+# Web UI (recommended for demos)
+python web/webUI_v1.py
+
+# Add PDFs to knowledge base
+python addToEmbeddings.py --source=pdf --files=report1.pdf,report2.pdf
+
+# Add CVE data to knowledge base
+python addToEmbeddings.py --source=cve --year=2024 --schema=v5
+
+# Original CLI (still works)
+python theRag.py --speed=fast --extension=chroma
+```
+
+### Phase 1 Goals Achieved
+✅ Core modules created and tested (all imports successful)
+✅ Configuration system with .env support
+✅ Incremental knowledge base updates (PDFs and CVE data)
+✅ Conversation-aware RAG implementation
+✅ Gradio web UI with Claude Projects-style layout
+✅ Knowledge base management (add/view sources)
+✅ Real-time statistics and refresh
+
+### Next: Phase 2 (LangChain Implementation)
+- [ ] rag/langchain_impl.py using ConversationalRetrievalChain
+- [ ] web/webUI_v2.py with LangChain integration
+- [ ] Performance comparison: Phase 1 vs Phase 2
+- [ ] Refactor theRag.py to use core/ modules (optional)
+
 ## [2025-01] Embedding Optimization & File Format Support
 
 ### Added (localEmbedding.py)
