@@ -19,7 +19,10 @@ def get_path(env_var: str, default: str) -> Path:
     path_str = os.getenv(env_var, default)
     return Path(path_str)
 
-CHROMA_DB_PATH = get_path('CHROMA_DB_PATH', './CVEEmbeddings.chroma')
+# Embedding base path (without extension)
+# Usage: f"{EMBEDDING_PATH}.{extension}" where extension is csv, pkl, parquet, or chroma
+EMBEDDING_PATH = get_path('EMBEDDING_PATH', './embeddings/CVEEmbeddings')
+
 CVE_V5_PATH = get_path('CVE_V5_PATH', '../cvelistV5/cves')
 CVE_V4_PATH = get_path('CVE_V4_PATH', '../cvelist')
 TEMP_UPLOAD_DIR = get_path('TEMP_UPLOAD_DIR', './temp_uploads')
@@ -94,13 +97,13 @@ LLM_TOP_P = float(os.getenv('LLM_TOP_P', '0.9'))
 # Path Validation
 # =============================================================================
 
-def validate_paths(check_cve_feeds=True, check_chroma=True):
+def validate_paths(check_cve_feeds=True, check_embeddings=False):
     """
     Validate that required paths exist.
 
     Args:
         check_cve_feeds: Whether to check CVE feed paths
-        check_chroma: Whether to check Chroma database path
+        check_embeddings: Whether to check embedding path (disabled by default as files are generated)
 
     Returns:
         list: List of error messages (empty if all valid)
@@ -113,8 +116,16 @@ def validate_paths(check_cve_feeds=True, check_chroma=True):
         if not CVE_V4_PATH.exists():
             errors.append(f"CVE V4 path not found: {CVE_V4_PATH}")
 
-    if check_chroma and not CHROMA_DB_PATH.exists():
-        errors.append(f"Chroma database not found: {CHROMA_DB_PATH}")
+    if check_embeddings:
+        # Check if at least one embedding format exists
+        embedding_exists = any([
+            Path(f"{EMBEDDING_PATH}.chroma").exists(),
+            Path(f"{EMBEDDING_PATH}.pkl").exists(),
+            Path(f"{EMBEDDING_PATH}.csv").exists(),
+            Path(f"{EMBEDDING_PATH}.parquet").exists()
+        ])
+        if not embedding_exists:
+            errors.append(f"No embedding files found at: {EMBEDDING_PATH}.*")
 
     return errors
 
@@ -128,7 +139,7 @@ def print_config():
     print("RAG_LLM_CVE Configuration")
     print("=" * 60)
     print("\nPaths:")
-    print(f"  CHROMA_DB_PATH: {CHROMA_DB_PATH}")
+    print(f"  EMBEDDING_PATH: {EMBEDDING_PATH}")
     print(f"  CVE_V5_PATH: {CVE_V5_PATH}")
     print(f"  CVE_V4_PATH: {CVE_V4_PATH}")
     print(f"  TEMP_UPLOAD_DIR: {TEMP_UPLOAD_DIR}")
@@ -171,7 +182,7 @@ if __name__ == "__main__":
     print_config()
 
     # Validate paths
-    errors = validate_paths(check_cve_feeds=True, check_chroma=True)
+    errors = validate_paths(check_cve_feeds=True, check_embeddings=True)
     if errors:
         print("\n⚠️ Configuration Errors:")
         for error in errors:

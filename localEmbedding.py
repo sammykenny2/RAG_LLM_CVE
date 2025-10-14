@@ -16,7 +16,8 @@ from config import (
     CHUNK_SIZE,
     EMBEDDING_BATCH_SIZE,
     EMBEDDING_PRECISION,
-    EMBEDDING_MODEL_NAME
+    EMBEDDING_MODEL_NAME,
+    EMBEDDING_PATH
 )
 
 def read_pdf(pdf_path):
@@ -208,12 +209,14 @@ Examples:
         PRECISION = EMBEDDING_PRECISION
         print(f"Running in FASTEST mode (aggressive optimization) - chunk_size={CHUNK_SIZE * 2}, batch_size={EMBEDDING_BATCH_SIZE * 2}, precision={EMBEDDING_PRECISION}")
 
-    # Get user input
+    # Get user input for PDF path
     pdf_path = input("Please enter the PDF file path (with .pdf extension): ")
-    base_name = input("Please enter the output file name (without extension): ")
 
-    # Construct output path with extension (consistent naming for all formats)
-    output_path = f"{base_name}.{args.extension}"
+    # Construct output path from EMBEDDING_PATH with extension
+    output_path = f"{EMBEDDING_PATH}.{args.extension}"
+
+    print(f"\nOutput will be saved to: {output_path}")
+    print(f"(Configure via EMBEDDING_PATH in .env to change location)\n")
 
     # Process PDF
     process_pdf(pdf_path, SENTENCE_SIZE, output_path, BATCH_SIZE, PRECISION, args.extension)

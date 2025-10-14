@@ -25,7 +25,6 @@ from core.pdf_processor import PDFProcessor
 
 # Import configuration
 from config import (
-    CHROMA_DB_PATH,
     LLAMA_MODEL_NAME,
     EMBEDDING_MODEL_NAME,
     CONVERSATION_HISTORY_LENGTH,

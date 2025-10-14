@@ -10,7 +10,7 @@ from typing import List, Dict, Optional, Union
 
 # Import configuration
 from config import (
-    CHROMA_DB_PATH,
+    EMBEDDING_PATH,
     RETRIEVAL_TOP_K,
     VERBOSE_LOGGING
 )
@@ -46,7 +46,7 @@ class ChromaManager:
             db_path: Path to Chroma database directory (default from config)
             collection_name: Name of collection to use
         """
-        self.db_path = Path(db_path) if db_path else CHROMA_DB_PATH
+        self.db_path = Path(db_path) if db_path else EMBEDDING_PATH
         self.collection_name = collection_name
         self.client = None
         self.collection = None

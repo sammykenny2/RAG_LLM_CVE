@@ -60,6 +60,7 @@ from config import (
     DEFAULT_EMBEDDING_FORMAT,
     EMBEDDING_MODEL_NAME,
     LLAMA_MODEL_NAME,
+    EMBEDDING_PATH,
     CVE_V5_PATH,
     CVE_V4_PATH
 )
@@ -162,8 +163,8 @@ if USE_CUDNN_OPTIMIZATIONS:
 
 llamaSug = ""
 
-# Check embedding file/directory exists (consistent naming: CVEEmbeddings.{extension})
-EMBEDDING_FILE = f"CVEEmbeddings.{EMBEDDING_EXTENSION}"
+# Check embedding file/directory exists (uses EMBEDDING_PATH from config)
+EMBEDDING_FILE = f"{EMBEDDING_PATH}.{EMBEDDING_EXTENSION}"
 
 if not os.path.exists(EMBEDDING_FILE):
     print(f"❌ Error: {EMBEDDING_FILE} not found!")

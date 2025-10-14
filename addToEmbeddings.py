@@ -33,7 +33,7 @@ from core.cve_lookup import extract_cve_numbers, format_second_set, extract_cve_
 
 # Import configuration
 from config import (
-    CHROMA_DB_PATH,
+    EMBEDDING_PATH,
     CVE_V5_PATH,
     CVE_V4_PATH,
     CHUNK_SIZE,
@@ -397,7 +397,7 @@ Examples:
     print(f"Chunk size: {args.chunk_size}")
     print(f"Batch size: {args.batch_size}")
     print(f"Precision: {args.precision}")
-    print(f"Database: {CHROMA_DB_PATH}")
+    print(f"Database: {EMBEDDING_PATH}")
 
     # Initialize components
     print(f"\nInitializing components...")

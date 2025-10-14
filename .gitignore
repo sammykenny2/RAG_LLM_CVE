@@ -57,8 +57,8 @@ temp_uploads/
 # Generated CVE description files
 CVEDescription*.txt
 
-# Sample files directory (test reports and demo data)
-samples/
+# Temporary files directory (test reports and demo data)
+temp/
 
 # Embedding files (auto-generated, large files)
 # Note: Existing files on GitHub will remain, but future changes won't be tracked
