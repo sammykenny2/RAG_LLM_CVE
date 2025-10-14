@@ -60,11 +60,16 @@ CVEDescription*.txt
 # Sample files directory (test reports and demo data)
 samples/
 
+# Embedding files (auto-generated, large files)
+# Note: Existing files on GitHub will remain, but future changes won't be tracked
+CVEEmbeddings.csv
+CVEEmbeddings.pkl
+CVEEmbeddings.parquet
+CVEEmbeddings.chroma/
+
 # Model cache
 .cache/
 *.bin
-# Exception: Allow Chroma database files
-!CVEEmbeddings.chroma/**/*.bin
 transformers_cache/
 huggingface/
 

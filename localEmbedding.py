@@ -1,7 +1,7 @@
 import fitz
 from tqdm.auto import tqdm
 import pandas as pd
-from spacy.lang.en import English
+import re
 from sentence_transformers import SentenceTransformer
 import torch
 import numpy as np
@@ -30,6 +30,27 @@ def read_pdf(pdf_path):
     
     return texts
 
+def split_sentences(text):
+    """
+    Split text into sentences using both English and Chinese punctuation.
+
+    Supports:
+    - Chinese punctuation: 。！？
+    - English punctuation: . ! ?
+    - Mixed content: handles both languages seamlessly
+
+    Args:
+        text: Input text to split
+
+    Returns:
+        list: List of sentences
+    """
+    # Pattern matches Chinese and English sentence-ending punctuation
+    pattern = r'[。！？.!?]+[\s\n]*'
+    sentences = re.split(pattern, text)
+    # Filter out empty strings and strip whitespace
+    return [s.strip() for s in sentences if s.strip()]
+
 def split(input_list, chunk_size):
     """Split a list into chunks of specified size."""
     return [input_list[i:i + chunk_size] for i in range(0, len(input_list), chunk_size)]
@@ -46,13 +67,10 @@ def process_pdf(pdf_path, sentence_size, output_path, batch_size, precision, ext
 
     texts = read_pdf(pdf_path)
 
-    # Initialize spaCy
-    nlp = English()
-    nlp.add_pipe("sentencizer")
-
-    # Add sentences to each page
+    # Split text into sentences (supports both English and Chinese)
+    print("Splitting text into sentences...")
     for item in tqdm(texts):
-        item["sentences"] = [str(sentence) for sentence in nlp(item["text"]).sents]
+        item["sentences"] = split_sentences(item["text"])
 
     # Split sentences into chunks
     for item in tqdm(texts):

@@ -16,7 +16,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 # Import LangChain RAG
 from rag.langchain_impl import LangChainRAG
-from spacy.lang.en import English
+import re
 import numpy as np
 
 # Import configuration
@@ -31,6 +31,31 @@ from config import (
     EMBEDDING_BATCH_SIZE,
     EMBEDDING_PRECISION
 )
+
+# =============================================================================
+# Utility functions
+# =============================================================================
+
+def split_sentences(text):
+    """
+    Split text into sentences using both English and Chinese punctuation.
+
+    Supports:
+    - Chinese punctuation: 。！？
+    - English punctuation: . ! ?
+    - Mixed content: handles both languages seamlessly
+
+    Args:
+        text: Input text to split
+
+    Returns:
+        list: List of sentences
+    """
+    # Pattern matches Chinese and English sentence-ending punctuation
+    pattern = r'[。！？.!?]+[\s\n]*'
+    sentences = re.split(pattern, text)
+    # Filter out empty strings and strip whitespace
+    return [s.strip() for s in sentences if s.strip()]
 
 # =============================================================================
 # Global state
@@ -192,17 +217,12 @@ def add_pdf_to_kb(file, source_name: str = None) -> str:
 
         print(f"Adding {source_name} to knowledge base...")
 
-        # Initialize spaCy for chunking
-        nlp = English()
-        nlp.add_pipe("sentencizer")
-
         # Extract text
         pdf_processor = PDFProcessor()
         text = pdf_processor.extract_text(file_path)
 
-        # Split into sentences and chunks
-        doc = nlp(text)
-        sentences = [str(sent) for sent in doc.sents]
+        # Split into sentences (supports both English and Chinese)
+        sentences = split_sentences(text)
 
         # Create chunks
         chunks = []

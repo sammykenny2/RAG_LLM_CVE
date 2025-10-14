@@ -22,7 +22,7 @@ from pathlib import Path
 from datetime import datetime
 from tqdm.auto import tqdm
 import pandas as pd
-from spacy.lang.en import English
+import re
 import numpy as np
 
 # Import core modules
@@ -41,6 +41,27 @@ from config import (
     EMBEDDING_PRECISION,
     DEFAULT_SCHEMA
 )
+
+def split_sentences(text):
+    """
+    Split text into sentences using both English and Chinese punctuation.
+
+    Supports:
+    - Chinese punctuation: 。！？
+    - English punctuation: . ! ?
+    - Mixed content: handles both languages seamlessly
+
+    Args:
+        text: Input text to split
+
+    Returns:
+        list: List of sentences
+    """
+    # Pattern matches Chinese and English sentence-ending punctuation
+    pattern = r'[。！？.!?]+[\s\n]*'
+    sentences = re.split(pattern, text)
+    # Filter out empty strings and strip whitespace
+    return [s.strip() for s in sentences if s.strip()]
 
 def split_list(input_list, chunk_size):
     """Split a list into chunks of specified size."""
@@ -65,10 +86,6 @@ def process_pdf_files(
         batch_size: Batch size for embedding generation
         precision: 'float32' or 'float16'
     """
-    # Initialize spaCy sentencizer
-    nlp = English()
-    nlp.add_pipe("sentencizer")
-
     # Initialize PDF processor
     pdf_processor = PDFProcessor(periodic_gc=True)
 
@@ -88,10 +105,9 @@ def process_pdf_files(
         print("Extracting text from PDF...")
         all_text = pdf_processor.extract_text(pdf_path)
 
-        # Split into sentences
+        # Split into sentences (supports both English and Chinese)
         print("Splitting into sentences...")
-        doc = nlp(all_text)
-        sentences = [str(sent) for sent in doc.sents]
+        sentences = split_sentences(all_text)
 
         # Create chunks
         print(f"Creating chunks (size={chunk_size})...")
