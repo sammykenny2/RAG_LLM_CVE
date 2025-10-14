@@ -4,8 +4,8 @@
 
 $ErrorActionPreference = "Stop"
 
-# Get project root directory (parent of scripts folder)
-$ProjectRoot = Split-Path -Parent $PSScriptRoot
+# Get project root directory (two levels up: scripts/windows/ -> scripts/ -> root)
+$ProjectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "  RAG_LLM_CVE Environment Setup (CPU)" -ForegroundColor Cyan

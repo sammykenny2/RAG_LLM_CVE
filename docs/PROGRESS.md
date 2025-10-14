@@ -50,13 +50,13 @@ This file tracks completed changes and upcoming features for the project.
   - process_report_for_cve_validation() for PDF + CVE lookup
 
 ### Added (Tools and Web UI)
-- **addToEmbeddings.py**: Incremental knowledge base updates
+- **add_to_embeddings.py**: Incremental knowledge base updates
   - Add PDFs: `--source=pdf --files=report.pdf,report2.pdf`
   - Add CVE data: `--source=cve --year=2024 --schema=v5`
   - Configurable chunk size and batch size
   - Automatic metadata tagging
   - Progress bars and error handling
-- **web/webUI.py**: Gradio web interface (Phase 1)
+- **web/web_ui.py**: Gradio web interface (Phase 1)
   - Claude Projects-style layout (left chat + right settings/KB)
   - Conversational AI with 10-round history
   - Upload PDF for validation (summarize/validate/add to KB)
@@ -83,10 +83,10 @@ RAG_LLM_CVE/
 │   └── pure_python.py     # Phase 1: Pure Python RAG
 ├── web/                   # Web interfaces
 │   └── webUI.py           # Phase 1: Gradio UI
-├── theRag.py              # CLI application (original)
-├── localEmbedding.py      # Generate embeddings
-├── addToEmbeddings.py     # Incremental updates (new)
-├── extractCVE.py          # Export CVE descriptions
+├── validate_report.py     # CLI application (original)
+├── build_embeddings.py    # Generate embeddings
+├── add_to_embeddings.py   # Incremental updates (new)
+├── extract_cve.py         # Export CVE descriptions
 ├── config.py              # Configuration loader (new)
 ├── .env.example           # Config template (new)
 ├── .env                   # Local config (gitignored)
@@ -99,16 +99,16 @@ RAG_LLM_CVE/
 ### Usage Examples
 ```bash
 # Web UI (recommended for demos)
-python web/webUI.py
+python web/web_ui.py
 
 # Add PDFs to knowledge base
-python cli/addToEmbeddings.py --source=pdf --files=report1.pdf,report2.pdf
+python cli/add_to_embeddings.py --source=pdf --files=report1.pdf,report2.pdf
 
 # Add CVE data to knowledge base
-python cli/addToEmbeddings.py --source=cve --year=2024 --schema=v5
+python cli/add_to_embeddings.py --source=cve --year=2024 --schema=v5
 
 # Original CLI (still works)
-python cli/theRag.py --speed=fast --extension=chroma
+python cli/validate_report.py --speed=fast --extension=chroma
 ```
 
 ### Phase 1 Goals Achieved
@@ -137,7 +137,7 @@ python cli/theRag.py --speed=fast --extension=chroma
   - get_kb_stats() and delete_source() for KB management
 
 ### Added (LangChain Web UI)
-- **web/webUILangChain.py**: Gradio interface using LangChain
+- **web/web_ui_langchain.py**: Gradio interface using LangChain
   - Same Claude Projects-style layout as Phase 1
   - Uses LangChainRAG for backend
   - Automatic memory management (no manual history tracking)
@@ -160,10 +160,10 @@ python cli/theRag.py --speed=fast --extension=chroma
 ### Usage Examples
 ```bash
 # Phase 1 (Pure Python, port 7860)
-python web/webUI.py
+python web/web_ui.py
 
 # Phase 2 (LangChain, port 7861)
-python web/webUILangChain.py
+python web/web_ui_langchain.py
 
 # Both can run simultaneously for A/B comparison
 ```
@@ -181,12 +181,12 @@ RAG_LLM_CVE/
 │   ├── pure_python.py     # Phase 1: Manual implementation
 │   └── langchain_impl.py  # Phase 2: LangChain (new)
 ├── web/                   # Web interfaces
-│   ├── webUI.py           # Phase 1: Pure Python
-│   └── webUILangChain.py  # Phase 2: LangChain (new)
-├── theRag.py              # CLI application (original)
-├── localEmbedding.py      # Generate embeddings
-├── addToEmbeddings.py     # Incremental updates
-├── extractCVE.py          # Export CVE descriptions
+│   ├── web_ui.py          # Phase 1: Pure Python
+│   └── web_ui_langchain.py # Phase 2: LangChain (new)
+├── validate_report.py     # CLI application (original)
+├── build_embeddings.py    # Generate embeddings
+├── add_to_embeddings.py   # Incremental updates
+├── extract_cve.py         # Export CVE descriptions
 ├── config.py              # Configuration loader
 ├── .env.example           # Config template
 └── FEATURE_PLAN.md        # Planning document
@@ -214,7 +214,7 @@ RAG_LLM_CVE/
 
 ## [2025-01] Embedding Optimization & File Format Support
 
-### Added (localEmbedding.py)
+### Added (build_embeddings.py)
 - **Three-level speed control** via `--speed` parameter:
   - `normal`: Baseline quality (float32, batch_size=32, chunk_size=10)
   - `fast`: Recommended default (float16, batch_size=64, chunk_size=10, 1.5-2x faster)
@@ -228,7 +228,7 @@ RAG_LLM_CVE/
 - **Automatic device selection**: Initializes SentenceTransformer directly on correct device (CPU/CUDA)
 - **Progress reporting**: Real-time progress bar during batch encoding
 
-### Added (theRag.py)
+### Added (validate_report.py)
 - **Embedding format support** via `--extension` parameter:
   - Reads `CVEEmbeddings.{extension}` (or directory for chroma) based on parameter
   - Supports csv, pkl (default), parquet, chroma formats
@@ -236,20 +236,20 @@ RAG_LLM_CVE/
 - **Format-specific loading**: Optimized readers for each format
   - Chroma: Direct vector database queries (no need to load all embeddings into memory)
 
-### Added (extractCVE.py)
+### Added (extract_cve.py)
 - **Verbose mode** via `--verbose` or `-v` flag:
   - Default: Shows progress bar with file count
   - Verbose: Shows detailed file-by-file logging
 - **Progress bar integration** using tqdm (non-verbose mode)
 
 ### Changed
-- **localEmbedding.py**: Default output format changed to `.pkl` (from `.csv`)
-- **theRag.py**: Default embedding format changed to `.pkl` (from `.csv`)
+- **build_embeddings.py**: Default output format changed to `.pkl` (from `.csv`)
+- **validate_report.py**: Default embedding format changed to `.pkl` (from `.csv`)
 - **requirements.txt**: Added `pyarrow` for parquet support, `chromadb` for vector database support
 - User input flow: Now asks for base filename without extension (for file-based formats)
-- Chroma format creates directory instead of file (e.g., `CVEEmbeddings/` instead of `CVEEmbeddings.pkl`)
+- Chroma format creates directory instead of file (e.g., `cve_embeddings/` instead of `cve_embeddings.pkl`)
 
-### Performance Impact (localEmbedding.py)
+### Performance Impact (build_embeddings.py)
 - **Batch encoding speedup**:
   - GPU (GTX 1660 Ti): 10-20x faster than one-by-one encoding
   - CPU: 3-5x faster than one-by-one encoding
@@ -269,16 +269,16 @@ RAG_LLM_CVE/
 
 ### Verified Configurations
 ✅ **Tested and verified working (2025-01-13)**:
-- `localEmbedding.py --speed=fast --extension=pkl` → CVEEmbeddings.pkl (~33 MB)
-- `localEmbedding.py --speed=fastest --extension=parquet` → CVEEmbeddings.parquet (~24 MB)
-- `theRag.py --speed=fast --extension=pkl` → Successfully loaded and processed
-- `theRag.py --speed=fastest --extension=parquet` → Successfully loaded and processed
+- `build_embeddings.py --speed=fast --extension=pkl` → cve_embeddings.pkl (~33 MB)
+- `build_embeddings.py --speed=fastest --extension=parquet` → cve_embeddings.parquet (~24 MB)
+- `validate_report.py --speed=fast --extension=pkl` → Successfully loaded and processed
+- `validate_report.py --speed=fastest --extension=parquet` → Successfully loaded and processed
 - All combinations tested on CUDA 11.8 (GTX 1660 Ti) without issues
 
 ✅ **Chroma integration (2025-01-14)**:
 - Added chromadb to requirements.txt
-- `localEmbedding.py --extension=chroma` → Creates CVEEmbeddings/ directory with vector database
-- `theRag.py --extension=chroma` → Direct query from Chroma database (no memory loading)
+- `build_embeddings.py --extension=chroma` → Creates cve_embeddings/ directory with vector database
+- `validate_report.py --extension=chroma` → Direct query from Chroma database (no memory loading)
 - Persistent client mode (no server required)
 
 ### Bug Fixes
@@ -448,18 +448,19 @@ RAG_LLM_CVE/
 ### Repository Structure
 ```
 RAG_LLM_CVE/
-├── theRag.py              # Main application (optimized)
-├── localEmbedding.py      # Generate embedding database
-├── extractCVE.py          # Export CVE descriptions (optional)
-├── cleanupLlamaCache.py   # Clean model cache
+├── validate_report.py     # Main application (optimized)
+├── build_embeddings.py    # Generate embedding database
+├── extract_cve.py         # Export CVE descriptions (optional)
+├── cleanup_cache.py       # Clean model cache
 ├── CLAUDE.md              # Project documentation and user guide
 ├── ARCHITECTURE.md        # Technical details and system architecture
 ├── PROGRESS.md            # This file (completed changes and upcoming features)
 ├── requirements.txt       # Python dependencies
 ├── scripts/               # Environment setup scripts
-│   ├── setup-cpu.ps1
-│   ├── setup-cuda118.ps1
-│   └── setup-cuda124.ps1
+│   └── windows/           # Windows PowerShell scripts
+│       ├── Setup-CPU.ps1
+│       ├── Setup-CUDA118.ps1
+│       └── Setup-CUDA124.ps1
 └── .venv-*/               # Virtual environments (gitignored)
 ```
 

@@ -62,10 +62,10 @@ temp/
 
 # Embedding files (auto-generated, large files)
 # Note: Existing files on GitHub will remain, but future changes won't be tracked
-CVEEmbeddings.csv
-CVEEmbeddings.pkl
-CVEEmbeddings.parquet
-CVEEmbeddings.chroma/
+cve_embeddings.csv
+cve_embeddings.pkl
+cve_embeddings.parquet
+cve_embeddings.chroma/
 
 # Model cache
 .cache/

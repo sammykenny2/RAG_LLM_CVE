@@ -38,7 +38,7 @@ Use PowerShell scripts in `scripts/` directory. These scripts create isolated vi
 
 **CPU-only** (no GPU required):
 ```powershell
-.\scripts\setup-cpu.ps1
+.\scripts\windows\Setup-CPU.ps1
 ```
 Creates `.venv-cpu` with PyTorch CPU version (~200MB download)
 
@@ -47,7 +47,7 @@ Creates `.venv-cpu` with PyTorch CPU version (~200MB download)
 # First install CUDA Toolkit 11.8:
 # https://developer.nvidia.com/cuda-11-8-0-download-archive
 
-.\scripts\setup-cuda118.ps1
+.\scripts\windows\Setup-CUDA118.ps1
 ```
 Creates `.venv-cuda118` with PyTorch + CUDA 11.8 (~2.5GB download)
 
@@ -56,7 +56,7 @@ Creates `.venv-cuda118` with PyTorch + CUDA 11.8 (~2.5GB download)
 # First install CUDA Toolkit 12.4:
 # https://developer.nvidia.com/cuda-12-4-0-download-archive
 
-.\scripts\setup-cuda124.ps1
+.\scripts\windows\Setup-CUDA124.ps1
 ```
 Creates `.venv-cuda124` with PyTorch + CUDA 12.4 (~2.5GB download)
 
@@ -99,7 +99,7 @@ pip install -r requirements.txt
 Choose based on your hardware (see Installation section above):
 ```powershell
 # Example for RTX 4060
-.\scripts\setup-cuda124.ps1
+.\scripts\windows\Setup-CUDA124.ps1
 .\.venv-cuda124\Scripts\Activate.ps1
 ```
 
@@ -112,23 +112,23 @@ huggingface-cli login
 ### Step 3: Build Embedding Database (one-time setup)
 ```bash
 # Default (recommended: fast speed, pkl format)
-python cli/localEmbedding.py
+python cli/build_embeddings.py
 # When prompted, enter PDF path and output file name (without extension)
-# Outputs: CVEEmbeddings.pkl (~2-5 minutes on GPU, 10-20 minutes on CPU)
+# Outputs: cve_embeddings.pkl (~2-5 minutes on GPU, 10-20 minutes on CPU)
 
 # Speed levels
-python cli/localEmbedding.py --speed=normal    # Baseline quality (float32, slower)
-python cli/localEmbedding.py --speed=fast      # Recommended (default): float16, 1.5-2x faster
-python cli/localEmbedding.py --speed=fastest   # Maximum speed: float16 + larger chunks, 2-3x faster
+python cli/build_embeddings.py --speed=normal    # Baseline quality (float32, slower)
+python cli/build_embeddings.py --speed=fast      # Recommended (default): float16, 1.5-2x faster
+python cli/build_embeddings.py --speed=fastest   # Maximum speed: float16 + larger chunks, 2-3x faster
 
 # Output formats (affects file size and read speed)
-python cli/localEmbedding.py --extension=csv      # Text format, largest (~95 MB)
-python cli/localEmbedding.py --extension=pkl      # Pickle (default), balanced (~33 MB)
-python cli/localEmbedding.py --extension=parquet  # Optimal: smallest (~24 MB), fastest read, requires pyarrow
-python cli/localEmbedding.py --extension=chroma   # Vector database, no server required, best for large datasets
+python cli/build_embeddings.py --extension=csv      # Text format, largest (~95 MB)
+python cli/build_embeddings.py --extension=pkl      # Pickle (default), balanced (~33 MB)
+python cli/build_embeddings.py --extension=parquet  # Optimal: smallest (~24 MB), fastest read, requires pyarrow
+python cli/build_embeddings.py --extension=chroma   # Vector database, no server required, best for large datasets
 
 # Combined example
-python cli/localEmbedding.py --speed=fastest --extension=parquet
+python cli/build_embeddings.py --speed=fastest --extension=parquet
 ```
 
 **Format comparison**:
@@ -140,22 +140,22 @@ python cli/localEmbedding.py --speed=fastest --extension=parquet
 ### Step 4: (Optional) Extract CVE Reference Text
 ```bash
 # Extract current year from V5 (default, fastest, shows progress bar)
-python cli/extractCVE.py
+python cli/extract_cve.py
 
 # Extract specific year from V5
-python cli/extractCVE.py --year=2024
+python cli/extract_cve.py --year=2024
 
 # Extract from V4 only
-python cli/extractCVE.py --schema=v4
+python cli/extract_cve.py --schema=v4
 
 # Extract from both V5 and V4 (with deduplication, slower)
-python cli/extractCVE.py --schema=all
+python cli/extract_cve.py --schema=all
 
 # Extract all years from both schemas
-python cli/extractCVE.py --year=all --schema=all
+python cli/extract_cve.py --year=all --schema=all
 
 # Enable detailed logging (for debugging)
-python cli/extractCVE.py --verbose
+python cli/extract_cve.py --verbose
 
 # Output file naming:
 # - Single year: CVEDescription2024.txt
@@ -174,29 +174,29 @@ python cli/extractCVE.py --verbose
 ### Step 5: Analyze Threat Intelligence Reports
 ```bash
 # Default (uses fast speed, full mode, v5→v4 fallback schema, pkl embeddings)
-python cli/theRag.py
+python cli/validate_report.py
 
 # Demo mode (faster, limited to 10 pages)
-python cli/theRag.py --mode=demo
+python cli/validate_report.py --mode=demo
 
 # Speed levels (optimize LLM performance)
-python cli/theRag.py --speed=normal   # Baseline, maximum precision (FP32)
-python cli/theRag.py --speed=fast     # Recommended (default): FP16 + optimized cache
-python cli/theRag.py --speed=fastest  # Maximum speed: +low temperature +SDPA
+python cli/validate_report.py --speed=normal   # Baseline, maximum precision (FP32)
+python cli/validate_report.py --speed=fast     # Recommended (default): FP16 + optimized cache
+python cli/validate_report.py --speed=fastest  # Maximum speed: +low temperature +SDPA
 
 # Embedding file format (must match localEmbedding.py output)
-python cli/theRag.py --extension=csv      # Read CVEEmbeddings.csv
-python cli/theRag.py --extension=pkl      # Read CVEEmbeddings.pkl (default)
-python cli/theRag.py --extension=parquet  # Read CVEEmbeddings.parquet (fastest file-based)
-python cli/theRag.py --extension=chroma   # Read CVEEmbeddings/ (vector database, optimized)
+python cli/validate_report.py --extension=csv      # Read cve_embeddings.csv
+python cli/validate_report.py --extension=pkl      # Read cve_embeddings.pkl (default)
+python cli/validate_report.py --extension=parquet  # Read cve_embeddings.parquet (fastest file-based)
+python cli/validate_report.py --extension=chroma   # Read cve_embeddings/ (vector database, optimized)
 
 # Use specific CVE schema
-python cli/theRag.py --schema=v5      # V5 only
-python cli/theRag.py --schema=v4      # V4 only
-python cli/theRag.py --schema=all     # V5→V4 fallback (default)
+python cli/validate_report.py --schema=v5      # V5 only
+python cli/validate_report.py --schema=v4      # V4 only
+python cli/validate_report.py --schema=all     # V5→V4 fallback (default)
 
 # Combine all parameters
-python cli/theRag.py --mode=full --speed=fastest --extension=parquet --schema=v5
+python cli/validate_report.py --mode=full --speed=fastest --extension=parquet --schema=v5
 ```
 
 **Speed options** (see docs/ARCHITECTURE.md for details):
@@ -238,16 +238,16 @@ python cli/theRag.py --mode=full --speed=fastest --extension=parquet --schema=v5
 
 The project includes two web interfaces with Claude Projects-style layout:
 
-#### Phase 1: Pure Python (webUI.py)
+#### Phase 1: Pure Python (web_ui.py)
 ```bash
 # Launch Phase 1 web interface (port 7860)
-python web/webUI.py
+python web/web_ui.py
 
 # With custom configuration
-python web/webUI.py --server-name=0.0.0.0 --server-port=7860
+python web/web_ui.py --server-name=0.0.0.0 --server-port=7860
 
 # Share publicly (generates temporary URL)
-python web/webUI.py --share
+python web/web_ui.py --share
 ```
 
 **Features**:
@@ -257,10 +257,10 @@ python web/webUI.py --share
 - View and manage knowledge base sources
 - Manual conversation history management (last 10 rounds)
 
-#### Phase 2: LangChain (webUILangChain.py)
+#### Phase 2: LangChain (web_ui_langchain.py)
 ```bash
 # Launch Phase 2 web interface (port 7861)
-python web/webUILangChain.py
+python web/web_ui_langchain.py
 
 # Both versions can run simultaneously for comparison
 ```
@@ -333,22 +333,22 @@ Use `cli/addToEmbeddings.py` to add new documents to an existing knowledge base:
 
 ```bash
 # Add single PDF
-python cli/addToEmbeddings.py --pdf=new_report.pdf
+python cli/add_to_embeddings.py --pdf=new_report.pdf
 
 # Add multiple PDFs
-python cli/addToEmbeddings.py --pdf="report1.pdf,report2.pdf,report3.pdf"
+python cli/add_to_embeddings.py --pdf="report1.pdf,report2.pdf,report3.pdf"
 
 # Add CVE data by year
-python cli/addToEmbeddings.py --cve-year=2024
+python cli/add_to_embeddings.py --cve-year=2024
 
 # Specify target database (must already exist)
-python cli/addToEmbeddings.py --pdf=report.pdf --target=CVEEmbeddings.pkl
+python cli/add_to_embeddings.py --pdf=report.pdf --target=cve_embeddings.pkl
 
 # With custom speed and format
-python cli/addToEmbeddings.py --pdf=report.pdf --speed=fast --extension=chroma
+python cli/add_to_embeddings.py --pdf=report.pdf --speed=fast --extension=chroma
 ```
 
-**Note**: The target embedding database must already exist (created by `cli/localEmbedding.py`). This tool only adds incremental updates.
+**Note**: The target embedding database must already exist (created by `cli/build_embeddings.py`). This tool only adds incremental updates.
 
 ## Configuration System
 
@@ -358,7 +358,7 @@ The project uses `.env` for configuration. Copy `.env.example` to `.env` and cus
 
 ```bash
 # Paths
-CHROMA_DB_PATH=./CVEEmbeddings.chroma
+CHROMA_DB_PATH=./cve_embeddings.chroma
 CVE_V5_PATH=../cvelistV5/cves
 CVE_V4_PATH=../cvelist
 
@@ -438,7 +438,7 @@ from config import (
 ### Embedding & Retrieval (Optimized)
 - **Global SentenceTransformer**: Loaded once at startup (not per-call)
 - Model: `all-mpnet-base-v2` (768 dimensions)
-- Loads `CVEEmbeddings.csv` with precomputed embeddings
+- Loads `cve_embeddings.csv` with precomputed embeddings
 - Returns top-3 (demo) or top-5 (full) chunks via dot product scoring
 - Feeds retrieved context + query to Llama for CVE recommendation
 
@@ -463,11 +463,11 @@ from config import (
 ```
 RAG_LLM_CVE/
 ├── cli/                 # Command-line tools
-│   ├── theRag.py        # Main RAG application
-│   ├── localEmbedding.py # Generate embedding database
-│   ├── addToEmbeddings.py # Incremental knowledge base updates
-│   ├── extractCVE.py    # Optional: export CVE descriptions
-│   └── cleanupLlamaCache.py # Clean Llama model cache
+│   ├── validate_report.py # Main RAG application
+│   ├── build_embeddings.py # Generate embedding database
+│   ├── add_to_embeddings.py # Incremental knowledge base updates
+│   ├── extract_cve.py   # Optional: export CVE descriptions
+│   └── cleanup_cache.py # Clean Llama model cache
 ├── core/                # Shared modules (Phase 1 & 2)
 │   ├── __init__.py
 │   ├── models.py        # Llama model loading wrapper
@@ -480,23 +480,24 @@ RAG_LLM_CVE/
 │   ├── pure_python.py   # Phase 1: Manual implementation
 │   └── langchain_impl.py # Phase 2: LangChain wrapper
 ├── web/                 # Web interfaces
-│   ├── webUI.py         # Phase 1: Pure Python (port 7860)
-│   └── webUILangChain.py # Phase 2: LangChain (port 7861)
+│   ├── web_ui.py        # Phase 1: Pure Python (port 7860)
+│   └── web_ui_langchain.py # Phase 2: LangChain (port 7861)
 ├── docs/                # Documentation
 │   ├── ARCHITECTURE.md  # System architecture and technical details
 │   └── PROGRESS.md      # Completed changes and upcoming features
 ├── embeddings/          # Prebuilt embedding files (tracked)
-│   ├── CVEEmbeddings.csv
-│   ├── CVEEmbeddings.pkl
-│   ├── CVEEmbeddings.parquet
-│   └── CVEEmbeddings.chroma/
+│   ├── cve_embeddings.csv
+│   ├── cve_embeddings.pkl
+│   ├── cve_embeddings.parquet
+│   └── cve_embeddings.chroma/
 ├── samples/             # Sample PDF files (tracked)
 │   ├── CVEDocument.pdf
 │   └── CVEpdf2024.pdf
 ├── scripts/             # Environment setup scripts
-│   ├── setup-cpu.ps1    # CPU-only environment
-│   ├── setup-cuda118.ps1 # CUDA 11.8 environment
-│   └── setup-cuda124.ps1 # CUDA 12.4 environment
+│   └── windows/         # Windows PowerShell scripts
+│       ├── Setup-CPU.ps1    # CPU-only environment
+│       ├── Setup-CUDA118.ps1 # CUDA 11.8 environment
+│       └── Setup-CUDA124.ps1 # CUDA 12.4 environment
 ├── config.py            # Unified configuration (loads from .env)
 ├── .env.example         # Configuration template (committed)
 ├── .env                 # Local configuration (gitignored)
@@ -522,19 +523,19 @@ RAG_LLM_CVE/
 ### Key File Interactions
 
 #### CLI Tools
-- **`cli/theRag.py`** (CLI RAG application):
-  - Reads: User PDF, `CVEEmbeddings.{extension}`, CVE JSON feeds
+- **`cli/validate_report.py`** (CLI RAG application):
+  - Reads: User PDF, `cve_embeddings.{extension}`, CVE JSON feeds
   - Uses: `core/` modules, embedding database
   - Outputs: Interactive menu with Summary/Validate/Q&A options
 
-- **`cli/localEmbedding.py`** (Initial embedding generation):
+- **`cli/build_embeddings.py`** (Initial embedding generation):
   - Reads: User-provided PDF corpus
-  - Writes: `CVEEmbeddings.{extension}` (csv/pkl/parquet/chroma)
+  - Writes: `cve_embeddings.{extension}` (csv/pkl/parquet/chroma)
   - Speed: normal (baseline), fast (default, 1.5-2x), fastest (2-3x)
 
 - **`cli/addToEmbeddings.py`** (Incremental updates):
-  - Reads: Existing `CVEEmbeddings.{extension}`, new PDFs
-  - Writes: Updated `CVEEmbeddings.{extension}` with new documents
+  - Reads: Existing `cve_embeddings.{extension}`, new PDFs
+  - Writes: Updated `cve_embeddings.{extension}` with new documents
   - Note: Target database must already exist
 
 - **`cli/extractCVE.py`** (CVE reference extraction):
@@ -543,12 +544,12 @@ RAG_LLM_CVE/
   - Supports: v5/v4 schema selection, year ranges, deduplication
 
 #### Web Interfaces
-- **`web/webUI.py`** (Phase 1: Pure Python):
+- **`web/web_ui.py`** (Phase 1: Pure Python):
   - Uses: `rag/pure_python.py`, `core/` modules
   - Port: 7860
   - Features: Chat, validation, knowledge base management
 
-- **`web/webUILangChain.py`** (Phase 2: LangChain):
+- **`web/web_ui_langchain.py`** (Phase 2: LangChain):
   - Uses: `rag/langchain_impl.py`, `core/` modules
   - Port: 7861
   - Features: Same as Phase 1, with LangChain automatic memory
@@ -589,12 +590,12 @@ RAG_LLM_CVE/
 - `all-mpnet-base-v2` from SentenceTransformers
 - 768-dimensional embeddings
 - **Globally initialized once** at startup (performance optimization)
-- Used for both corpus building (`cli/localEmbedding.py`) and query encoding (`cli/theRag.py`)
+- Used for both corpus building (`cli/build_embeddings.py`) and query encoding (`cli/validate_report.py`)
 
 ## Important Notes
 
 - **Sync CVE Feeds**: Ensure `../cvelistV5/` and `../cvelist/` are up-to-date to minimize "Could Not Find" fallbacks
-- **Embedding File Dependency**: `CVEEmbeddings.{extension}` must exist before running `cli/theRag.py`
+- **Embedding File Dependency**: `cve_embeddings.{extension}` must exist before running `cli/validate_report.py`
   - Generate with `cli/localEmbedding.py --extension={extension}`
   - `--extension` parameter must match between localEmbedding.py and theRag.py
   - Default: `.pkl` (balanced size/speed)
