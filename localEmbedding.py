@@ -9,6 +9,16 @@ import argparse
 import pickle
 import chromadb
 
+# Import configuration
+from config import (
+    DEFAULT_SPEED,
+    DEFAULT_EMBEDDING_FORMAT,
+    CHUNK_SIZE,
+    EMBEDDING_BATCH_SIZE,
+    EMBEDDING_PRECISION,
+    EMBEDDING_MODEL_NAME
+)
+
 def read_pdf(pdf_path):
     """Extract text from each page of the PDF and return as a list of dictionaries."""
     pdf = fitz.open(pdf_path)
@@ -64,7 +74,7 @@ def process_pdf(pdf_path, sentence_size, output_path, batch_size, precision, ext
     # Initialize SentenceTransformer on correct device
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Initializing embedding model on {device}...")
-    embedding_model = SentenceTransformer(model_name_or_path="all-mpnet-base-v2", device=device)
+    embedding_model = SentenceTransformer(model_name_or_path=EMBEDDING_MODEL_NAME, device=device)
 
     # Batch encode all chunks (MUCH faster than one-by-one)
     print(f"Generating embeddings for {len(dic_chunks)} chunks...")
@@ -151,34 +161,34 @@ Examples:
         '--speed',
         type=str,
         choices=['normal', 'fast', 'fastest'],
-        default='fast',
-        help='Processing speed: normal (float32, conservative), fast (float16, recommended, default), fastest (float16 + larger chunks)'
+        default=DEFAULT_SPEED,
+        help=f'Processing speed: normal (float32), fast (float16, recommended), fastest (float16 + larger chunks) (default: {DEFAULT_SPEED})'
     )
     parser.add_argument(
         '--extension',
         type=str,
         choices=['csv', 'pkl', 'parquet', 'chroma'],
-        default='pkl',
-        help='Output format: csv (text), pkl (default, balanced), parquet (optimal), chroma (vector database, no server)'
+        default=DEFAULT_EMBEDDING_FORMAT,
+        help=f'Output format: csv (text), pkl (pickle), parquet (optimal), chroma (vector database) (default: {DEFAULT_EMBEDDING_FORMAT})'
     )
     args = parser.parse_args()
 
     # Configure based on speed level
     if args.speed == 'normal':
-        SENTENCE_SIZE = 10
+        SENTENCE_SIZE = CHUNK_SIZE
         BATCH_SIZE = 32
         PRECISION = 'float32'
         print("Running in NORMAL mode (baseline quality)")
     elif args.speed == 'fast':
-        SENTENCE_SIZE = 10
-        BATCH_SIZE = 64
-        PRECISION = 'float16'
-        print("Running in FAST mode (recommended)")
+        SENTENCE_SIZE = CHUNK_SIZE
+        BATCH_SIZE = EMBEDDING_BATCH_SIZE
+        PRECISION = EMBEDDING_PRECISION
+        print(f"Running in FAST mode (recommended) - chunk_size={CHUNK_SIZE}, batch_size={EMBEDDING_BATCH_SIZE}, precision={EMBEDDING_PRECISION}")
     else:  # fastest
-        SENTENCE_SIZE = 20
-        BATCH_SIZE = 128
-        PRECISION = 'float16'
-        print("Running in FASTEST mode (aggressive optimization)")
+        SENTENCE_SIZE = CHUNK_SIZE * 2
+        BATCH_SIZE = EMBEDDING_BATCH_SIZE * 2
+        PRECISION = EMBEDDING_PRECISION
+        print(f"Running in FASTEST mode (aggressive optimization) - chunk_size={CHUNK_SIZE * 2}, batch_size={EMBEDDING_BATCH_SIZE * 2}, precision={EMBEDDING_PRECISION}")
 
     # Get user input
     pdf_path = input("Please enter the PDF file path (with .pdf extension): ")

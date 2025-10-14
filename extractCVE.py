@@ -4,6 +4,13 @@ import argparse
 from datetime import datetime
 from tqdm import tqdm
 
+# Import configuration
+from config import (
+    CVE_V5_PATH,
+    CVE_V4_PATH,
+    DEFAULT_SCHEMA
+)
+
 def extract_cve_info(data: dict) -> tuple[str, str, str, str] | None:
     """Extract CVE information from v5 or v4 schema.
 
@@ -155,8 +162,8 @@ Examples:
         '--schema',
         type=str,
         choices=['v5', 'v4', 'all'],
-        default='v5',
-        help='Schema to process: v5 (default, fastest), v4, or all (both with deduplication)'
+        default=DEFAULT_SCHEMA,
+        help=f'Schema to process: v5 (fastest), v4, or all (both with deduplication) (default: {DEFAULT_SCHEMA})'
     )
     parser.add_argument(
         '--verbose', '-v',
@@ -168,8 +175,8 @@ Examples:
     # Determine which years to process
     if args.year.lower() == 'all':
         # Scan directories based on schema selection
-        v5_years = get_available_years("../cvelistV5/cves") if args.schema in ['v5', 'all'] else []
-        v4_years = get_available_years("../cvelist") if args.schema in ['v4', 'all'] else []
+        v5_years = get_available_years(str(CVE_V5_PATH)) if args.schema in ['v5', 'all'] else []
+        v4_years = get_available_years(str(CVE_V4_PATH)) if args.schema in ['v4', 'all'] else []
         years = sorted(set(v5_years + v4_years))
         if not years:
             print(f"Error: No year directories found in CVE feeds for schema '{args.schema}'.")
@@ -208,8 +215,8 @@ Examples:
         print(f"Processing Year: {year}")
         print(f"{'='*60}")
 
-        v5_folder = f"../cvelistV5/cves/{year}"
-        v4_folder = f"../cvelist/{year}"
+        v5_folder = str(CVE_V5_PATH / str(year))
+        v4_folder = str(CVE_V4_PATH / str(year))
 
         # Process based on schema selection
         if args.schema in ['v5', 'all']:

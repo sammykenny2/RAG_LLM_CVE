@@ -52,16 +52,28 @@ from sentence_transformers import util, SentenceTransformer
 # Configuration
 # ============================================================================
 
+# Import configuration
+from config import (
+    DEFAULT_SPEED,
+    DEFAULT_MODE,
+    DEFAULT_SCHEMA,
+    DEFAULT_EMBEDDING_FORMAT,
+    EMBEDDING_MODEL_NAME,
+    LLAMA_MODEL_NAME,
+    CVE_V5_PATH,
+    CVE_V4_PATH
+)
+
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description='CVE RAG Analysis Tool with Multi-Level Optimization')
-parser.add_argument('--mode', choices=['demo', 'full'], default='full',
-                    help='Run mode: demo (memory-optimized) or full (complete features)')
-parser.add_argument('--schema', type=str, choices=['v5', 'v4', 'all'], default='all',
-                    help='CVE schema to use: v5 (CVE 5.0 only), v4 (CVE 4.0 only), or all (v5→v4 fallback, default)')
-parser.add_argument('--speed', type=str, choices=['normal', 'fast', 'fastest'], default='fast',
-                    help='Optimization level: normal=baseline (chunk-aware only), fast=recommended (default, +FP16), fastest=aggressive (+lower temp +SDPA)')
-parser.add_argument('--extension', type=str, choices=['csv', 'pkl', 'parquet', 'chroma'], default='pkl',
-                    help='Embedding file extension: csv (text), pkl (default, balanced), parquet (optimal), chroma (vector database, no server)')
+parser.add_argument('--mode', choices=['demo', 'full'], default=DEFAULT_MODE,
+                    help=f'Run mode: demo (memory-optimized) or full (complete features) (default: {DEFAULT_MODE})')
+parser.add_argument('--schema', type=str, choices=['v5', 'v4', 'all'], default=DEFAULT_SCHEMA,
+                    help=f'CVE schema to use: v5 (CVE 5.0 only), v4 (CVE 4.0 only), or all (v5→v4 fallback) (default: {DEFAULT_SCHEMA})')
+parser.add_argument('--speed', type=str, choices=['normal', 'fast', 'fastest'], default=DEFAULT_SPEED,
+                    help=f'Optimization level: normal=baseline, fast=recommended (+FP16), fastest=aggressive (+lower temp +SDPA) (default: {DEFAULT_SPEED})')
+parser.add_argument('--extension', type=str, choices=['csv', 'pkl', 'parquet', 'chroma'], default=DEFAULT_EMBEDDING_FORMAT,
+                    help=f'Embedding file extension: csv, pkl, parquet, chroma (default: {DEFAULT_EMBEDDING_FORMAT})')
 args = parser.parse_args()
 
 DEMO_MODE = (args.mode == 'demo')
@@ -161,7 +173,7 @@ if not os.path.exists(EMBEDDING_FILE):
 
 # Initialize SentenceTransformer once (global) for efficiency
 device = "cuda" if torch.cuda.is_available() else "cpu"
-embedding_model = SentenceTransformer(model_name_or_path="all-mpnet-base-v2", device=device)
+embedding_model = SentenceTransformer(model_name_or_path=EMBEDDING_MODEL_NAME, device=device)
 
 # ============================================================================
 # Helper functions
@@ -247,9 +259,8 @@ def generate_chunked_responses(system_prompt: str,
 # ============================================================================
 
 def initialize_model():
-    model_id = "meta-llama/Llama-3.2-1B-Instruct"
     tokenizer = AutoTokenizer.from_pretrained(
-        model_id,
+        LLAMA_MODEL_NAME,
         trust_remote_code=True
     )
 
@@ -274,7 +285,7 @@ def initialize_model():
         except Exception as e:
             print(f"  └─ SDPA not available: {e}, using default attention")
 
-    model = AutoModelForCausalLM.from_pretrained(model_id, **model_kwargs)
+    model = AutoModelForCausalLM.from_pretrained(LLAMA_MODEL_NAME, **model_kwargs)
     return tokenizer, model
 
 def cleanup_model(model):
@@ -425,30 +436,30 @@ def load_cve_record(cve: str, first_set: int, second_set: str) -> dict | None:
 
     if CVE_SCHEMA == 'v5':
         # v5 only
-        v5_path = f"../cvelistV5/cves/{first_set}/{formatted_x}/CVE-{first_set}-{second_set}.json"
-        if os.path.exists(v5_path):
+        v5_path = CVE_V5_PATH / str(first_set) / formatted_x / f"CVE-{first_set}-{second_set}.json"
+        if v5_path.exists():
             with open(v5_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
         return None
 
     elif CVE_SCHEMA == 'v4':
         # v4 only
-        v4_path = f"../cvelist/{first_set}/{formatted_x}/CVE-{first_set}-{second_set}.json"
-        if os.path.exists(v4_path):
+        v4_path = CVE_V4_PATH / str(first_set) / formatted_x / f"CVE-{first_set}-{second_set}.json"
+        if v4_path.exists():
             with open(v4_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
         return None
 
     else:  # CVE_SCHEMA == 'all'
         # Try v5 first, fallback to v4
-        v5_path = f"../cvelistV5/cves/{first_set}/{formatted_x}/CVE-{first_set}-{second_set}.json"
-        if os.path.exists(v5_path):
+        v5_path = CVE_V5_PATH / str(first_set) / formatted_x / f"CVE-{first_set}-{second_set}.json"
+        if v5_path.exists():
             with open(v5_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
 
         # Fallback to v4 schema
-        v4_path = f"../cvelist/{first_set}/{formatted_x}/CVE-{first_set}-{second_set}.json"
-        if os.path.exists(v4_path):
+        v4_path = CVE_V4_PATH / str(first_set) / formatted_x / f"CVE-{first_set}-{second_set}.json"
+        if v4_path.exists():
             with open(v4_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
 
