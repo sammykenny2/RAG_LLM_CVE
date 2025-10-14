@@ -234,6 +234,174 @@ python theRag.py --mode=full --speed=fastest --extension=parquet --schema=v5
 4. Exit
 ```
 
+### Step 6: Web UI (Gradio Interface)
+
+The project includes two web interfaces with Claude Projects-style layout:
+
+#### Phase 1: Pure Python (webUI_v1.py)
+```bash
+# Launch Phase 1 web interface (port 7860)
+python web/webUI_v1.py
+
+# With custom configuration
+python web/webUI_v1.py --server-name=0.0.0.0 --server-port=7860
+
+# Share publicly (generates temporary URL)
+python web/webUI_v1.py --share
+```
+
+**Features**:
+- Chat interface with RAG-based question answering
+- Upload PDF reports for validation (Summary/Validate/Q&A)
+- Add PDFs to knowledge base permanently
+- View and manage knowledge base sources
+- Manual conversation history management (last 10 rounds)
+
+#### Phase 2: LangChain (webUI_v2.py)
+```bash
+# Launch Phase 2 web interface (port 7861)
+python web/webUI_v2.py
+
+# Both versions can run simultaneously for comparison
+```
+
+**Features**:
+- Same UI as Phase 1
+- LangChain ConversationalRetrievalChain for RAG workflow
+- Automatic memory management (ConversationBufferWindowMemory)
+- Standardized LangChain abstractions
+
+#### Web UI Layout
+```
+┌──────────────────────────────────────────────────────┐
+│  Left Column (7/12)         │ Right Column (5/12)     │
+│                             │                         │
+│  💬 Chat History             │ ⚙️ Analysis Settings    │
+│  [Conversation Display]     │  Speed:  [fast ▼]       │
+│                             │  Mode:   [full ▼]       │
+│  Your message:              │  Schema: [all ▼]        │
+│  [________________] [Send]  │                         │
+│                             │ ───────────────────     │
+│  📎 Upload Report            │ 📚 Knowledge Base       │
+│     for Validation          │  [+ Add Files]          │
+│                             │                         │
+│                             │  Current Sources:       │
+│                             │  • CVEpdf2024.pdf       │
+│                             │    (7,261 chunks)       │
+│                             │  [🔄 Refresh]           │
+└──────────────────────────────────────────────────────┘
+```
+
+#### Usage Examples
+
+**Ask questions about CVEs**:
+```
+User: "What is CVE-2024-1234?"
+AI: [Retrieves from knowledge base and responds with context]
+```
+
+**Validate uploaded reports**:
+1. Click upload button → Select PDF report
+2. Type "validate" in chat to validate CVE usage
+3. Or type "summarize" for executive summary
+4. Or type "add to kb" to add to knowledge base
+
+**Manage knowledge base**:
+- Use right panel "Add Files" to expand knowledge base
+- View all sources with chunk counts
+- Click refresh to update statistics
+
+#### Comparison: Phase 1 vs Phase 2
+
+| Feature | Phase 1 (Pure Python) | Phase 2 (LangChain) |
+|---------|----------------------|---------------------|
+| **Port** | 7860 | 7861 |
+| **History Management** | Manual (deque, 10 rounds) | Automatic (ConversationBufferWindowMemory) |
+| **RAG Workflow** | Custom logic | ConversationalRetrievalChain |
+| **Embeddings** | Direct SentenceTransformer | HuggingFaceEmbeddings wrapper |
+| **Vector Store** | Direct Chroma queries | LangChain Chroma wrapper |
+| **Code Complexity** | More control, more code | Abstraction, less code |
+| **Use Case** | Learning internals, debugging | Standardized workflow, faster development |
+
+**When to use each**:
+- **Phase 1**: Fine-grained control, understanding RAG internals, custom prompts
+- **Phase 2**: Rapid prototyping, standardized workflow, LangChain ecosystem integration
+
+### Step 7: Incremental Knowledge Base Updates
+
+Use `addToEmbeddings.py` to add new documents to an existing knowledge base:
+
+```bash
+# Add single PDF
+python addToEmbeddings.py --pdf=new_report.pdf
+
+# Add multiple PDFs
+python addToEmbeddings.py --pdf="report1.pdf,report2.pdf,report3.pdf"
+
+# Add CVE data by year
+python addToEmbeddings.py --cve-year=2024
+
+# Specify target database (must already exist)
+python addToEmbeddings.py --pdf=report.pdf --target=CVEEmbeddings.pkl
+
+# With custom speed and format
+python addToEmbeddings.py --pdf=report.pdf --speed=fast --extension=chroma
+```
+
+**Note**: The target embedding database must already exist (created by `localEmbedding.py`). This tool only adds incremental updates.
+
+## Configuration System
+
+### Environment Variables (.env)
+
+The project uses `.env` for configuration. Copy `.env.example` to `.env` and customize:
+
+```bash
+# Paths
+CHROMA_DB_PATH=./CVEEmbeddings.chroma
+CVE_V5_PATH=../cvelistV5/cves
+CVE_V4_PATH=../cvelist
+
+# Models
+LLAMA_MODEL_NAME=meta-llama/Llama-3.2-1B-Instruct
+EMBEDDING_MODEL_NAME=all-mpnet-base-v2
+
+# Defaults
+DEFAULT_SPEED=fast              # normal, fast, fastest
+DEFAULT_MODE=full               # demo, full
+DEFAULT_SCHEMA=all              # v5, v4, all
+
+# Web UI
+GRADIO_SERVER_NAME=127.0.0.1
+GRADIO_SERVER_PORT=7860
+GRADIO_SHARE=False
+
+# Advanced
+CONVERSATION_HISTORY_LENGTH=10
+RETRIEVAL_TOP_K=5
+LLM_TEMPERATURE=0.3
+LLM_TOP_P=0.9
+CHUNK_SIZE=10
+EMBEDDING_BATCH_SIZE=64
+EMBEDDING_PRECISION=float16
+VERBOSE_LOGGING=False
+```
+
+### Configuration Loading (config.py)
+
+All scripts automatically load configuration from `.env`:
+
+```python
+from config import (
+    LLAMA_MODEL_NAME,
+    DEFAULT_SPEED,
+    GRADIO_SERVER_PORT,
+    # ... other settings
+)
+```
+
+**Priority**: Environment variables override defaults in `config.py`.
+
 ## Mode Comparison
 
 | Feature | Demo Mode (`--mode=demo`) | Full Mode (default) |
@@ -294,14 +462,34 @@ python theRag.py --mode=full --speed=fastest --extension=parquet --schema=v5
 ### Expected Directory Structure
 ```
 RAG_LLM_CVE/
-├── theRag.py            # Main RAG application (dual-mode)
+├── core/                # Shared modules (Phase 1 & 2)
+│   ├── __init__.py
+│   ├── models.py        # Llama model loading wrapper
+│   ├── embeddings.py    # SentenceTransformer wrapper
+│   ├── chroma_manager.py # Chroma CRUD operations
+│   ├── cve_lookup.py    # CVE JSON file queries
+│   └── pdf_processor.py # PDF text extraction
+├── rag/                 # RAG implementations
+│   ├── __init__.py
+│   ├── pure_python.py   # Phase 1: Manual implementation
+│   └── langchain_impl.py # Phase 2: LangChain wrapper
+├── web/                 # Web interfaces
+│   ├── webUI_v1.py      # Phase 1: Pure Python (port 7860)
+│   └── webUI_v2.py      # Phase 2: LangChain (port 7861)
+├── theRag.py            # CLI RAG application (uses core/)
 ├── localEmbedding.py    # Generate embedding database
+├── addToEmbeddings.py   # Incremental knowledge base updates
 ├── extractCVE.py        # Optional: export CVE descriptions
 ├── cleanupLlamaCache.py # Clean Llama model cache
-├── requirements.txt     # Python dependencies (includes pyarrow, chromadb)
+├── config.py            # Unified configuration (loads from .env)
+├── .env.example         # Configuration template (committed)
+├── .env                 # Local configuration (gitignored)
+├── requirements.txt     # Base dependencies (includes pyarrow, chromadb, langchain)
 ├── CVEEmbeddings.pkl    # Generated by localEmbedding.py (default format)
 │                        # (or .csv / .parquet / CVEEmbeddings/ dir for chroma)
+├── CVEEmbeddings.chroma/ # Chroma vector database (if using chroma format)
 ├── samples/             # Sample reports for testing (gitignored)
+├── test_data/           # Temporary test files (gitignored)
 ├── scripts/             # Environment setup scripts
 │   ├── setup-cpu.ps1    # CPU-only environment
 │   ├── setup-cuda118.ps1 # CUDA 11.8 environment
@@ -322,32 +510,49 @@ RAG_LLM_CVE/
 ```
 
 ### Key File Interactions
-- `theRag.py` reads from:
-  - User-provided PDF (via `fitz.open`)
-  - `CVEEmbeddings.{extension}` (embedding database, based on `--extension` parameter)
-    - `--extension=csv` → `CVEEmbeddings.csv` (file)
-    - `--extension=pkl` (default) → `CVEEmbeddings.pkl` (file)
-    - `--extension=parquet` → `CVEEmbeddings.parquet` (file)
-    - `--extension=chroma` → `CVEEmbeddings/` (directory with vector database)
-  - CVE JSON feeds (based on `--schema` parameter):
-    - `--schema=v5`: Only `../cvelistV5/cves/<year>/<prefix>/CVE-*.json`
-    - `--schema=v4`: Only `../cvelist/<year>/<prefix>/CVE-*.json`
-    - `--schema=all` (default): Try v5 first, fallback to v4
-- `localEmbedding.py` writes to:
-  - `<user_input>.{extension}` (based on `--extension` parameter)
-  - Default: `CVEEmbeddings.pkl` (file)
-  - Chroma: `<user_input>/` (directory with vector database)
-  - **Speed parameter** affects processing: normal (baseline), fast (default, 1.5-2x), fastest (2-3x)
-- `extractCVE.py` reads from:
-  - `../cvelistV5/cves/<year>/` (V5 schema, default)
-  - `../cvelist/<year>/` (V4 schema, optional)
-  - **Schema selection** via `--schema`: v5 (default, fastest), v4, or all (with deduplication)
-  - **Year selection** via `--year`: current year (default), specific year, multiple years, or all
-  - **Verbose mode** via `--verbose`: Shows detailed file-by-file logging (default: progress bar)
-  - Only `--schema=all` enables deduplication (V5 priority over V4)
-- `extractCVE.py` writes to:
-  - `CVEDescription<year>.txt` (single year)
-  - `CVEDescription<min>-<max>.txt` (multiple years)
+
+#### CLI Tools
+- **`theRag.py`** (CLI RAG application):
+  - Reads: User PDF, `CVEEmbeddings.{extension}`, CVE JSON feeds
+  - Uses: `core/` modules, embedding database
+  - Outputs: Interactive menu with Summary/Validate/Q&A options
+
+- **`localEmbedding.py`** (Initial embedding generation):
+  - Reads: User-provided PDF corpus
+  - Writes: `CVEEmbeddings.{extension}` (csv/pkl/parquet/chroma)
+  - Speed: normal (baseline), fast (default, 1.5-2x), fastest (2-3x)
+
+- **`addToEmbeddings.py`** (Incremental updates):
+  - Reads: Existing `CVEEmbeddings.{extension}`, new PDFs
+  - Writes: Updated `CVEEmbeddings.{extension}` with new documents
+  - Note: Target database must already exist
+
+- **`extractCVE.py`** (CVE reference extraction):
+  - Reads: `../cvelistV5/cves/<year>/` (v5) or `../cvelist/<year>/` (v4)
+  - Writes: `CVEDescription<year>.txt` or `CVEDescription<min>-<max>.txt`
+  - Supports: v5/v4 schema selection, year ranges, deduplication
+
+#### Web Interfaces
+- **`web/webUI_v1.py`** (Phase 1: Pure Python):
+  - Uses: `rag/pure_python.py`, `core/` modules
+  - Port: 7860
+  - Features: Chat, validation, knowledge base management
+
+- **`web/webUI_v2.py`** (Phase 2: LangChain):
+  - Uses: `rag/langchain_impl.py`, `core/` modules
+  - Port: 7861
+  - Features: Same as v1, with LangChain automatic memory
+
+#### Core Modules (Shared)
+- **`core/models.py`**: Llama model initialization and generation
+- **`core/embeddings.py`**: SentenceTransformer embedding operations
+- **`core/chroma_manager.py`**: Vector database CRUD (add, query, delete, stats)
+- **`core/cve_lookup.py`**: CVE JSON file parsing and batch lookup
+- **`core/pdf_processor.py`**: PDF text extraction with PyMuPDF
+
+#### RAG Implementations
+- **`rag/pure_python.py`**: Manual RAG with deque-based history (Phase 1)
+- **`rag/langchain_impl.py`**: LangChain chains and memory (Phase 2)
 
 ## Model Configuration
 

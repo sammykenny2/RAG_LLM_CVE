@@ -71,6 +71,157 @@ RAG-based CVE validation system that reduces LLM hallucinations in Security Oper
   - `--schema=v4`: Extract from V4 only
   - `--schema=all`: Extract from both with deduplication (V5 priority)
 
+## Module Architecture
+
+### Modular Structure (Phase 1 & 2)
+
+The project uses a layered modular architecture with shared core components:
+
+```
+RAG_LLM_CVE/
+├── core/                # Shared utilities (Phase 1 & 2)
+│   ├── models.py        # Llama model wrapper
+│   ├── embeddings.py    # SentenceTransformer wrapper
+│   ├── chroma_manager.py # Vector database CRUD
+│   ├── cve_lookup.py    # CVE JSON parsing
+│   └── pdf_processor.py # PDF text extraction
+├── rag/                 # RAG implementations
+│   ├── pure_python.py   # Phase 1: Manual implementation
+│   └── langchain_impl.py # Phase 2: LangChain chains
+└── web/                 # Web interfaces
+    ├── webUI_v1.py      # Phase 1: Pure Python (port 7860)
+    └── webUI_v2.py      # Phase 2: LangChain (port 7861)
+```
+
+### Phase 1: Pure Python Implementation
+
+**Architecture**: Direct component usage with manual orchestration
+
+```
+webUI_v1.py (Gradio)
+    ↓
+rag/pure_python.py (PureRAG class)
+    ↓
+core/models.py (LlamaModel)           core/embeddings.py (EmbeddingModel)
+core/chroma_manager.py (ChromaManager) core/cve_lookup.py
+core/pdf_processor.py
+```
+
+**Features**:
+- Manual conversation history (deque with 10-round sliding window)
+- Direct Chroma queries with metadata filtering
+- Custom RAG workflow with fine-grained control
+- Explicit memory management
+
+**Use Cases**:
+- Learning RAG internals
+- Debugging and optimization
+- Custom prompt engineering
+- Performance benchmarking
+
+### Phase 2: LangChain Implementation
+
+**Architecture**: LangChain abstractions with automatic orchestration
+
+```
+webUI_v2.py (Gradio)
+    ↓
+rag/langchain_impl.py (LangChainRAG class)
+    ↓
+ConversationalRetrievalChain          ConversationBufferWindowMemory (k=10)
+    ↓                                     ↓
+HuggingFacePipeline (Llama wrapper)   LangChain Chroma (vector store)
+    ↓                                     ↓
+HuggingFaceEmbeddings (SentenceTransformer wrapper)
+    ↓
+core/ modules (shared with Phase 1)
+```
+
+**Features**:
+- Automatic conversation history management
+- ConversationalRetrievalChain for standardized RAG workflow
+- LangChain Memory with automatic pruning
+- Document loaders and text splitters
+
+**Use Cases**:
+- Rapid prototyping
+- Standardized workflow
+- LangChain ecosystem integration
+- Production deployment (if LangChain is preferred)
+
+### Comparison: Phase 1 vs Phase 2
+
+| Aspect | Phase 1 (Pure Python) | Phase 2 (LangChain) |
+|--------|----------------------|---------------------|
+| **Conversation History** | Manual (deque, 10 rounds) | Automatic (ConversationBufferWindowMemory) |
+| **RAG Workflow** | Custom query + retrieval logic | ConversationalRetrievalChain |
+| **Embeddings** | Direct SentenceTransformer | HuggingFaceEmbeddings wrapper |
+| **Vector Store** | Direct Chroma client queries | LangChain Chroma wrapper |
+| **Code Lines** | More code, more control | Less code, more abstraction |
+| **Learning Curve** | Understanding RAG internals | Understanding LangChain API |
+| **Debugging** | Easier to trace | Black box abstractions |
+| **Flexibility** | Full control over prompts | LangChain prompt templates |
+| **Performance** | Optimized, minimal overhead | Slight overhead from abstractions |
+| **Port** | 7860 | 7861 |
+
+### Chroma Metadata Schema
+
+Both phases use consistent metadata structure for vector database:
+
+```python
+metadata = {
+    "source_type": "pdf",           # "pdf" or "cve"
+    "source_name": "CVEpdf2024.pdf", # Filename or "CVE List 2024"
+    "added_date": "2025-01-14",     # ISO format (YYYY-MM-DD)
+    "chunk_index": 1234,            # Sequential index
+    "page_number": 5,               # PDF page (if applicable)
+    "precision": "float16"          # Embedding precision
+}
+```
+
+**Purpose**:
+- **source_type**: Filter by document type (PDF reports vs CVE data)
+- **source_name**: Track and delete specific documents
+- **added_date**: Audit trail for knowledge base updates
+- **chunk_index**: Order chunks within same document
+- **page_number**: Source tracing for PDFs
+- **precision**: Ensure embedding consistency (float16/float32)
+
+**Operations**:
+- `chroma_manager.add_documents(texts, embeddings, metadata)`: Add with metadata
+- `chroma_manager.query(embedding, filter={"source_type": "pdf"})`: Filter by type
+- `chroma_manager.delete_by_source("report1.pdf")`: Remove specific source
+- `chroma_manager.get_stats()`: Aggregate by source_type and source_name
+
+### Web UI Architecture (Gradio)
+
+**Framework**: Gradio (Python-native web framework)
+
+**Technology Stack**:
+- **Backend**: Gradio → FastAPI/Starlette → Uvicorn (ASGI server)
+- **Frontend**: Auto-generated React UI from Python code
+- **Communication**: HTTP/WebSocket for real-time updates
+- **Deployment**: Single command (`python webUI_v1.py`)
+
+**Advantages**:
+- No HTML/CSS/JavaScript required
+- ChatGPT-style UI out of the box
+- Automatic WebSocket handling for streaming
+- Complex layouts via `gr.Blocks()`, `gr.Row()`, `gr.Column()`
+- Built-in file upload, markdown rendering
+- Easy deployment: `--share` flag generates public URL (valid 72 hours)
+
+**Layout**: Claude Projects-inspired two-column design
+- **Left Column (7/12)**: Chat interface with conversation history
+- **Right Column (5/12)**:
+  - Top: Analysis Settings (speed/mode/schema dropdowns)
+  - Bottom: Knowledge Base management (add/view/delete sources)
+
+**Deployment Options**:
+1. **Local**: `python web/webUI_v1.py` (http://localhost:7860)
+2. **Share Link**: `python web/webUI_v1.py --share` (https://xxx.gradio.live)
+3. **Production**: Docker + Nginx (optional)
+
 ## Runtime Architecture
 
 ### Main Implementation: theRag.py
@@ -552,6 +703,85 @@ python theRag.py --speed=normal --mode=full --schema=all
 - FP16 and cache optimizations ineffective on CPU
 - fastest only adds 5-10% from temperature/SDPA
 - Save energy and use normal or fast
+
+## Key Design Decisions
+
+### Why Phase 1 Before Phase 2?
+
+**Rationale**:
+1. **Learning**: Understand RAG internals before using abstractions
+2. **Debugging**: Easier to debug custom code vs LangChain black box
+3. **Flexibility**: Fine-grained control over prompts and retrieval logic
+4. **Comparison**: Benchmark pure Python vs LangChain performance
+5. **Fallback**: If LangChain has issues, Phase 1 is production-ready
+
+**Outcome**: Both phases coexist, allowing A/B testing and gradual migration.
+
+### Why Gradio Over Custom Frontend?
+
+| Criteria | Gradio | Flask+React | FastAPI+Vue |
+|----------|--------|-------------|-------------|
+| **Dev Time** | 1-2 days | 2-3 weeks | 3-4 weeks |
+| **Learning Curve** | None (pure Python) | Moderate | Steep |
+| **UI Quality** | Modern (ChatGPT-like) | Custom | Custom |
+| **Deployment** | 1 command | Complex | Complex |
+| **Suitable For** | PoC, Demo | Production | Enterprise |
+
+**Decision**: Gradio for rapid prototyping and quality UI without frontend development.
+
+### Why Not Expose Embedding Precision in UI?
+
+**Reasoning**:
+- Too technical for non-technical users
+- Mixing precisions causes ranking inconsistencies (should be fixed at `fast`)
+- Configuration should be in `.env`, not user-facing UI
+- If needed, can be exposed in "Advanced Settings" (future enhancement)
+
+**Current Approach**: `.env` sets `EMBEDDING_PRECISION=float16`, all components use same precision.
+
+### Why Unified `fast` Speed Level?
+
+**Problem**: Mixed precision (float32 + float16) causes ranking inconsistencies in retrieval.
+
+**Solution**:
+- `fast` (default) uses float16 for both embeddings and LLM
+- Provides 1.5-2x speedup with <1% accuracy loss
+- Consistent precision ensures stable similarity scores
+
+**Comparison**:
+| Speed  | Precision | Chunk Size | Batch Size | Use Case |
+|--------|-----------|------------|------------|----------|
+| normal | float32   | 10         | 32         | Baseline |
+| fast   | float16   | 10         | 64         | Recommended (default) |
+| fastest| float16   | 20         | 128        | Max speed (larger chunks) |
+
+### Why Two Ports for Phase 1 and Phase 2?
+
+**Reasoning**:
+- Both implementations can run simultaneously for A/B comparison
+- Phase 1 (port 7860): Pure Python baseline
+- Phase 2 (port 7861): LangChain alternative
+- Users can compare performance, accuracy, and behavior side-by-side
+
+**Use Case**: Demo both approaches in company presentation.
+
+### Why Manual CVE Regex Over LLM Extraction?
+
+**Previous Approach**: Ask LLM to extract CVEs from report text.
+
+**Problems**:
+- Slow (30-60 sec per LLM call)
+- Unreliable (hallucinations, missed CVEs)
+- Expensive (tokens + compute)
+
+**Current Approach**: Direct regex `CVE-\d{4}-\d{4,7}` on extracted text.
+
+**Benefits**:
+- Instant (<1 sec)
+- 100% accurate for standard format
+- No token cost
+
+**Trade-off**: Won't catch non-standard CVE mentions (acceptable for official reports).
 
 ## Troubleshooting
 
