@@ -1,4 +1,10 @@
-"""Remove all cached Llama 3.2 model artifacts from the local Hugging Face cache."""
+"""
+Clean up Llama model cache.
+Remove all cached Llama 3.2 model artifacts from the local Hugging Face cache.
+
+Usage:
+    python cleanup_cache.py
+"""
 
 import os
 import shutil
@@ -46,6 +52,12 @@ def remove_dir(path: Path) -> bool:
 
 
 def main() -> None:
+    print(f"\n{'='*60}")
+    print(f"Cleanup Cache - Remove Llama Model Artifacts")
+    print(f"{'='*60}\n")
+
+    print("Scanning Hugging Face cache directories...")
+
     removed = []
     for root in candidate_roots():
         if not root.exists():
@@ -55,12 +67,22 @@ def main() -> None:
             if item.is_dir() and "Llama-3.2" in item.name and "Instruct" in item.name:
                 if remove_dir(item):
                     removed.append(item)
+
+    print(f"\n{'='*60}")
+    print(f"Summary:")
+    print(f"{'='*60}")
+
     if removed:
+        print(f"Removed:     {len(removed)} directory/directories")
+        print(f"{'='*60}\n")
         print("Removed cached Llama 3.2 model directories:")
         for path in removed:
-            print(f" - {path}")
+            print(f"  - {path}")
+        print(f"\n✅ Cleanup completed successfully!")
     else:
-        print("No cached Llama 3.2 model directories found.")
+        print(f"Found:       0 cached directories")
+        print(f"{'='*60}")
+        print(f"\n💡 No cached Llama 3.2 model directories found.")
 
 
 if __name__ == "__main__":

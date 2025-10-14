@@ -150,11 +150,11 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python extractCVE.py                       # Extract current year from V5 (fastest)
-  python extractCVE.py --year=2024           # Extract 2024 from V5
-  python extractCVE.py --schema=all          # Extract from both V5 and V4 (with dedup)
-  python extractCVE.py --schema=v4           # Extract from V4 only
-  python extractCVE.py --year=all --schema=all  # Extract all years from both schemas
+  python extract_cve.py                       # Extract current year from V5 (fastest)
+  python extract_cve.py --year=2024           # Extract 2024 from V5
+  python extract_cve.py --schema=all          # Extract from both V5 and V4 (with dedup)
+  python extract_cve.py --schema=v4           # Extract from V4 only
+  python extract_cve.py --year=all --schema=all  # Extract all years from both schemas
         """
     )
     parser.add_argument(
@@ -205,7 +205,6 @@ Examples:
     # Clear output file if it exists
     if os.path.exists(output_file):
         os.remove(output_file)
-        print(f"Cleared existing output file: {output_file}")
 
     # Track processed CVEs to avoid duplicates (only when schema=all)
     processed_cves = set() if args.schema == 'all' else None
@@ -213,6 +212,15 @@ Examples:
     total_v5_count = 0
     total_v4_count = 0
     total_v4_skipped = 0
+
+    # Print header
+    print(f"\n{'='*60}")
+    print(f"Extract CVE Descriptions - Export to Text File")
+    print(f"{'='*60}\n")
+    print(f"Years:       {years}")
+    print(f"Schema:      {args.schema}")
+    print(f"Output:      {output_file}")
+    print(f"{'='*60}")
 
     # Process each year
     for year in years:
@@ -253,23 +261,25 @@ Examples:
 
     # Final summary
     print(f"\n{'='*60}")
-    print(f"=== Extraction Complete ===")
+    print(f"Summary:")
     print(f"{'='*60}")
-    print(f"Years processed: {years}")
-    print(f"Schema: {args.schema}")
+    print(f"Years:       {years}")
+    print(f"Schema:      {args.schema}")
 
     if args.schema == 'v5':
-        print(f"Total CVEs extracted: {total_v5_count}")
+        print(f"Total CVEs:  {total_v5_count}")
     elif args.schema == 'v4':
-        print(f"Total CVEs extracted: {total_v4_count}")
+        print(f"Total CVEs:  {total_v4_count}")
     else:  # all
-        print(f"Total V5 CVEs: {total_v5_count}")
-        print(f"Total V4 CVEs: {total_v4_count} (skipped {total_v4_skipped} duplicates)")
-        print(f"Unique CVEs extracted: {total_v5_count + total_v4_count}")
-        if processed_cves:
-            print(f"Memory usage: Tracked {len(processed_cves)} CVE IDs (~{len(processed_cves) * 20 // 1024} KB)")
+        print(f"V5 CVEs:     {total_v5_count}")
+        print(f"V4 CVEs:     {total_v4_count} (skipped {total_v4_skipped} duplicates)")
+        print(f"Unique:      {total_v5_count + total_v4_count}")
 
-    print(f"Output written to: {output_file}")
+    print(f"Output:      {output_file}")
+    print(f"{'='*60}")
+
+    print(f"\n✅ Extraction completed successfully!")
+    print(f"\n💡 Text file created at: {output_file}")
 
 
 if __name__ == "__main__":

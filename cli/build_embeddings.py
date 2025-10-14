@@ -13,6 +13,8 @@ import numpy as np
 import argparse
 import pickle
 import chromadb
+import json
+from datetime import datetime
 
 # Import configuration
 from config import (
@@ -22,8 +24,14 @@ from config import (
     EMBEDDING_BATCH_SIZE,
     EMBEDDING_PRECISION,
     EMBEDDING_MODEL_NAME,
-    EMBEDDING_PATH
+    EMBEDDING_PATH,
+    CVE_V5_PATH,
+    CVE_V4_PATH,
+    DEFAULT_SCHEMA
 )
+
+# Import CVE lookup utilities
+from core.cve_lookup import extract_cve_fields
 
 def read_pdf(pdf_path):
     """Extract text from each page of the PDF and return as a list of dictionaries."""
@@ -60,6 +68,67 @@ def split_sentences(text):
 def split(input_list, chunk_size):
     """Split a list into chunks of specified size."""
     return [input_list[i:i + chunk_size] for i in range(0, len(input_list), chunk_size)]
+
+def process_cve_data(year, schema, batch_size, precision):
+    """Extract CVE data and return texts with metadata."""
+    print(f"\n{'='*60}")
+    print(f"Processing CVE Data")
+    print(f"  Year: {year}")
+    print(f"  Schema: {schema}")
+    print(f"{'='*60}\n")
+
+    # Determine paths based on schema
+    paths_to_check = []
+    if schema in ['v5', 'all']:
+        v5_year_path = CVE_V5_PATH / str(year)
+        if v5_year_path.exists():
+            paths_to_check.append(('v5', v5_year_path))
+
+    if schema in ['v4', 'all']:
+        v4_year_path = CVE_V4_PATH / str(year)
+        if v4_year_path.exists():
+            paths_to_check.append(('v4', v4_year_path))
+
+    if not paths_to_check:
+        print(f"❌ No CVE data found for year {year} with schema {schema}")
+        return []
+
+    # Collect all CVE descriptions
+    cve_data = []
+
+    for schema_type, year_path in paths_to_check:
+        print(f"Scanning {schema_type.upper()} directory: {year_path}")
+
+        for subdir in tqdm(list(year_path.iterdir()), desc=f"Processing {schema_type}"):
+            if not subdir.is_dir():
+                continue
+
+            for json_file in subdir.glob("*.json"):
+                try:
+                    with open(json_file, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+
+                    cve_id, vendor, product, description = extract_cve_fields(data, json_file.stem)
+
+                    cve_text = (
+                        f"CVE Number: {cve_id}, "
+                        f"Vendor: {vendor}, "
+                        f"Product: {product}, "
+                        f"Description: {description}"
+                    )
+
+                    cve_data.append({
+                        "sentence_chunk": cve_text,
+                        "source_type": "cve",
+                        "source_name": f"CVE_{year}_{schema_type}",
+                        "cve_id": cve_id
+                    })
+
+                except Exception as e:
+                    continue
+
+    print(f"\nExtracted {len(cve_data)} CVE descriptions")
+    return cve_data
 
 def process_pdf(pdf_path, sentence_size, output_path, batch_size, precision, extension):
     """Process PDF to extract text, split into chunks, generate embeddings, and save to file."""
@@ -202,26 +271,161 @@ Examples:
         SENTENCE_SIZE = CHUNK_SIZE
         BATCH_SIZE = 32
         PRECISION = 'float32'
-        print("Running in NORMAL mode (baseline quality)")
+        speed_desc = "NORMAL (baseline quality, float32)"
     elif args.speed == 'fast':
         SENTENCE_SIZE = CHUNK_SIZE
         BATCH_SIZE = EMBEDDING_BATCH_SIZE
         PRECISION = EMBEDDING_PRECISION
-        print(f"Running in FAST mode (recommended) - chunk_size={CHUNK_SIZE}, batch_size={EMBEDDING_BATCH_SIZE}, precision={EMBEDDING_PRECISION}")
+        speed_desc = f"FAST (recommended, float16)"
     else:  # fastest
         SENTENCE_SIZE = CHUNK_SIZE * 2
         BATCH_SIZE = EMBEDDING_BATCH_SIZE * 2
         PRECISION = EMBEDDING_PRECISION
-        print(f"Running in FASTEST mode (aggressive optimization) - chunk_size={CHUNK_SIZE * 2}, batch_size={EMBEDDING_BATCH_SIZE * 2}, precision={EMBEDDING_PRECISION}")
+        speed_desc = f"FASTEST (aggressive optimization)"
 
-    # Get user input for PDF path
-    pdf_path = input("Please enter the PDF file path (with .pdf extension): ")
+    # Print header
+    print(f"\n{'='*60}")
+    print(f"Build Embeddings - Create New Knowledge Base")
+    print(f"{'='*60}\n")
 
-    # Construct output path from EMBEDDING_PATH with extension
+    # Ask user what to process
+    print("What would you like to build embeddings from?")
+    print("1. PDF file")
+    print("2. CVE data by year")
+    choice = input("\nEnter your choice (1 or 2): ").strip()
+
+    # Construct output path
     output_path = f"{EMBEDDING_PATH}.{args.extension}"
 
-    print(f"\nOutput will be saved to: {output_path}")
-    print(f"(Configure via EMBEDDING_PATH in .env to change location)\n")
+    # Get data based on choice
+    if choice == '1':
+        # PDF mode
+        source_type = 'pdf'
+        pdf_path = input("\nEnter PDF file path: ").strip()
+        year = None
+        schema = None
 
-    # Process PDF
-    process_pdf(pdf_path, SENTENCE_SIZE, output_path, BATCH_SIZE, PRECISION, args.extension)
+    elif choice == '2':
+        # CVE mode
+        source_type = 'cve'
+        pdf_path = None
+        year_input = input("\nEnter year for CVE data (e.g., 2024): ").strip()
+        try:
+            year = int(year_input)
+        except ValueError:
+            print(f"❌ Invalid year: {year_input}")
+            sys.exit(1)
+
+        print("\nSelect CVE schema:")
+        print("1. v5 only (fastest)")
+        print("2. v4 only")
+        print("3. v5 with v4 fallback (default)")
+        schema_choice = input("Enter your choice (1-3, default=3): ").strip() or '3'
+        schema_map = {'1': 'v5', '2': 'v4', '3': 'all'}
+        schema = schema_map.get(schema_choice, 'all')
+
+    else:
+        print(f"❌ Invalid choice: {choice}")
+        sys.exit(1)
+
+    # Display configuration
+    print(f"\n{'='*60}")
+    print(f"Configuration:")
+    print(f"{'='*60}")
+    print(f"Source:      {source_type}")
+    if source_type == 'pdf':
+        print(f"File:        {pdf_path}")
+    else:
+        print(f"Year:        {year}")
+        print(f"Schema:      {schema}")
+    print(f"Speed:       {speed_desc}")
+    print(f"Chunk size:  {SENTENCE_SIZE} sentences")
+    print(f"Batch size:  {BATCH_SIZE}")
+    print(f"Precision:   {PRECISION}")
+    print(f"Format:      {args.extension}")
+    print(f"Output:      {output_path}")
+    print(f"{'='*60}\n")
+
+    # Process based on choice
+    if source_type == 'pdf':
+        process_pdf(pdf_path, SENTENCE_SIZE, output_path, BATCH_SIZE, PRECISION, args.extension)
+
+    else:  # CVE mode
+        # Process CVE data
+        dic_chunks = process_cve_data(year, schema, BATCH_SIZE, PRECISION)
+
+        if not dic_chunks:
+            print("❌ No CVE data found to process")
+            sys.exit(1)
+
+        # Initialize SentenceTransformer
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        print(f"\nInitializing embedding model on {device}...")
+        embedding_model = SentenceTransformer(model_name_or_path=EMBEDDING_MODEL_NAME, device=device)
+
+        # Generate embeddings
+        print(f"Generating embeddings for {len(dic_chunks)} CVE descriptions...")
+        sentence_list = [item["sentence_chunk"] for item in dic_chunks]
+
+        embeddings = embedding_model.encode(
+            sentence_list,
+            batch_size=BATCH_SIZE,
+            show_progress_bar=True,
+            convert_to_numpy=True
+        )
+
+        if PRECISION == 'float16':
+            embeddings = embeddings.astype(np.float16)
+            print(f"  └─ Converted embeddings to float16 (50% memory reduction)")
+
+        # Assign embeddings
+        for idx, item in enumerate(dic_chunks):
+            item["embedding"] = embeddings[idx]
+
+        # Save based on extension
+        print(f"\nSaving embeddings to {output_path}...")
+        if args.extension == 'csv':
+            pd.DataFrame(dic_chunks).to_csv(output_path, index=False)
+        elif args.extension == 'pkl':
+            with open(output_path, 'wb') as f:
+                pickle.dump(dic_chunks, f)
+        elif args.extension == 'parquet':
+            df_output = pd.DataFrame(dic_chunks)
+            df_output.to_parquet(output_path, compression='snappy')
+        elif args.extension == 'chroma':
+            client = chromadb.PersistentClient(path=output_path)
+            try:
+                client.delete_collection("cve_embeddings")
+            except:
+                pass
+            collection = client.create_collection(
+                name="cve_embeddings",
+                metadata={"description": "CVE embeddings for RAG system"}
+            )
+            ids = [f"chunk_{i}" for i in range(len(dic_chunks))]
+            embeddings_list = [item["embedding"].tolist() for item in dic_chunks]
+            documents = [item["sentence_chunk"] for item in dic_chunks]
+
+            # Add metadata
+            metadatas = [
+                {
+                    "source_type": item.get("source_type", "cve"),
+                    "source_name": item.get("source_name", f"CVE_{year}"),
+                    "cve_id": item.get("cve_id", ""),
+                }
+                for item in dic_chunks
+            ]
+
+            batch_size = 5000
+            for i in range(0, len(ids), batch_size):
+                collection.add(
+                    ids=ids[i:i+batch_size],
+                    embeddings=embeddings_list[i:i+batch_size],
+                    documents=documents[i:i+batch_size],
+                    metadatas=metadatas[i:i+batch_size]
+                )
+            print(f"  └─ Stored {len(dic_chunks)} embeddings in Chroma database")
+
+        print(f"✅ Generated: {output_path}")
+        print(f"\n💡 To use this with validate_report.py, run:")
+        print(f"   python validate_report.py --extension={args.extension}")

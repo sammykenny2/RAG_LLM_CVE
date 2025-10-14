@@ -2,21 +2,10 @@
 Incremental embedding addition tool.
 Add PDFs and CVE data to existing Chroma database.
 
-Usage:
-    # Add PDF files
-    python addToEmbeddings.py --source=pdf --files=report1.pdf,report2.pdf
-
-    # Add CVE data by year
-    python addToEmbeddings.py --source=cve --year=2024
-
-    # Add CVE data by year and month range
-    python addToEmbeddings.py --source=cve --year=2024 --month=1-6
-
-    # Custom chunk size and batch size
-    python addToEmbeddings.py --source=pdf --files=report.pdf --chunk-size=20 --batch-size=128
+Interactive mode - just run the script and follow prompts:
+    python add_to_embeddings.py
 """
 
-import argparse
 import sys
 from pathlib import Path
 # Add project root to Python path
@@ -290,117 +279,70 @@ def process_cve_data(
     return n_added
 
 def main():
-    # Parse arguments
-    parser = argparse.ArgumentParser(
-        description='Add PDFs and CVE data to Chroma embeddings database',
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  # Add single PDF
-  python addToEmbeddings.py --source=pdf --files=report.pdf
-
-  # Add multiple PDFs
-  python addToEmbeddings.py --source=pdf --files=report1.pdf,report2.pdf
-
-  # Add CVE data for 2024
-  python addToEmbeddings.py --source=cve --year=2024
-
-  # Add CVE data with month filter (placeholder, not fully implemented)
-  python addToEmbeddings.py --source=cve --year=2024 --month=1-6
-
-  # Custom settings
-  python addToEmbeddings.py --source=pdf --files=report.pdf --chunk-size=20 --batch-size=128
-        """
-    )
-
-    parser.add_argument(
-        '--source',
-        type=str,
-        required=True,
-        choices=['pdf', 'cve'],
-        help='Source type: pdf or cve'
-    )
-
-    parser.add_argument(
-        '--files',
-        type=str,
-        help='Comma-separated PDF files (for --source=pdf)'
-    )
-
-    parser.add_argument(
-        '--year',
-        type=int,
-        help='Year for CVE data (for --source=cve)'
-    )
-
-    parser.add_argument(
-        '--month',
-        type=str,
-        help='Month range (e.g., 1-6) for CVE data (for --source=cve)'
-    )
-
-    parser.add_argument(
-        '--chunk-size',
-        type=int,
-        default=CHUNK_SIZE,
-        help=f'Number of sentences per chunk (default: {CHUNK_SIZE})'
-    )
-
-    parser.add_argument(
-        '--batch-size',
-        type=int,
-        default=EMBEDDING_BATCH_SIZE,
-        help=f'Batch size for embedding generation (default: {EMBEDDING_BATCH_SIZE})'
-    )
-
-    parser.add_argument(
-        '--precision',
-        type=str,
-        choices=['float32', 'float16'],
-        default=EMBEDDING_PRECISION,
-        help=f'Embedding precision (default: {EMBEDDING_PRECISION})'
-    )
-
-    parser.add_argument(
-        '--schema',
-        type=str,
-        choices=['v5', 'v4', 'all'],
-        default=DEFAULT_SCHEMA,
-        help=f'CVE schema to use (default: {DEFAULT_SCHEMA})'
-    )
-
-    parser.add_argument(
-        '--verbose',
-        action='store_true',
-        help='Enable verbose logging'
-    )
-
-    args = parser.parse_args()
-
-    # Validate arguments
-    if args.source == 'pdf' and not args.files:
-        parser.error("--files is required when --source=pdf")
-
-    if args.source == 'cve' and not args.year:
-        parser.error("--year is required when --source=cve")
-
-    # Parse month range
-    month_range = None
-    if args.month:
-        try:
-            start, end = args.month.split('-')
-            month_range = (int(start), int(end))
-        except:
-            parser.error("--month must be in format START-END (e.g., 1-6)")
-
     print(f"\n{'='*60}")
-    print(f"Incremental Embedding Addition Tool")
+    print(f"Add to Embeddings - Update Existing Knowledge Base")
+    print(f"{'='*60}\n")
+
+    # Interactive mode: ask user what to add
+    print("What would you like to add to the knowledge base?")
+    print("1. PDF file(s)")
+    print("2. CVE data by year")
+    choice = input("\nEnter your choice (1 or 2): ").strip()
+
+    # Determine source type
+    if choice == '1':
+        source_type = 'pdf'
+        # Ask for PDF file path(s)
+        pdf_input = input("\nEnter PDF file path(s) (comma-separated for multiple): ").strip()
+        pdf_files = [f.strip() for f in pdf_input.split(',')]
+        year = None
+        month_range = None
+        schema = DEFAULT_SCHEMA
+    elif choice == '2':
+        source_type = 'cve'
+        # Ask for year
+        year_input = input("\nEnter year for CVE data (e.g., 2024): ").strip()
+        try:
+            year = int(year_input)
+        except ValueError:
+            print(f"❌ Invalid year: {year_input}")
+            sys.exit(1)
+
+        # Ask for schema
+        print("\nSelect CVE schema:")
+        print("1. v5 only (fastest)")
+        print("2. v4 only")
+        print("3. v5 with v4 fallback (default)")
+        schema_choice = input("Enter your choice (1-3, default=3): ").strip() or '3'
+        schema_map = {'1': 'v5', '2': 'v4', '3': 'all'}
+        schema = schema_map.get(schema_choice, 'all')
+
+        pdf_files = None
+        month_range = None
+    else:
+        print(f"❌ Invalid choice: {choice}")
+        sys.exit(1)
+
+    # Use default settings
+    chunk_size = CHUNK_SIZE
+    batch_size = EMBEDDING_BATCH_SIZE
+    precision = EMBEDDING_PRECISION
+
+    # Display configuration
+    print(f"\n{'='*60}")
+    print(f"Configuration:")
     print(f"{'='*60}")
-    print(f"Source: {args.source}")
-    print(f"Chunk size: {args.chunk_size}")
-    print(f"Batch size: {args.batch_size}")
-    print(f"Precision: {args.precision}")
-    print(f"Database: {EMBEDDING_PATH}")
+    print(f"Source:      {source_type}")
+    if source_type == 'pdf':
+        print(f"Files:       {', '.join(pdf_files)}")
+    else:
+        print(f"Year:        {year}")
+        print(f"Schema:      {schema}")
+    print(f"Chunk size:  {chunk_size} sentences")
+    print(f"Batch size:  {batch_size}")
+    print(f"Precision:   {precision}")
+    print(f"Database:    {EMBEDDING_PATH}")
+    print(f"{'='*60}\n")
 
     # Initialize components
     print(f"\nInitializing components...")
@@ -412,48 +354,48 @@ Examples:
 
     # Process based on source type
     try:
-        if args.source == 'pdf':
-            pdf_files = [f.strip() for f in args.files.split(',')]
+        if source_type == 'pdf':
             total_added = process_pdf_files(
                 pdf_files,
                 chroma_manager,
                 embedding_model,
-                args.chunk_size,
-                args.batch_size,
-                args.precision
+                chunk_size,
+                batch_size,
+                precision
             )
 
-        elif args.source == 'cve':
+        elif source_type == 'cve':
             total_added = process_cve_data(
-                args.year,
+                year,
                 month_range,
                 chroma_manager,
                 embedding_model,
-                args.batch_size,
-                args.precision,
-                args.schema
+                batch_size,
+                precision,
+                schema
             )
 
         # Show final statistics
         print(f"\n{'='*60}")
-        print(f"Summary")
+        print(f"Summary:")
         print(f"{'='*60}")
-        print(f"Total documents added: {total_added}")
+        print(f"Documents added:      {total_added}")
 
         stats = chroma_manager.get_stats()
-        print(f"Total documents in database: {stats['total_docs']}")
-        print(f"By source type: {stats['by_source_type']}")
+        print(f"Total in database:    {stats['total_docs']}")
+        print(f"By source type:       {stats['by_source_type']}")
+        print(f"{'='*60}")
 
         print(f"\n✅ Operation completed successfully!")
+        print(f"\n💡 Knowledge base updated at: {EMBEDDING_PATH}")
 
     except KeyboardInterrupt:
         print(f"\n⚠️ Operation interrupted by user")
         sys.exit(1)
     except Exception as e:
         print(f"\n❌ Error: {e}")
-        if args.verbose:
-            import traceback
-            traceback.print_exc()
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
 
 if __name__ == "__main__":
