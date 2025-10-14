@@ -54,8 +54,8 @@ MANIFEST
 # Project specific
 # Temporary upload directory (web UI)
 temp_uploads/
-# Generated CVE description files
-CVEDescription*.txt
+# Generated CVE description files (root directory only, not output/)
+/CVEDescription*
 
 # Temporary files directory (test reports and demo data)
 temp/

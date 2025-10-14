@@ -25,6 +25,11 @@ EMBEDDING_PATH = get_path('EMBEDDING_PATH', './embeddings/CVEEmbeddings')
 
 CVE_V5_PATH = get_path('CVE_V5_PATH', '../cvelistV5/cves')
 CVE_V4_PATH = get_path('CVE_V4_PATH', '../cvelist')
+
+# CVE description export path (without extension)
+# Usage: f"{CVE_DESCRIPTION_PATH}.{extension}" where extension is txt or jsonl
+CVE_DESCRIPTION_PATH = get_path('CVE_DESCRIPTION_PATH', './output/CVEDescription')
+
 TEMP_UPLOAD_DIR = get_path('TEMP_UPLOAD_DIR', './temp_uploads')
 
 # =============================================================================
@@ -143,6 +148,7 @@ def print_config():
     print(f"  EMBEDDING_PATH: {EMBEDDING_PATH}")
     print(f"  CVE_V5_PATH: {CVE_V5_PATH}")
     print(f"  CVE_V4_PATH: {CVE_V4_PATH}")
+    print(f"  CVE_DESCRIPTION_PATH: {CVE_DESCRIPTION_PATH}")
     print(f"  TEMP_UPLOAD_DIR: {TEMP_UPLOAD_DIR}")
 
     print("\nModels:")

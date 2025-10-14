@@ -13,43 +13,13 @@ from tqdm import tqdm
 from config import (
     CVE_V5_PATH,
     CVE_V4_PATH,
+    CVE_DESCRIPTION_PATH,
     DEFAULT_SCHEMA
 )
 
-def extract_cve_info(data: dict) -> tuple[str, str, str, str] | None:
-    """Extract CVE information from v5 or v4 schema.
+# Import CVE lookup utilities
+from core.cve_lookup import extract_cve_fields
 
-    Returns: (cve_number, vendor_name, product_name, description) or None if failed
-    """
-    try:
-        # Try v5 schema first
-        if 'cveMetadata' in data:
-            cve_number = data['cveMetadata']['cveId']
-            affected_info = data['containers']['cna']['affected'][0]
-            vendor_name = affected_info.get('vendor') or affected_info.get('vendor_name', 'Unknown')
-            product_name = affected_info.get('product') or affected_info.get('product_name', 'Unknown')
-            description = data['containers']['cna']['descriptions'][0]['value']
-            return cve_number, vendor_name, product_name, description
-
-        # Try v4 schema
-        elif 'CVE_data_meta' in data:
-            cve_number = data['CVE_data_meta']['ID']
-            vendor_data = data['affects']['vendor']['vendor_data'][0]
-            vendor_name = vendor_data['vendor_name']
-            product_name = vendor_data['product']['product_data'][0]['product_name']
-
-            description_data = data['description']['description_data']
-            description = next(
-                (item['value'] for item in description_data if item.get('lang') == 'eng'),
-                description_data[0]['value'] if description_data else 'No description available.'
-            )
-            return cve_number, vendor_name, product_name, description
-
-        else:
-            return None
-
-    except (KeyError, IndexError, TypeError) as e:
-        return None
 
 
 def get_available_years(base_path: str) -> list[int]:
@@ -65,7 +35,7 @@ def get_available_years(base_path: str) -> list[int]:
     return sorted(years)
 
 
-def process_cve_directory(folder_path: str, source_label: str, output_file: str, processed_cves: set, verbose: bool = False):
+def process_cve_directory(folder_path: str, source_label: str, output_file: str, processed_cves: set, extension: str, verbose: bool = False):
     """Process CVE files from a directory and append to output file.
 
     Args:
@@ -73,6 +43,7 @@ def process_cve_directory(folder_path: str, source_label: str, output_file: str,
         source_label: Label for logging (e.g., "V5 CVE Schema (2024)")
         output_file: Output file path
         processed_cves: Set of already processed CVE IDs (for deduplication)
+        extension: Output format ('txt' or 'jsonl')
         verbose: Enable detailed logging (default: False)
 
     Returns:
@@ -106,35 +77,53 @@ def process_cve_directory(folder_path: str, source_label: str, output_file: str,
             with open(file_path, 'r', encoding='utf-8') as file:
                 data = json.load(file)
 
-            result = extract_cve_info(data)
+            # Use shared CVE extraction function from core module
+            cve_number, vendor_name, product_name, description = extract_cve_fields(data, file_name)
 
-            if result:
-                cve_number, vendor_name, product_name, description = result
+            # Check if already processed (V5 takes priority)
+            if cve_number in processed_cves:
+                if verbose:
+                    print(f"Skipped (already processed): {cve_number}")
+                skipped_count += 1
+                continue
 
-                # Check if already processed (V5 takes priority)
-                if cve_number in processed_cves:
-                    if verbose:
-                        print(f"Skipped (already processed): {cve_number}")
-                    skipped_count += 1
-                    continue
-
+            # Format output based on extension
+            if extension == 'txt':
+                # Text format (lossy, human-readable)
                 text_content = (
                     f"- CVE Number: {cve_number}, Vendor: {vendor_name}, "
                     f"Product: {product_name}, Description: {description}\n\n"
                 )
+            else:  # jsonl
+                # JSONL format (lossless, machine-readable)
+                # Determine schema type from data
+                schema_type = 'v5' if 'cveMetadata' in data else 'v4'
 
-                with open(output_file, 'a', encoding='utf-8') as f:
-                    f.write(text_content)
-                    if verbose:
-                        print("placed in")
+                # Extract year from CVE ID
+                year = cve_number.split('-')[1] if '-' in cve_number else 'unknown'
 
-                # Track processed CVE
-                processed_cves.add(cve_number)
-                processed_count += 1
-            else:
+                json_record = {
+                    'cve_id': cve_number,
+                    'vendor': vendor_name,
+                    'product': product_name,
+                    'description': description,
+                    'schema': schema_type,
+                    'year': year
+                }
+                text_content = json.dumps(json_record, ensure_ascii=False) + '\n'
+
+            with open(output_file, 'a', encoding='utf-8') as f:
+                f.write(text_content)
                 if verbose:
-                    print(f"Unknown schema format in {file_path}")
+                    print("placed in")
 
+            # Track processed CVE
+            processed_cves.add(cve_number)
+            processed_count += 1
+
+        except (KeyError, IndexError, TypeError) as e:
+            if verbose:
+                print(f"Could not parse CVE data in {file_path}: {e}")
         except Exception as e:
             if verbose:
                 print(f"Could not read file {file_path}: {e}")
@@ -175,6 +164,13 @@ Examples:
         action='store_true',
         help='Enable detailed logging (default: show progress only)'
     )
+    parser.add_argument(
+        '--extension',
+        type=str,
+        choices=['txt', 'jsonl'],
+        default='txt',
+        help='Output format: txt (human-readable, lossy) or jsonl (machine-readable, lossless) (default: txt)'
+    )
     args = parser.parse_args()
 
     # Determine which years to process
@@ -195,12 +191,13 @@ Examples:
             print(f"Error: Invalid year format '{args.year}'. Use single year (2024), comma-separated (2023,2024), or 'all'")
             return
 
-    # Determine output file name
-    if len(years) == 1:
-        output_file = f"CVEDescription{years[0]}.txt"
-    else:
-        year_range = f"{min(years)}-{max(years)}"
-        output_file = f"CVEDescription{year_range}.txt"
+    # Determine output file name using config path
+    output_file = f"{CVE_DESCRIPTION_PATH}.{args.extension}"
+
+    # Ensure output directory exists
+    output_dir = CVE_DESCRIPTION_PATH.parent
+    if not output_dir.exists():
+        output_dir.mkdir(parents=True, exist_ok=True)
 
     # Clear output file if it exists
     if os.path.exists(output_file):
@@ -215,10 +212,11 @@ Examples:
 
     # Print header
     print(f"\n{'='*60}")
-    print(f"Extract CVE Descriptions - Export to Text File")
+    print(f"Extract CVE Descriptions - Export to File")
     print(f"{'='*60}\n")
     print(f"Years:       {years}")
     print(f"Schema:      {args.schema}")
+    print(f"Format:      {args.extension} ({'human-readable' if args.extension == 'txt' else 'machine-readable'})")
     print(f"Output:      {output_file}")
     print(f"{'='*60}")
 
@@ -235,20 +233,20 @@ Examples:
         if args.schema in ['v5', 'all']:
             # Process V5 schema
             if processed_cves is not None:
-                v5_count, _ = process_cve_directory(v5_folder, f"V5 CVE Schema ({year})", output_file, processed_cves, args.verbose)
+                v5_count, _ = process_cve_directory(v5_folder, f"V5 CVE Schema ({year})", output_file, processed_cves, args.extension, args.verbose)
             else:
                 # No dedup needed for v5-only
-                v5_count, _ = process_cve_directory(v5_folder, f"V5 CVE Schema ({year})", output_file, set(), args.verbose)
+                v5_count, _ = process_cve_directory(v5_folder, f"V5 CVE Schema ({year})", output_file, set(), args.extension, args.verbose)
             total_v5_count += v5_count
 
         if args.schema in ['v4', 'all']:
             # Process V4 schema
             if processed_cves is not None:
-                v4_count, v4_skipped = process_cve_directory(v4_folder, f"V4 CVE Schema ({year})", output_file, processed_cves, args.verbose)
+                v4_count, v4_skipped = process_cve_directory(v4_folder, f"V4 CVE Schema ({year})", output_file, processed_cves, args.extension, args.verbose)
                 total_v4_skipped += v4_skipped
             else:
                 # No dedup needed for v4-only
-                v4_count, _ = process_cve_directory(v4_folder, f"V4 CVE Schema ({year})", output_file, set(), args.verbose)
+                v4_count, _ = process_cve_directory(v4_folder, f"V4 CVE Schema ({year})", output_file, set(), args.extension, args.verbose)
             total_v4_count += v4_count
 
         # Print summary based on schema
@@ -279,7 +277,10 @@ Examples:
     print(f"{'='*60}")
 
     print(f"\n✅ Extraction completed successfully!")
-    print(f"\n💡 Text file created at: {output_file}")
+    print(f"\n💡 File created at: {output_file}")
+    if args.extension == 'jsonl':
+        print(f"\n💡 JSONL format preserves all metadata (schema, year, etc.)")
+        print(f"   Use with build_embeddings.py option 3 for lossless processing")
 
 
 if __name__ == "__main__":

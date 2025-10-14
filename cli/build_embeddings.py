@@ -69,6 +69,99 @@ def split(input_list, chunk_size):
     """Split a list into chunks of specified size."""
     return [input_list[i:i + chunk_size] for i in range(0, len(input_list), chunk_size)]
 
+def process_cve_file(cve_file_path):
+    """Read CVE data from text or JSONL file.
+
+    Args:
+        cve_file_path: Path to TXT or JSONL file
+
+    Returns:
+        list: List of CVE data dictionaries with sentence_chunk and metadata
+    """
+    print(f"\n{'='*60}")
+    print(f"Processing CVE File")
+    print(f"  File: {cve_file_path}")
+    print(f"{'='*60}\n")
+
+    cve_data = []
+    file_ext = Path(cve_file_path).suffix.lower()
+
+    if not Path(cve_file_path).exists():
+        print(f"❌ File not found: {cve_file_path}")
+        return []
+
+    if file_ext == '.jsonl':
+        # JSONL format (lossless)
+        print("Format: JSONL (lossless, preserves all metadata)")
+        with open(cve_file_path, 'r', encoding='utf-8') as f:
+            for line_num, line in enumerate(tqdm(f.readlines(), desc="Reading JSONL"), 1):
+                try:
+                    record = json.loads(line.strip())
+                    cve_text = (
+                        f"CVE Number: {record['cve_id']}, "
+                        f"Vendor: {record['vendor']}, "
+                        f"Product: {record['product']}, "
+                        f"Description: {record['description']}"
+                    )
+                    cve_data.append({
+                        "sentence_chunk": cve_text,
+                        "source_type": "cve",
+                        "source_name": f"CVE_{record['year']}_{record['schema']}",
+                        "cve_id": record['cve_id']
+                    })
+                except (json.JSONDecodeError, KeyError) as e:
+                    print(f"⚠️ Skipping line {line_num}: {e}")
+                    continue
+
+    elif file_ext == '.txt':
+        # TXT format (lossy, need to parse and infer)
+        print("Format: TXT (lossy, metadata inferred from content)")
+        with open(cve_file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+
+        # Split by entries (each starts with "- CVE Number:")
+        entries = [e.strip() for e in content.split('- CVE Number:') if e.strip()]
+
+        for entry in tqdm(entries, desc="Parsing TXT"):
+            try:
+                # Parse: "CVE-YYYY-XXXXX, Vendor: ..., Product: ..., Description: ..."
+                parts = entry.split(', ', 3)  # Split into 4 parts max
+                if len(parts) < 4:
+                    continue
+
+                cve_id = parts[0].strip()
+                vendor = parts[1].replace('Vendor:', '').strip()
+                product = parts[2].replace('Product:', '').strip()
+                description = parts[3].replace('Description:', '').strip()
+
+                # Infer year from CVE ID
+                year = cve_id.split('-')[1] if '-' in cve_id else 'unknown'
+
+                cve_text = (
+                    f"CVE Number: {cve_id}, "
+                    f"Vendor: {vendor}, "
+                    f"Product: {product}, "
+                    f"Description: {description}"
+                )
+
+                cve_data.append({
+                    "sentence_chunk": cve_text,
+                    "source_type": "cve",
+                    "source_name": f"CVE_{year}_file",  # Schema unknown
+                    "cve_id": cve_id
+                })
+
+            except Exception as e:
+                print(f"⚠️ Error parsing entry: {e}")
+                continue
+
+    else:
+        print(f"❌ Unsupported file format: {file_ext}. Use .txt or .jsonl")
+        return []
+
+    print(f"\nExtracted {len(cve_data)} CVE descriptions")
+    return cve_data
+
 def process_cve_data(year, schema, batch_size, precision):
     """Extract CVE data and return texts with metadata."""
     print(f"\n{'='*60}")
@@ -291,8 +384,9 @@ Examples:
     # Ask user what to process
     print("What would you like to build embeddings from?")
     print("1. PDF file")
-    print("2. CVE data by year")
-    choice = input("\nEnter your choice (1 or 2): ").strip()
+    print("2. CVE data by year (from JSON feeds)")
+    print("3. CVE text/JSONL file (from extract_cve.py)")
+    choice = input("\nEnter your choice (1-3): ").strip()
 
     # Construct output path
     output_path = f"{EMBEDDING_PATH}.{args.extension}"
@@ -304,11 +398,13 @@ Examples:
         pdf_path = input("\nEnter PDF file path: ").strip()
         year = None
         schema = None
+        cve_file = None
 
     elif choice == '2':
-        # CVE mode
+        # CVE JSON mode
         source_type = 'cve'
         pdf_path = None
+        cve_file = None
         year_input = input("\nEnter year for CVE data (e.g., 2024): ").strip()
         try:
             year = int(year_input)
@@ -324,6 +420,14 @@ Examples:
         schema_map = {'1': 'v5', '2': 'v4', '3': 'all'}
         schema = schema_map.get(schema_choice, 'all')
 
+    elif choice == '3':
+        # CVE file mode (TXT or JSONL)
+        source_type = 'cve_file'
+        pdf_path = None
+        year = None
+        schema = None
+        cve_file = input("\nEnter CVE file path (.txt or .jsonl): ").strip()
+
     else:
         print(f"❌ Invalid choice: {choice}")
         sys.exit(1)
@@ -335,9 +439,11 @@ Examples:
     print(f"Source:      {source_type}")
     if source_type == 'pdf':
         print(f"File:        {pdf_path}")
-    else:
+    elif source_type == 'cve':
         print(f"Year:        {year}")
         print(f"Schema:      {schema}")
+    elif source_type == 'cve_file':
+        print(f"File:        {cve_file}")
     print(f"Speed:       {speed_desc}")
     print(f"Chunk size:  {SENTENCE_SIZE} sentences")
     print(f"Batch size:  {BATCH_SIZE}")
@@ -350,7 +456,87 @@ Examples:
     if source_type == 'pdf':
         process_pdf(pdf_path, SENTENCE_SIZE, output_path, BATCH_SIZE, PRECISION, args.extension)
 
-    else:  # CVE mode
+    elif source_type == 'cve_file':
+        # Process CVE from file
+        dic_chunks = process_cve_file(cve_file)
+
+        if not dic_chunks:
+            print("❌ No CVE data found to process")
+            sys.exit(1)
+
+        # Initialize SentenceTransformer
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        print(f"\nInitializing embedding model on {device}...")
+        embedding_model = SentenceTransformer(model_name_or_path=EMBEDDING_MODEL_NAME, device=device)
+
+        # Generate embeddings
+        print(f"Generating embeddings for {len(dic_chunks)} CVE descriptions...")
+        sentence_list = [item["sentence_chunk"] for item in dic_chunks]
+
+        embeddings = embedding_model.encode(
+            sentence_list,
+            batch_size=BATCH_SIZE,
+            show_progress_bar=True,
+            convert_to_numpy=True
+        )
+
+        if PRECISION == 'float16':
+            embeddings = embeddings.astype(np.float16)
+            print(f"  └─ Converted embeddings to float16 (50% memory reduction)")
+
+        # Assign embeddings
+        for idx, item in enumerate(dic_chunks):
+            item["embedding"] = embeddings[idx]
+
+        # Save based on extension
+        print(f"\nSaving embeddings to {output_path}...")
+        if args.extension == 'csv':
+            pd.DataFrame(dic_chunks).to_csv(output_path, index=False)
+        elif args.extension == 'pkl':
+            with open(output_path, 'wb') as f:
+                pickle.dump(dic_chunks, f)
+        elif args.extension == 'parquet':
+            df_output = pd.DataFrame(dic_chunks)
+            df_output.to_parquet(output_path, compression='snappy')
+        elif args.extension == 'chroma':
+            client = chromadb.PersistentClient(path=output_path)
+            try:
+                client.delete_collection("cve_embeddings")
+            except:
+                pass
+            collection = client.create_collection(
+                name="cve_embeddings",
+                metadata={"description": "CVE embeddings for RAG system"}
+            )
+            ids = [f"chunk_{i}" for i in range(len(dic_chunks))]
+            embeddings_list = [item["embedding"].tolist() for item in dic_chunks]
+            documents = [item["sentence_chunk"] for item in dic_chunks]
+
+            # Add metadata
+            metadatas = [
+                {
+                    "source_type": item.get("source_type", "cve"),
+                    "source_name": item.get("source_name", "CVE_file"),
+                    "cve_id": item.get("cve_id", ""),
+                }
+                for item in dic_chunks
+            ]
+
+            batch_size = 5000
+            for i in range(0, len(ids), batch_size):
+                collection.add(
+                    ids=ids[i:i+batch_size],
+                    embeddings=embeddings_list[i:i+batch_size],
+                    documents=documents[i:i+batch_size],
+                    metadatas=metadatas[i:i+batch_size]
+                )
+            print(f"  └─ Stored {len(dic_chunks)} embeddings in Chroma database")
+
+        print(f"✅ Generated: {output_path}")
+        print(f"\n💡 To use this with validate_report.py, run:")
+        print(f"   python validate_report.py --extension={args.extension}")
+
+    else:  # CVE JSON mode
         # Process CVE data
         dic_chunks = process_cve_data(year, schema, BATCH_SIZE, PRECISION)
 
