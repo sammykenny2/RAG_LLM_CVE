@@ -252,6 +252,10 @@ class ChromaManager:
         sources = {}
 
         for meta in metadatas:
+            # Handle None metadata (documents added without metadata)
+            if meta is None:
+                meta = {}
+
             source_type = meta.get('source_type', 'unknown')
             source_name = meta.get('source_name', 'unknown')
 
