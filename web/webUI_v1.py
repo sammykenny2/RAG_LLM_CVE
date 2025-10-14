@@ -98,19 +98,26 @@ def initialize_system(speed_level: str = DEFAULT_SPEED):
 # Chat interface handlers
 # =============================================================================
 
-def chat_respond(message: str, history: list) -> tuple:
+def chat_respond(message: str, history: list):
     """
     Handle chat messages with RAG context retrieval.
+
+    Generator function that yields intermediate states for better UX.
 
     Args:
         message: User message
         history: Gradio chat history format [[user, bot], ...]
 
-    Returns:
+    Yields:
         tuple: (empty string for input clear, updated history)
     """
     if not message.strip():
-        return "", history
+        yield "", history
+        return
+
+    # Immediately show user message with "Thinking..." placeholder
+    history.append([message, "💭 Thinking..."])
+    yield "", history
 
     try:
         # Query RAG system
@@ -120,15 +127,14 @@ def chat_respond(message: str, history: list) -> tuple:
             max_tokens=512
         )
 
-        # Update history
-        history.append([message, response])
-
-        return "", history
+        # Update history with actual response
+        history[-1][1] = response
+        yield "", history
 
     except Exception as e:
         error_msg = f"❌ Error: {str(e)}"
-        history.append([message, error_msg])
-        return "", history
+        history[-1][1] = error_msg
+        yield "", history
 
 def upload_for_validation(file) -> str:
     """
@@ -440,9 +446,6 @@ def create_interface():
                     kb_message = gr.Textbox(label="Status", interactive=False)
 
         # Event handlers
-        def handle_send(message, history):
-            return chat_respond(message, history)
-
         def handle_upload(file):
             # Show instructions when file is uploaded
             instruction_msg = upload_for_validation(file)
@@ -456,9 +459,9 @@ def create_interface():
         def handle_refresh_kb():
             return format_kb_display()
 
-        # Connect events
-        msg_input.submit(handle_send, [msg_input, chatbot], [msg_input, chatbot])
-        send_btn.click(handle_send, [msg_input, chatbot], [msg_input, chatbot])
+        # Connect events - directly bind chat_respond (it's a generator)
+        msg_input.submit(chat_respond, [msg_input, chatbot], [msg_input, chatbot])
+        send_btn.click(chat_respond, [msg_input, chatbot], [msg_input, chatbot])
 
         upload_file.change(handle_upload, [upload_file], [msg_input])
 
