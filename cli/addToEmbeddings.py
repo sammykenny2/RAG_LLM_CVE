@@ -19,6 +19,9 @@ Usage:
 import argparse
 import sys
 from pathlib import Path
+# Add project root to Python path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 from datetime import datetime
 from tqdm.auto import tqdm
 import pandas as pd
