@@ -16,5 +16,6 @@ torchvision
 huggingface_hub
 pandas
 pyarrow
+chromadb
 reportlab
 spacy

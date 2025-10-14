@@ -45,6 +45,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pickle
+import chromadb
 from sentence_transformers import util, SentenceTransformer
 
 # ============================================================================
@@ -59,8 +60,8 @@ parser.add_argument('--schema', type=str, choices=['v5', 'v4', 'all'], default='
                     help='CVE schema to use: v5 (CVE 5.0 only), v4 (CVE 4.0 only), or all (v5→v4 fallback, default)')
 parser.add_argument('--speed', type=str, choices=['normal', 'fast', 'fastest'], default='fast',
                     help='Optimization level: normal=baseline (chunk-aware only), fast=recommended (default, +FP16), fastest=aggressive (+lower temp +SDPA)')
-parser.add_argument('--extension', type=str, choices=['csv', 'pkl', 'parquet'], default='pkl',
-                    help='Embedding file extension: csv (text), pkl (default, balanced), parquet (optimal, requires pyarrow)')
+parser.add_argument('--extension', type=str, choices=['csv', 'pkl', 'parquet', 'chroma'], default='pkl',
+                    help='Embedding file extension: csv (text), pkl (default, balanced), parquet (optimal), chroma (vector database, no server)')
 args = parser.parse_args()
 
 DEMO_MODE = (args.mode == 'demo')
@@ -149,8 +150,9 @@ if USE_CUDNN_OPTIMIZATIONS:
 
 llamaSug = ""
 
-# Check embedding file exists
+# Check embedding file/directory exists (consistent naming: CVEEmbeddings.{extension})
 EMBEDDING_FILE = f"CVEEmbeddings.{EMBEDDING_EXTENSION}"
+
 if not os.path.exists(EMBEDDING_FILE):
     print(f"❌ Error: {EMBEDDING_FILE} not found!")
     print(f"💡 Generate it first with:")
@@ -486,38 +488,61 @@ def extract_cve_fields(data: dict, fallback_id: str) -> tuple[str, str, str, str
 def asking_llama_for_advice(cveDesp: str) -> str:
     """Recommend similar CVE using preloaded embedding model (optimized)."""
     # Load embeddings based on file extension
-    if EMBEDDING_EXTENSION == 'csv':
-        # CSV format
-        if MAX_EMBEDDING_ROWS is not None:
-            chunk_embeddings_df = pd.read_csv(EMBEDDING_FILE, nrows=MAX_EMBEDDING_ROWS)
-        else:
-            chunk_embeddings_df = pd.read_csv(EMBEDDING_FILE)
-        chunk_embeddings_df["embedding"] = chunk_embeddings_df["embedding"].apply(lambda x: np.fromstring(x.strip("[]"), sep=" "))
+    if EMBEDDING_EXTENSION == 'chroma':
+        # Chroma vector database
+        client = chromadb.PersistentClient(path=EMBEDDING_FILE)
+        collection = client.get_collection("cve_embeddings")
 
-    elif EMBEDDING_EXTENSION == 'pkl':
-        # Pickle format
-        with open(EMBEDDING_FILE, 'rb') as f:
-            data = pickle.load(f)
-        chunk_embeddings_df = pd.DataFrame(data)
-        if MAX_EMBEDDING_ROWS is not None:
-            chunk_embeddings_df = chunk_embeddings_df.head(MAX_EMBEDDING_ROWS)
+        # Query Chroma directly (no need to load all embeddings)
+        n_results = TOP_K_RETRIEVAL if MAX_EMBEDDING_ROWS is None else min(TOP_K_RETRIEVAL, MAX_EMBEDDING_ROWS)
 
-    elif EMBEDDING_EXTENSION == 'parquet':
-        # Parquet format
-        chunk_embeddings_df = pd.read_parquet(EMBEDDING_FILE)
-        if MAX_EMBEDDING_ROWS is not None:
-            chunk_embeddings_df = chunk_embeddings_df.head(MAX_EMBEDDING_ROWS)
+        # Encode query using global embedding model
+        query_embedding = embedding_model.encode(cveDesp, convert_to_tensor=False)
 
-    embeddings = torch.tensor(np.stack(chunk_embeddings_df["embedding"].tolist(), axis=0), dtype=torch.float32).to(device)
+        # Query Chroma
+        results = collection.query(
+            query_embeddings=[query_embedding.tolist()],
+            n_results=n_results
+        )
 
-    text_chunks = chunk_embeddings_df.to_dict(orient="records")
+        # Extract context from Chroma results
+        context_items = results['documents'][0]  # List of document strings
+        context_str = "- " + "\n- ".join(context_items)
 
-    # Use global embedding_model instead of creating new instance
-    indices = retrieve_context(query=cveDesp, embeddings=embeddings, model=embedding_model)
+    else:
+        # File-based formats (csv, pkl, parquet)
+        if EMBEDDING_EXTENSION == 'csv':
+            # CSV format
+            if MAX_EMBEDDING_ROWS is not None:
+                chunk_embeddings_df = pd.read_csv(EMBEDDING_FILE, nrows=MAX_EMBEDDING_ROWS)
+            else:
+                chunk_embeddings_df = pd.read_csv(EMBEDDING_FILE)
+            chunk_embeddings_df["embedding"] = chunk_embeddings_df["embedding"].apply(lambda x: np.fromstring(x.strip("[]"), sep=" "))
 
-    context_items = [text_chunks[i] for i in indices]
+        elif EMBEDDING_EXTENSION == 'pkl':
+            # Pickle format
+            with open(EMBEDDING_FILE, 'rb') as f:
+                data = pickle.load(f)
+            chunk_embeddings_df = pd.DataFrame(data)
+            if MAX_EMBEDDING_ROWS is not None:
+                chunk_embeddings_df = chunk_embeddings_df.head(MAX_EMBEDDING_ROWS)
 
-    context_str = "- " + "\n- ".join([item["sentence_chunk"] for item in context_items])
+        elif EMBEDDING_EXTENSION == 'parquet':
+            # Parquet format
+            chunk_embeddings_df = pd.read_parquet(EMBEDDING_FILE)
+            if MAX_EMBEDDING_ROWS is not None:
+                chunk_embeddings_df = chunk_embeddings_df.head(MAX_EMBEDDING_ROWS)
+
+        embeddings = torch.tensor(np.stack(chunk_embeddings_df["embedding"].tolist(), axis=0), dtype=torch.float32).to(device)
+
+        text_chunks = chunk_embeddings_df.to_dict(orient="records")
+
+        # Use global embedding_model instead of creating new instance
+        indices = retrieve_context(query=cveDesp, embeddings=embeddings, model=embedding_model)
+
+        context_items = [text_chunks[i] for i in indices]
+
+        context_str = "- " + "\n- ".join([item["sentence_chunk"] for item in context_items])
 
     messages = [
         {"role": "system", "content": f""""You are a Q&A Assistant. You will be provided with relevant information about various CVEs. Based on this information, your task is to recommend the CVE number that most closely matches the description of the vulnerability.
@@ -543,9 +568,10 @@ def asking_llama_for_advice(cveDesp: str) -> str:
     response = outputs[0][input_ids.shape[-1]:]
     llamaSug = tokenizer.decode(response, skip_special_tokens=True)
 
-    # Cleanup
-    del embeddings
-    del text_chunks
+    # Cleanup (only for non-chroma formats)
+    if EMBEDDING_EXTENSION != 'chroma':
+        del embeddings
+        del text_chunks
     torch.cuda.empty_cache()
     gc.collect()
 

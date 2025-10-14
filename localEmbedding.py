@@ -7,6 +7,7 @@ import torch
 import numpy as np
 import argparse
 import pickle
+import chromadb
 
 def read_pdf(pdf_path):
     """Extract text from each page of the PDF and return as a list of dictionaries."""
@@ -96,9 +97,40 @@ def process_pdf(pdf_path, sentence_size, output_path, batch_size, precision, ext
     elif extension == 'parquet':
         df_output = pd.DataFrame(dic_chunks)
         df_output.to_parquet(output_path, compression='snappy')
+    elif extension == 'chroma':
+        # Chroma vector database (persistent, no server required)
+        client = chromadb.PersistentClient(path=output_path)
+
+        # Delete existing collection if it exists (to allow re-creation)
+        try:
+            client.delete_collection("cve_embeddings")
+        except:
+            pass
+
+        # Create new collection
+        collection = client.create_collection(
+            name="cve_embeddings",
+            metadata={"description": "CVE embeddings for RAG system"}
+        )
+
+        # Prepare data for Chroma
+        ids = [f"chunk_{i}" for i in range(len(dic_chunks))]
+        embeddings_list = [item["embedding"].tolist() for item in dic_chunks]
+        documents = [item["sentence_chunk"] for item in dic_chunks]
+
+        # Add to collection in batches (Chroma has batch size limits)
+        batch_size = 5000
+        for i in range(0, len(ids), batch_size):
+            collection.add(
+                ids=ids[i:i+batch_size],
+                embeddings=embeddings_list[i:i+batch_size],
+                documents=documents[i:i+batch_size]
+            )
+
+        print(f"  └─ Stored {len(dic_chunks)} embeddings in Chroma database")
 
     print(f"✅ Generated: {output_path}")
-    print(f"💡 To use this file with theRag.py, run:")
+    print(f"💡 To use this with theRag.py, run:")
     print(f"   python theRag.py --extension={extension}")
 
 
@@ -125,9 +157,9 @@ Examples:
     parser.add_argument(
         '--extension',
         type=str,
-        choices=['csv', 'pkl', 'parquet'],
+        choices=['csv', 'pkl', 'parquet', 'chroma'],
         default='pkl',
-        help='Output format: csv (text), pkl (default, balanced), parquet (optimal, requires pyarrow)'
+        help='Output format: csv (text), pkl (default, balanced), parquet (optimal), chroma (vector database, no server)'
     )
     args = parser.parse_args()
 
@@ -152,7 +184,7 @@ Examples:
     pdf_path = input("Please enter the PDF file path (with .pdf extension): ")
     base_name = input("Please enter the output file name (without extension): ")
 
-    # Construct output path with extension
+    # Construct output path with extension (consistent naming for all formats)
     output_path = f"{base_name}.{args.extension}"
 
     # Process PDF

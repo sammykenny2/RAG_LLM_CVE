@@ -14,15 +14,17 @@ This file tracks completed changes and upcoming features for the project.
   - `csv`: Text format, largest (~95 MB), slowest read, maximum compatibility
   - `pkl`: Pickle (default), balanced (~33 MB), Python-native
   - `parquet`: Parquet, smallest (~24 MB), fastest read (5-10x), requires pyarrow
+  - `chroma`: Vector database (directory-based), optimized queries, no server required, best for large datasets
 - **Automatic device selection**: Initializes SentenceTransformer directly on correct device (CPU/CUDA)
 - **Progress reporting**: Real-time progress bar during batch encoding
 
 ### Added (theRag.py)
 - **Embedding format support** via `--extension` parameter:
-  - Reads `CVEEmbeddings.{extension}` based on parameter
-  - Supports csv, pkl (default), parquet formats
-  - File existence check with helpful error messages
+  - Reads `CVEEmbeddings.{extension}` (or directory for chroma) based on parameter
+  - Supports csv, pkl (default), parquet, chroma formats
+  - File/directory existence check with helpful error messages
 - **Format-specific loading**: Optimized readers for each format
+  - Chroma: Direct vector database queries (no need to load all embeddings into memory)
 
 ### Added (extractCVE.py)
 - **Verbose mode** via `--verbose` or `-v` flag:
@@ -33,8 +35,9 @@ This file tracks completed changes and upcoming features for the project.
 ### Changed
 - **localEmbedding.py**: Default output format changed to `.pkl` (from `.csv`)
 - **theRag.py**: Default embedding format changed to `.pkl` (from `.csv`)
-- **requirements.txt**: Added `pyarrow` for parquet support
-- User input flow: Now asks for base filename without extension
+- **requirements.txt**: Added `pyarrow` for parquet support, `chromadb` for vector database support
+- User input flow: Now asks for base filename without extension (for file-based formats)
+- Chroma format creates directory instead of file (e.g., `CVEEmbeddings/` instead of `CVEEmbeddings.pkl`)
 
 ### Performance Impact (localEmbedding.py)
 - **Batch encoding speedup**:
@@ -61,6 +64,12 @@ This file tracks completed changes and upcoming features for the project.
 - `theRag.py --speed=fast --extension=pkl` → Successfully loaded and processed
 - `theRag.py --speed=fastest --extension=parquet` → Successfully loaded and processed
 - All combinations tested on CUDA 11.8 (GTX 1660 Ti) without issues
+
+✅ **Chroma integration (2025-01-14)**:
+- Added chromadb to requirements.txt
+- `localEmbedding.py --extension=chroma` → Creates CVEEmbeddings/ directory with vector database
+- `theRag.py --extension=chroma` → Direct query from Chroma database (no memory loading)
+- Persistent client mode (no server required)
 
 ### Bug Fixes
 - Fixed `SentenceTransformer.encode()` dtype parameter issue (not supported)
