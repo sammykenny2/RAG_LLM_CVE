@@ -62,7 +62,6 @@ temp/
 
 # Embedding files (auto-generated, large files)
 # Note: Existing files on GitHub will remain, but future changes won't be tracked
-CVEEmbeddings/
 CVEEmbeddings.csv
 CVEEmbeddings.pkl
 CVEEmbeddings.parquet
