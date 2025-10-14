@@ -156,8 +156,8 @@ Examples:
         '--schema',
         type=str,
         choices=['v5', 'v4', 'all'],
-        default=DEFAULT_SCHEMA,
-        help=f'Schema to process: v5 (fastest), v4, or all (both with deduplication) (default: {DEFAULT_SCHEMA})'
+        default='v5',
+        help='Schema to process: v5 (fastest), v4, or all (both with deduplication) (default: v5)'
     )
     parser.add_argument(
         '--verbose', '-v',
@@ -168,8 +168,8 @@ Examples:
         '--extension',
         type=str,
         choices=['txt', 'jsonl'],
-        default='txt',
-        help='Output format: txt (human-readable, lossy) or jsonl (machine-readable, lossless) (default: txt)'
+        default='jsonl',
+        help='Output format: txt (human-readable, lossy) or jsonl (machine-readable, lossless) (default: jsonl)'
     )
     args = parser.parse_args()
 
