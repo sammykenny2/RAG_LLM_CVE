@@ -33,6 +33,19 @@ from config import (
 # Import CVE lookup utilities
 from core.cve_lookup import extract_cve_fields
 
+def get_available_years(base_path):
+    """Scan directory for available year folders."""
+    import os
+    if not os.path.exists(base_path):
+        return []
+
+    years = []
+    for item in os.listdir(base_path):
+        item_path = os.path.join(base_path, item)
+        if os.path.isdir(item_path) and item.isdigit() and len(item) == 4:
+            years.append(int(item))
+    return sorted(years)
+
 def read_pdf(pdf_path):
     """Extract text from each page of the PDF and return as a list of dictionaries."""
     pdf = fitz.open(pdf_path)
@@ -177,75 +190,101 @@ def process_cve_file(cve_file_path, keyword_filter=None):
         print(f"\nExtracted {len(cve_data)} CVE descriptions")
     return cve_data
 
-def process_cve_data(year, schema, batch_size, precision, keyword_filter=None):
-    """Extract CVE data and return texts with metadata."""
+def process_cve_data(years, schema, batch_size, precision, keyword_filter=None):
+    """Extract CVE data and return texts with metadata.
+
+    Args:
+        years: List of years to process
+        schema: 'v5', 'v4', or 'all'
+        batch_size: Batch size for processing
+        precision: 'float32' or 'float16'
+        keyword_filter: Optional keyword filter
+
+    Returns:
+        list: CVE data dictionaries
+    """
     print(f"\n{'='*60}")
     print(f"Processing CVE Data")
-    print(f"  Year: {year}")
+    print(f"  Years: {years}")
     print(f"  Schema: {schema}")
     if keyword_filter:
         print(f"  Filter: '{keyword_filter}' (case-insensitive)")
     print(f"{'='*60}\n")
 
-    # Determine paths based on schema
-    paths_to_check = []
-    if schema in ['v5', 'all']:
-        v5_year_path = CVE_V5_PATH / str(year)
-        if v5_year_path.exists():
-            paths_to_check.append(('v5', v5_year_path))
+    # Collect all CVE descriptions from all years
+    all_cve_data = []
 
-    if schema in ['v4', 'all']:
-        v4_year_path = CVE_V4_PATH / str(year)
-        if v4_year_path.exists():
-            paths_to_check.append(('v4', v4_year_path))
+    for year in years:
+        print(f"\n{'='*60}")
+        print(f"Processing Year: {year}")
+        print(f"{'='*60}")
 
-    if not paths_to_check:
-        print(f"❌ No CVE data found for year {year} with schema {schema}")
-        return []
+        # Determine paths based on schema
+        paths_to_check = []
+        if schema in ['v5', 'all']:
+            v5_year_path = CVE_V5_PATH / str(year)
+            if v5_year_path.exists():
+                paths_to_check.append(('v5', v5_year_path))
 
-    # Collect all CVE descriptions
-    cve_data = []
+        if schema in ['v4', 'all']:
+            v4_year_path = CVE_V4_PATH / str(year)
+            if v4_year_path.exists():
+                paths_to_check.append(('v4', v4_year_path))
 
-    for schema_type, year_path in paths_to_check:
-        print(f"Scanning {schema_type.upper()} directory: {year_path}")
+        if not paths_to_check:
+            print(f"⚠️ No CVE data found for year {year} with schema {schema}")
+            continue
 
-        for subdir in tqdm(list(year_path.iterdir()), desc=f"Processing {schema_type}"):
-            if not subdir.is_dir():
-                continue
+        year_cve_count = 0
 
-            for json_file in subdir.glob("*.json"):
-                try:
-                    with open(json_file, 'r', encoding='utf-8') as f:
-                        data = json.load(f)
+        for schema_type, year_path in paths_to_check:
+            print(f"Scanning {schema_type.upper()} directory: {year_path}")
 
-                    cve_id, vendor, product, description = extract_cve_fields(data, json_file.stem)
-
-                    cve_text = (
-                        f"CVE Number: {cve_id}, "
-                        f"Vendor: {vendor}, "
-                        f"Product: {product}, "
-                        f"Description: {description}"
-                    )
-
-                    # Apply keyword filter if specified
-                    if keyword_filter and keyword_filter.lower() not in cve_text.lower():
-                        continue
-
-                    cve_data.append({
-                        "sentence_chunk": cve_text,
-                        "source_type": "cve",
-                        "source_name": f"CVE_{year}_{schema_type}",
-                        "cve_id": cve_id
-                    })
-
-                except Exception as e:
+            for subdir in tqdm(list(year_path.iterdir()), desc=f"Processing {schema_type} ({year})"):
+                if not subdir.is_dir():
                     continue
 
+                for json_file in subdir.glob("*.json"):
+                    try:
+                        with open(json_file, 'r', encoding='utf-8') as f:
+                            data = json.load(f)
+
+                        cve_id, vendor, product, description = extract_cve_fields(data, json_file.stem)
+
+                        cve_text = (
+                            f"CVE Number: {cve_id}, "
+                            f"Vendor: {vendor}, "
+                            f"Product: {product}, "
+                            f"Description: {description}"
+                        )
+
+                        # Apply keyword filter if specified
+                        if keyword_filter and keyword_filter.lower() not in cve_text.lower():
+                            continue
+
+                        all_cve_data.append({
+                            "sentence_chunk": cve_text,
+                            "source_type": "cve",
+                            "source_name": f"CVE_{year}_{schema_type}",
+                            "cve_id": cve_id
+                        })
+                        year_cve_count += 1
+
+                    except Exception as e:
+                        continue
+
+        print(f"Year {year}: Extracted {year_cve_count} CVE descriptions")
+
     if keyword_filter:
-        print(f"\n✅ Extracted {len(cve_data)} CVE descriptions (filtered by '{keyword_filter}')")
+        print(f"\n{'='*60}")
+        print(f"✅ Total: Extracted {len(all_cve_data)} CVE descriptions (filtered by '{keyword_filter}')")
+        print(f"{'='*60}")
     else:
-        print(f"\nExtracted {len(cve_data)} CVE descriptions")
-    return cve_data
+        print(f"\n{'='*60}")
+        print(f"Total: Extracted {len(all_cve_data)} CVE descriptions")
+        print(f"{'='*60}")
+
+    return all_cve_data
 
 def process_pdf(pdf_path, sentence_size, output_path, batch_size, precision, extension):
     """Process PDF to extract text, split into chunks, generate embeddings, and save to file."""
@@ -451,13 +490,9 @@ Examples:
         source_type = 'cve'
         pdf_path = None
         cve_file = None
-        year_input = input("\nEnter year for CVE data (e.g., 2025): ").strip()
-        try:
-            year = int(year_input)
-        except ValueError:
-            print(f"❌ Invalid year: {year_input}")
-            sys.exit(1)
+        year_input = input("\nEnter year(s) for CVE data (e.g., 2025, 2023-2025, or 'all'): ").strip()
 
+        # Determine schema first (needed for 'all' year detection)
         print("\nSelect CVE schema:")
         print("1. v5 only (fastest)")
         print("2. v4 only")
@@ -465,6 +500,46 @@ Examples:
         schema_choice = input("Enter your choice (1-3, default=3): ").strip() or '3'
         schema_map = {'1': 'v5', '2': 'v4', '3': 'all'}
         schema = schema_map.get(schema_choice, 'all')
+
+        # Parse year input
+        if year_input.lower() == 'all':
+            # Scan directories based on schema selection
+            v5_years = get_available_years(str(CVE_V5_PATH)) if schema in ['v5', 'all'] else []
+            v4_years = get_available_years(str(CVE_V4_PATH)) if schema in ['v4', 'all'] else []
+            years = sorted(set(v5_years + v4_years))
+            if not years:
+                print(f"❌ No year directories found in CVE feeds for schema '{schema}'")
+                sys.exit(1)
+            print(f"Processing all available years: {years}")
+        elif '-' in year_input:
+            # Range format: 2023-2025
+            try:
+                start_year, end_year = year_input.split('-')
+                start_year = int(start_year.strip())
+                end_year = int(end_year.strip())
+                if start_year > end_year:
+                    print(f"❌ Invalid range: start year {start_year} > end year {end_year}")
+                    sys.exit(1)
+                years = list(range(start_year, end_year + 1))
+                print(f"Processing years {start_year}-{end_year}: {years}")
+            except ValueError:
+                print(f"❌ Invalid year range format: {year_input}. Use format: 2023-2025")
+                sys.exit(1)
+        elif ',' in year_input:
+            # Comma-separated format: 2023,2024,2025
+            try:
+                years = [int(y.strip()) for y in year_input.split(',')]
+                print(f"Processing years: {years}")
+            except ValueError:
+                print(f"❌ Invalid year format: {year_input}. Use single year (2025), range (2023-2025), comma-separated (2023,2024,2025), or 'all'")
+                sys.exit(1)
+        else:
+            # Single year
+            try:
+                years = [int(year_input)]
+            except ValueError:
+                print(f"❌ Invalid year format: {year_input}. Use single year (2025), range (2023-2025), comma-separated (2023,2024,2025), or 'all'")
+                sys.exit(1)
 
         # Ask for filter keyword
         filter_input = input("\nFilter CVEs by keyword (leave empty for all): ").strip()
@@ -492,7 +567,7 @@ Examples:
     if source_type == 'pdf':
         print(f"File:        {pdf_path}")
     elif source_type == 'cve':
-        print(f"Year:        {year}")
+        print(f"Years:       {years}")
         print(f"Schema:      {schema}")
         if args.filter:
             print(f"Filter:      '{args.filter}' (case-insensitive)")
@@ -594,7 +669,7 @@ Examples:
 
     else:  # CVE JSON mode
         # Process CVE data
-        dic_chunks = process_cve_data(year, schema, BATCH_SIZE, PRECISION, keyword_filter=args.filter)
+        dic_chunks = process_cve_data(years, schema, BATCH_SIZE, PRECISION, keyword_filter=args.filter)
 
         if not dic_chunks:
             print("❌ No CVE data found to process")
@@ -652,7 +727,7 @@ Examples:
             metadatas = [
                 {
                     "source_type": item.get("source_type", "cve"),
-                    "source_name": item.get("source_name", f"CVE_{year}"),
+                    "source_name": item.get("source_name", "CVE_unknown"),
                     "cve_id": item.get("cve_id", ""),
                 }
                 for item in dic_chunks

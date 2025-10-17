@@ -464,6 +464,7 @@ def main():
         schema = DEFAULT_SCHEMA
         cve_file = None
         filter_keyword = None
+        replace_existing = False  # Not applicable for PDFs
     elif choice == '2':
         source_type = 'cve'
         # Ask for year
@@ -483,6 +484,10 @@ def main():
         schema_map = {'1': 'v5', '2': 'v4', '3': 'all'}
         schema = schema_map.get(schema_choice, 'all')
 
+        # Ask if should replace existing data
+        replace_input = input("\nReplace existing year data? (Y/n): ").strip().lower()
+        replace_existing = replace_input != 'n'
+
         # Ask for filter keyword
         filter_keyword = input("\nFilter CVEs by keyword (leave empty for all): ").strip() or None
 
@@ -498,6 +503,7 @@ def main():
         month_range = None
         schema = None
         filter_keyword = None  # File should be pre-filtered by extract_cve.py
+        replace_existing = False  # Not applicable for CVE file import
     else:
         print(f"❌ Invalid choice: {choice}")
         sys.exit(1)
@@ -517,6 +523,7 @@ def main():
     elif source_type == 'cve':
         print(f"Year:        {year}")
         print(f"Schema:      {schema}")
+        print(f"Mode:        {'Replace' if replace_existing else 'Add only'}")
         if filter_keyword:
             print(f"Filter:      '{filter_keyword}' (case-insensitive)")
     elif source_type == 'cve_file':
@@ -548,6 +555,17 @@ def main():
             )
 
         elif source_type == 'cve':
+            # If replace mode, delete existing year data first
+            if replace_existing:
+                print(f"\n{'='*60}")
+                print(f"🗑️  Deleting existing data for year {year}")
+                print(f"{'='*60}")
+                deleted_count = chroma_manager.delete_by_year(year, schema)
+                if deleted_count > 0:
+                    print(f"✅ Cleared {deleted_count} existing documents")
+                print()
+
+            # Now add new data
             total_added = process_cve_data(
                 year,
                 month_range,

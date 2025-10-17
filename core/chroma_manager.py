@@ -264,6 +264,53 @@ class ChromaManager:
                 print(f"⚠️ No documents found for source: {source_name}")
             return 0
 
+    def delete_by_year(self, year: int, schema: str = None) -> int:
+        """
+        Delete all CVE documents from a specific year.
+
+        Args:
+            year: Year to delete (e.g., 2025)
+            schema: Optional schema filter ('v5', 'v4', or 'all' for both)
+
+        Returns:
+            int: Number of documents deleted
+        """
+        if not self._initialized:
+            self.initialize()
+
+        # Determine which source_names to delete based on schema
+        source_names_to_delete = []
+        if schema == 'v5':
+            source_names_to_delete = [f"CVE_{year}_v5"]
+        elif schema == 'v4':
+            source_names_to_delete = [f"CVE_{year}_v4"]
+        else:  # 'all' or None - delete both
+            source_names_to_delete = [f"CVE_{year}_v5", f"CVE_{year}_v4"]
+
+        total_deleted = 0
+
+        for source_name in source_names_to_delete:
+            # Get IDs matching this source_name
+            results = self.collection.get(
+                where={
+                    "source_type": "cve",
+                    "source_name": source_name
+                }
+            )
+            ids_to_delete = results['ids']
+
+            if ids_to_delete:
+                self.collection.delete(ids=ids_to_delete)
+                print(f"  ✅ Deleted {len(ids_to_delete)} documents from {source_name}")
+                total_deleted += len(ids_to_delete)
+
+        if total_deleted > 0:
+            print(f"✅ Total deleted for year {year}: {total_deleted} documents")
+        else:
+            print(f"⚠️ No documents found for year {year}")
+
+        return total_deleted
+
     def get_stats(self) -> Dict:
         """
         Get statistics about the collection.
