@@ -68,6 +68,18 @@ rag_system = None
 current_speed = DEFAULT_SPEED
 current_mode = DEFAULT_MODE
 
+# Track uploaded files
+chat_uploaded_file = None  # Left side: for chat validation
+chat_file_uploading = False  # Left side upload status
+
+# Upload directories
+TEMP_UPLOAD_DIR = Path("temp_uploads")  # For chat files (temporary, no embeddings)
+KB_UPLOAD_DIR = Path("kb_uploads")  # For KB files (backup, generate embeddings)
+
+# Ensure upload directories exist
+TEMP_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+KB_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
 def initialize_system(speed_level: str = DEFAULT_SPEED, force_reload: bool = False):
     """Initialize LangChain RAG system based on speed level."""
     global rag_system, current_speed
@@ -160,55 +172,171 @@ def chat_respond(message: str, history: list):
         history: Gradio chat history (messages format: list of dicts with 'role' and 'content')
 
     Yields:
-        tuple: (empty string for input clear, updated history)
+        tuple: (empty string for input clear, updated history, empty string to clear file status, button update to disable)
     """
+    global chat_uploaded_file, chat_file_uploading
+
     if not message.strip():
-        yield "", history
+        yield "", history, "", gr.update()
         return
 
+    # Check if file is still uploading
+    if chat_file_uploading:
+        history.append({"role": "user", "content": message})
+        history.append({"role": "assistant", "content": "⏳ Please wait, file is still uploading..."})
+        yield "", history, "", gr.update()
+        return
+
+    # Build user message with file attachment if present
+    user_content = message
+    if chat_uploaded_file:
+        file_name = Path(chat_uploaded_file).name
+        user_content = f"{message}\n\n📎 **Attached:** {file_name}"
+
     # Immediately show user message with "Thinking..." placeholder
-    history.append({"role": "user", "content": message})
+    history.append({"role": "user", "content": user_content})
     history.append({"role": "assistant", "content": "💭 Thinking..."})
-    yield "", history
+    yield "", history, "", gr.update()
 
     try:
-        # Query LangChain RAG (memory managed automatically)
-        response = rag_system.query(question=message)
+        message_lower = message.strip().lower()
+        import os
 
-        # Update history with actual response
+        # Check if user is requesting to summarize or validate uploaded file
+        if chat_uploaded_file and message_lower in ['summarize', 'validate']:
+            if message_lower == 'summarize':
+                response = process_uploaded_report(chat_uploaded_file, action='summarize', mode=current_mode)
+            elif message_lower == 'validate':
+                response = process_uploaded_report(chat_uploaded_file, action='validate', schema=DEFAULT_SCHEMA, mode=current_mode)
+        else:
+            # Normal RAG query (LangChain memory managed automatically)
+            response = rag_system.query(question=message)
+
+        # Delete uploaded file from disk if exists
+        if chat_uploaded_file and os.path.exists(chat_uploaded_file):
+            try:
+                os.remove(chat_uploaded_file)
+            except Exception as e:
+                print(f"Warning: Could not delete file {chat_uploaded_file}: {e}")
+
+        # Clear uploaded file reference after sending
+        chat_uploaded_file = None
+
+        # Update history with actual response, clear file status, and disable remove button
         history[-1]["content"] = response
-        yield "", history
+        yield "", history, "", gr.update(interactive=False)
 
     except Exception as e:
         error_msg = f"❌ Error: {str(e)}"
         history[-1]["content"] = error_msg
-        yield "", history
 
-def upload_for_validation(file) -> str:
+        # Delete uploaded file from disk if exists (even on error)
+        import os
+        if chat_uploaded_file and os.path.exists(chat_uploaded_file):
+            try:
+                os.remove(chat_uploaded_file)
+            except Exception as e:
+                print(f"Warning: Could not delete file {chat_uploaded_file}: {e}")
+
+        # Clear uploaded file reference even on error
+        chat_uploaded_file = None
+
+        yield "", history, "", gr.update(interactive=False)
+
+def handle_chat_file_upload(file):
     """
-    Handle file upload for validation.
+    Handle file upload for chat (left side).
 
     Args:
-        file: Gradio File object
+        file: Gradio File object (path string)
 
     Returns:
-        str: Instructions message
+        tuple: (HTML status display, button update to enable)
     """
+    global chat_uploaded_file, chat_file_uploading
+    import shutil
+    import time
+
     if file is None:
-        return "⚠️ No file selected"
+        return "", gr.update(interactive=False)
 
     try:
-        file_path = Path(file.name)
-        return (
-            f"📄 Uploaded: {file_path.name}\n\n"
-            "Please select what you want to do:\n"
-            "- Type 'summarize' to get a summary\n"
-            "- Type 'validate' to validate CVE usage\n"
-            "- Type 'add to kb' to add to knowledge base\n"
-            "- Or ask any question about the report"
-        )
+        # Set uploading status
+        chat_file_uploading = True
+
+        # Get source file path
+        source_path = Path(file)
+        file_name = source_path.name
+
+        # Show uploading status
+        uploading_html = f"""
+        <div style='padding: 10px; background-color: #fff3cd; border-radius: 5px; border-left: 4px solid #ffc107;'>
+            <p style='margin: 0;'><b>📄 {file_name}</b></p>
+            <p style='margin: 5px 0 0 0; color: #856404;'>🔄 Uploading...</p>
+        </div>
+        """
+
+        # Simulate upload delay (for demo purposes, can remove in production)
+        time.sleep(0.5)
+
+        # Copy file to temp_upload directory
+        dest_path = TEMP_UPLOAD_DIR / file_name
+        shutil.copy2(source_path, dest_path)
+
+        # Update global state
+        chat_uploaded_file = str(dest_path)
+        chat_file_uploading = False
+
+        # Show success status
+        success_html = f"""
+        <div style='padding: 10px; background-color: #d4edda; border-radius: 5px; border-left: 4px solid #28a745;'>
+            <p style='margin: 0;'><b>📄 {file_name}</b></p>
+            <p style='margin: 5px 0 0 0; color: #155724;'>✅ Ready</p>
+        </div>
+        """
+
+        # Enable remove button
+        return success_html, gr.update(interactive=True)
+
     except Exception as e:
-        return f"❌ Upload error: {str(e)}"
+        chat_file_uploading = False
+        # Get file name if possible, otherwise use generic label
+        try:
+            display_name = Path(file).name if file else "File"
+        except:
+            display_name = "File"
+
+        error_html = f"""
+        <div style='padding: 10px; background-color: #f8d7da; border-radius: 5px; border-left: 4px solid #dc3545;'>
+            <p style='margin: 0;'><b>📄 {display_name}</b></p>
+            <p style='margin: 5px 0 0 0; color: #721c24;'>❌ Upload Error</p>
+        </div>
+        """
+        return error_html, gr.update(interactive=False)
+
+def handle_remove_chat_file():
+    """
+    Remove uploaded file from chat (left side).
+
+    Returns:
+        tuple: (Empty HTML to clear status display, button update to disable)
+    """
+    global chat_uploaded_file, chat_file_uploading
+    import os
+
+    # Delete file if exists
+    if chat_uploaded_file and os.path.exists(chat_uploaded_file):
+        try:
+            os.remove(chat_uploaded_file)
+        except Exception as e:
+            print(f"Warning: Could not delete file {chat_uploaded_file}: {e}")
+
+    # Clear global state
+    chat_uploaded_file = None
+    chat_file_uploading = False
+
+    # Return empty HTML to clear display and disable button
+    return "", gr.update(interactive=False)
 
 def process_uploaded_report(
     file,
@@ -282,6 +410,75 @@ def process_uploaded_report(
 # Knowledge base management
 # =============================================================================
 
+def handle_kb_file_upload(file):
+    """
+    Handle file upload for Knowledge Base (right side).
+    Uploads file and immediately processes it to generate embeddings.
+
+    Args:
+        file: Gradio File object (path string)
+
+    Returns:
+        tuple: (status_html, updated_kb_display, updated_dropdown_choices, cleared_file_input)
+    """
+    import shutil
+
+    if file is None:
+        return "", format_kb_display(), gr.update(choices=get_source_names()), None
+
+    try:
+        # Get source file path
+        source_path = Path(file)
+        file_name = source_path.name
+
+        # Copy file to kb_uploads directory
+        dest_path = KB_UPLOAD_DIR / file_name
+        shutil.copy2(source_path, dest_path)
+
+        # Immediately process the file
+        print(f"Adding {file_name} to knowledge base...")
+
+        # Extract text
+        from core.pdf_processor import PDFProcessor
+        pdf_processor = PDFProcessor()
+        text = pdf_processor.extract_text(dest_path)
+
+        # Split into sentences (supports both English and Chinese)
+        sentences = split_sentences(text)
+
+        # Create chunks
+        chunks = []
+        for i in range(0, len(sentences), CHUNK_SIZE):
+            chunk = "".join(sentences[i:i+CHUNK_SIZE]).strip()
+            if chunk:
+                chunks.append(chunk)
+
+        # Prepare metadata
+        metadatas = [
+            {
+                'source_type': 'pdf',
+                'source_name': file_name,
+                'added_date': datetime.now().isoformat(),
+                'chunk_index': i,
+                'precision': EMBEDDING_PRECISION
+            }
+            for i in range(len(chunks))
+        ]
+
+        # Add to knowledge base (LangChain handles embedding generation)
+        rag_system.add_document_to_kb(texts=chunks, metadatas=metadatas)
+
+        print(f"✅ Added {len(chunks)} chunks from {file_name} to knowledge base")
+
+        # Return empty status (hide immediately), updated KB display, dropdown, and clear file input
+        return "", format_kb_display(), gr.update(choices=get_source_names()), None
+
+    except Exception as e:
+        print(f"❌ Error adding {file.name if file else 'file'} to knowledge base: {str(e)}")
+
+        # Return empty status even on error (hide immediately), and clear file input
+        return "", format_kb_display(), gr.update(choices=get_source_names()), None
+
 def add_pdf_to_kb(file, source_name: str = None) -> str:
     """
     Add PDF to knowledge base using LangChain.
@@ -353,21 +550,30 @@ def format_kb_display() -> str:
 
         sources = stats.get('sources', {})
 
-        # Build HTML
-        html = f"<div style='padding: 10px;'>"
-        html += f"<h4>📊 Statistics</h4>"
-        html += f"<p><b>Total documents:</b> {stats.get('total_docs', 0)}</p>"
-        html += f"<p><b>By type:</b> {dict(stats.get('by_source_type', {}))}</p>"
-        html += f"<br>"
-        html += f"<h4>📚 Sources ({len(sources)})</h4>"
-        html += f"<ul style='list-style: none; padding-left: 0;'>"
+        # Build HTML with collapsible sources list
+        html = f"""
+        <div style='padding: 10px; background-color: #f0f0f0; border-radius: 5px;'>
+            <h4>📊 Statistics</h4>
+            <p><b>Total documents:</b> {stats.get('total_docs', 0)}</p>
+            <p><b>By type:</b> {dict(stats.get('by_source_type', {}))}</p>
+            <br>
+            <details>
+                <summary style='cursor: pointer; font-weight: bold; font-size: 1.1em;'>
+                    📚 Sources ({len(sources)})
+                </summary>
+                <ul style='list-style: none; padding-left: 0; margin-top: 10px;'>
+        """
 
         for source_name, info in sources.items():
             icon = "📄" if info['type'] == 'pdf' else "🔖"
             date = info['added_date'][:10]
             html += f"<li>{icon} <b>{source_name}</b> ({info['count']} chunks, added {date})</li>"
 
-        html += f"</ul></div>"
+        html += """
+                </ul>
+            </details>
+        </div>
+        """
 
         return html
 
@@ -437,10 +643,10 @@ def create_interface():
         with gr.Row():
             # Left column: Chat interface (7/12 width)
             with gr.Column(scale=7):
-                gr.Markdown("### 💬 Conversation (LangChain)")
+                gr.Markdown("### 💬 Conversation")
 
                 chatbot = gr.Chatbot(
-                    label="Chat History (Auto-managed by LangChain Memory)",
+                    label="Chat History",
                     height=500,
                     show_copy_button=True,
                     type='messages'  # Use OpenAI-style message format
@@ -456,10 +662,20 @@ def create_interface():
 
                 # Action buttons row (Claude Projects style)
                 with gr.Row():
-                    upload_modal_btn = gr.Button("➕ Add File", size="sm", scale=1)
+                    upload_file_btn = gr.UploadButton(
+                        "➕ Add File",
+                        file_types=[".pdf"],
+                        file_count="single",
+                        size="sm",
+                        scale=1
+                    )
+                    remove_file_btn = gr.Button("🗑️", size="sm", scale=0, min_width=40, interactive=False)
                     send_btn = gr.Button("Send →", size="sm", scale=1, variant="primary", elem_id="send_btn")
                     with gr.Column(scale=8):
                         pass  # Spacer
+
+                # File upload status display
+                chat_file_status = gr.HTML(value="")
 
             # Right column: Settings and Knowledge Base (5/12 width)
             with gr.Column(scale=5):
@@ -474,7 +690,7 @@ def create_interface():
                     speed_dropdown = gr.Dropdown(
                         choices=['normal', 'fast', 'fastest'],
                         value=DEFAULT_SPEED,
-                        label="Speed Level",
+                        label="Speed",
                         info="⚠️ Changing speed will reload the model (takes 1-2 min)"
                     )
                     mode_dropdown = gr.Dropdown(
@@ -498,90 +714,29 @@ def create_interface():
                         refresh_kb_btn = gr.Button("🔄 Refresh", size="sm", scale=1)
 
                     # Delete section
-                    gr.Markdown("**Remove Source:**")
                     source_dropdown = gr.Dropdown(
                         choices=[],
-                        label="Select source to remove",
+                        label="Remove",
                         interactive=True
                     )
                     delete_btn = gr.Button("🗑️ Delete Selected Source", size="sm", variant="stop")
 
                     # Add section
-                    gr.Markdown("**Add New Source:**")
-                    add_kb_file = gr.File(
-                        label="Select PDF File",
+                    add_file = gr.File(
+                        label="Add",
                         file_types=[".pdf"],
+                        file_count="single",
                         type="filepath"
                     )
-                    add_kb_btn = gr.Button("➕ Add to Knowledge Base", variant="primary")
-
-        # Modal for file upload (Claude Projects style)
-        with gr.Row(visible=False) as upload_modal:
-            with gr.Column(scale=1):
-                pass  # Left spacer
-            with gr.Column(scale=10):
-                with gr.Group():
-                    gr.Markdown("### 📄 Upload File")
-
-                    upload_file = gr.File(
-                        label="Select PDF File",
+                    kb_upload_btn = gr.UploadButton(
+                        "➕ Add File To Knowledge Base",
                         file_types=[".pdf"],
-                        type="filepath"
+                        file_count="single",
+                        size="sm"
                     )
-
-                    gr.Markdown("**What would you like to do?**")
-
-                    with gr.Row():
-                        summarize_btn = gr.Button("📝 Summarize", variant="secondary")
-                        validate_btn = gr.Button("✅ Validate CVEs", variant="secondary")
-                        add_to_kb_btn_modal = gr.Button("📚 Add to Knowledge Base", variant="primary")
-
-                    upload_status = gr.Textbox(label="Status", interactive=False)
-
-                    with gr.Row():
-                        close_modal_btn = gr.Button("Close", size="sm")
-            with gr.Column(scale=1):
-                pass  # Right spacer
+                    kb_file_status = gr.HTML(value="", visible=False)
 
         # Event handlers
-        def show_upload_modal():
-            """Show the upload modal."""
-            return gr.update(visible=True)
-
-        def hide_upload_modal():
-            """Hide the upload modal."""
-            return gr.update(visible=False)
-
-        def handle_summarize(file):
-            """Handle summarize action from modal."""
-            if file is None:
-                return "⚠️ Please select a file first", gr.update(visible=True)
-            result = process_uploaded_report(file, action='summarize', mode=current_mode)
-            return result, gr.update(visible=True)
-
-        def handle_validate(file):
-            """Handle validate action from modal."""
-            if file is None:
-                return "⚠️ Please select a file first", gr.update(visible=True)
-            result = process_uploaded_report(file, action='validate', schema=DEFAULT_SCHEMA, mode=current_mode)
-            return result, gr.update(visible=True)
-
-        def handle_add_to_kb_modal(file):
-            """Handle add to KB action from modal."""
-            if file is None:
-                return "⚠️ Please select a file first", gr.update(visible=True), format_kb_display(), gr.update()
-            result = add_pdf_to_kb(file)
-            updated_display = format_kb_display()
-            updated_sources = get_source_names()
-            return result, gr.update(visible=False), updated_display, gr.update(choices=updated_sources)
-
-        def handle_add_to_kb(file):
-            """Handle add to KB from right panel."""
-            result = add_pdf_to_kb(file)
-            print(result)  # Print to console instead of UI
-            updated_display = format_kb_display()
-            updated_sources = get_source_names()
-            return updated_display, gr.update(choices=updated_sources)
 
         def handle_refresh_kb():
             """Refresh knowledge base display and source dropdown."""
@@ -608,16 +763,19 @@ def create_interface():
             return updated_status
 
         # Connect events - chat
-        msg_input.submit(chat_respond, [msg_input, chatbot], [msg_input, chatbot])
-        send_btn.click(chat_respond, [msg_input, chatbot], [msg_input, chatbot])
+        msg_input.submit(chat_respond, [msg_input, chatbot], [msg_input, chatbot, chat_file_status, remove_file_btn])
+        send_btn.click(chat_respond, [msg_input, chatbot], [msg_input, chatbot, chat_file_status, remove_file_btn])
 
-        # Modal handlers
-        upload_modal_btn.click(show_upload_modal, outputs=[upload_modal])
-        close_modal_btn.click(hide_upload_modal, outputs=[upload_modal])
-
-        summarize_btn.click(handle_summarize, inputs=[upload_file], outputs=[upload_status, upload_modal])
-        validate_btn.click(handle_validate, inputs=[upload_file], outputs=[upload_status, upload_modal])
-        add_to_kb_btn_modal.click(handle_add_to_kb_modal, inputs=[upload_file], outputs=[upload_status, upload_modal, kb_display, source_dropdown])
+        # File upload handlers - left side (chat)
+        upload_file_btn.upload(
+            handle_chat_file_upload,
+            inputs=[upload_file_btn],
+            outputs=[chat_file_status, remove_file_btn]
+        )
+        remove_file_btn.click(
+            handle_remove_chat_file,
+            outputs=[chat_file_status, remove_file_btn]
+        )
 
         # Settings change handlers
         speed_dropdown.change(
@@ -631,18 +789,31 @@ def create_interface():
             outputs=[status_display]
         )
 
+        # File upload handlers - right side (KB)
+        # Both drag-and-drop (add_file) and button click (kb_upload_btn) trigger the same handler
+        add_file.upload(
+            handle_kb_file_upload,
+            inputs=[add_file],
+            outputs=[kb_file_status, kb_display, source_dropdown, add_file]
+        )
+        kb_upload_btn.upload(
+            handle_kb_file_upload,
+            inputs=[kb_upload_btn],
+            outputs=[kb_file_status, kb_display, source_dropdown, add_file]
+        )
+
         # Knowledge base handlers
-        add_kb_btn.click(handle_add_to_kb, [add_kb_file], [kb_display, source_dropdown])
         refresh_kb_btn.click(handle_refresh_kb, outputs=[kb_display, source_dropdown])
         delete_btn.click(handle_delete_source, [source_dropdown], [kb_display, source_dropdown])
 
         # Auto-refresh knowledge base on page load
         demo.load(handle_refresh_kb, outputs=[kb_display, source_dropdown])
 
-        # Custom JavaScript for Enter to submit
+        # Custom JavaScript for Enter to submit and hide empty containers
         demo.load(None, None, None, js="""
         function() {
             setTimeout(function() {
+                // Enter to submit
                 const textarea = document.querySelector('#msg_input textarea');
                 if (textarea) {
                     textarea.addEventListener('keydown', function(e) {
@@ -653,6 +824,31 @@ def create_interface():
                         }
                     });
                 }
+
+                // Hide empty HTML containers
+                function hideEmptyContainers() {
+                    const htmlContainers = document.querySelectorAll('.html-container');
+                    htmlContainers.forEach(function(container) {
+                        const prose = container.querySelector('.prose');
+                        if (prose && prose.innerHTML.trim() === '') {
+                            container.style.display = 'none';
+                        } else if (prose && prose.innerHTML.trim() !== '') {
+                            container.style.display = '';
+                        }
+                    });
+                }
+
+                // Run immediately and observe changes
+                hideEmptyContainers();
+
+                const observer = new MutationObserver(function() {
+                    hideEmptyContainers();
+                });
+
+                observer.observe(document.body, {
+                    childList: true,
+                    subtree: true
+                });
             }, 1000);
         }
         """)

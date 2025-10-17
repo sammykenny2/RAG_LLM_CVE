@@ -52,8 +52,9 @@ MANIFEST
 .env
 
 # Project specific
-# Temporary upload directory (web UI)
-temp_uploads/
+# Temporary upload directories (web UI)
+temp_uploads/   # Chat file uploads (temporary, no embeddings)
+kb_uploads/     # Knowledge base file uploads (backup, with embeddings)
 # Generated CVE description files (root directory only, not output/)
 /CVEDescription*
 

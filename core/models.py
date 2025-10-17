@@ -101,13 +101,15 @@ class LlamaModel:
         # Load tokenizer
         self.tokenizer = AutoTokenizer.from_pretrained(
             self.model_name,
-            trust_remote_code=True
+            trust_remote_code=True,
+            local_files_only=True  # Use local cache only, no network required
         )
 
         # Build model kwargs
         model_kwargs = {
             "device_map": "auto",
             "trust_remote_code": True,
+            "local_files_only": True,  # Use local cache only, no network required
         }
 
         # 4-bit quantization (takes priority over FP16)

@@ -280,6 +280,19 @@ metadata = {
 2. **Share Link**: `python web/web_ui.py --share` (https://xxx.gradio.live)
 3. **Production**: Docker + Nginx (optional)
 
+**State Management & JavaScript Integration**:
+- **Upload Status Display**: Colored notification blocks (green=success, red=error, yellow=uploading)
+  - Success: Shows filename + "✅ Ready" (no instructional text)
+  - Error: Shows filename + "❌ Upload Error" (no error details for cleaner UX)
+  - Safe fallback to generic "File" label if filename extraction fails
+- **Empty Container Handling**: JavaScript MutationObserver pattern
+  - Watches DOM changes to detect empty HTML containers
+  - Automatically applies `display: none` to prevent visible layout artifacts
+  - Gradio filters inline `<script>` tags, requires global injection via `demo.load(..., js=...)`
+- **File Management**: Temporary storage in `temp_uploads/` (chat) and `kb_uploads/` (knowledge base)
+  - Chat files deleted after send or manual removal
+  - KB files persist with embeddings in Chroma database
+
 ## Runtime Architecture
 
 ### Main Implementation: cli/validate_report.py

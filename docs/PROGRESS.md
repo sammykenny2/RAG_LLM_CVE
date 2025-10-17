@@ -120,6 +120,36 @@ python cli/validate_report.py --speed=fast --extension=chroma
 ✅ Knowledge base management (add/view sources)
 ✅ Real-time statistics and refresh
 
+## [2025-10] Phase 3: Web UI Improvements
+
+### Changed (Web UI Polish)
+- **Upload status simplification** (web_ui.py and web_ui_langchain.py):
+  - Removed instructional text from success messages ("Type 'summarize' or 'validate' in chat")
+  - Success display now shows only: filename + "✅ Ready"
+  - Error display now shows only: filename + "❌ Upload Error" (no error details)
+  - Safe filename extraction with try-catch fallback
+- **Empty container handling**:
+  - Added JavaScript MutationObserver to detect and hide empty HTML containers
+  - Prevents visible horizontal lines when upload status is cleared
+  - Auto-detects `.html-container` with empty `.prose` child and applies `display: none`
+- **UI consistency** (web_ui_langchain.py):
+  - Removed LangChain mentions from UI labels (except main title)
+  - "Conversation (LangChain)" → "Conversation"
+  - "Chat History (Auto-managed by LangChain Memory)" → "Chat History"
+  - Maintains consistent user experience across Phase 1 and Phase 2
+
+### Technical Details
+- **MutationObserver pattern**: Watches DOM changes in real-time to hide empty containers
+- **Gradio HTML filtering**: Inline `<script>` tags are filtered, requiring global JavaScript injection via `demo.load(..., js=...)`
+- **Status block design**: Colored notification boxes with left border (green=success, red=error, yellow=uploading)
+- **Error handling**: Graceful fallback to generic "File" label if filename extraction fails
+
+### User Experience Impact
+- Cleaner, less cluttered upload status display
+- No confusing instructional text that might distract users
+- No visible layout artifacts when upload status is cleared
+- Consistent branding between Phase 1 and Phase 2 implementations
+
 ## [2025-10] Phase 2: LangChain Implementation
 
 ### Added (LangChain RAG)
@@ -464,6 +494,32 @@ RAG_LLM_CVE/
 └── .venv-*/               # Virtual environments (gitignored)
 ```
 
+## Known Issues
+
+### Phase 2: LangChain Web UI (web_ui_langchain.py)
+- [ ] **LLM response quality issues** (High Priority)
+  - **Problem 1**: Frequent "I don't know" responses despite relevant knowledge base content
+  - **Problem 2**: Occasionally hangs with excessive computation, frontend unresponsive
+  - **Symptoms**:
+    - User asks valid question about CVE or document in KB
+    - LLM returns "I don't know" or generic non-answer
+    - Sometimes takes 5+ minutes without response (appears frozen)
+  - **Suspected causes**:
+    - **ConversationalRetrievalChain configuration**: May not be passing retrieved context correctly to LLM
+    - **Memory management**: ConversationBufferWindowMemory might be interfering with context
+    - **Prompt template issues**: LangChain default prompts may not match Llama 3.2's format
+    - **Retrieval parameters**: top_k or similarity threshold might be too restrictive
+    - **Infinite loop**: Possible bug in chain execution causing hang
+  - **Troubleshooting steps needed**:
+    1. Compare retrieval results between Phase 1 (working) and Phase 2 (broken)
+    2. Log intermediate outputs: retrieved chunks, formatted prompts, LLM inputs
+    3. Test with verbose mode to trace chain execution
+    4. Verify Llama prompt template matches LangChain's expectations
+    5. Check if memory is cleared properly between queries
+    6. Monitor token counts and context window usage
+  - **Workaround**: Use Phase 1 (web_ui.py) which works reliably
+  - **Note**: Phase 1 (Pure Python) does not have these issues - investigation should focus on LangChain integration differences
+
 ## Upcoming Features
 
 ### Planned Optimizations
@@ -474,6 +530,34 @@ RAG_LLM_CVE/
   - Rationale: Prevents splitting important context across chunk boundaries
   - Implementation: Replace `split()` with `split_with_overlap()` in PDF processing
   - Cost-benefit: Acceptable trade-off for security reports where accuracy is critical
+- [ ] **Multi-file conversation context** (High Priority)
+  - Allow chat interface to retain multiple uploaded files across conversation
+  - Current limitation: New file upload clears previous file
+  - Use case: User uploads File A, asks questions, then uploads File B but needs to reference File A
+  - Technical challenges:
+    - **File management**: Maintain list of active files in conversation session
+    - **Temporary embeddings**: Generate embeddings for uploaded files without persisting to Chroma
+      - Option 1: In-memory embeddings (fast, memory-intensive)
+      - Option 2: Session-scoped temporary Chroma collection (persistent across chat, deleted on exit)
+    - **RAG workflow refactor**:
+      - Dual-source retrieval: Query both KB (permanent) and session files (temporary)
+      - Merge and rank results from multiple sources
+      - File-aware context: Track which file each retrieved chunk comes from
+    - **LLM prompt engineering**:
+      - Include file provenance in context ("From File A: ...", "From File B: ...")
+      - Manage context window limits with multiple file contents
+      - Smart truncation when files exceed token budget
+    - **UI/UX considerations**:
+      - Display list of active files in conversation
+      - Allow individual file removal
+      - Clear visual indication of which files are in context
+  - Implementation approach:
+    1. Replace single `chat_uploaded_file` with `chat_uploaded_files[]` list
+    2. Create `TemporaryEmbeddingManager` class for session-scoped embeddings
+    3. Refactor `rag_system.query()` to accept `session_sources` parameter
+    4. Update prompt templates to include file provenance metadata
+    5. Add file list UI component with remove buttons
+  - Expected impact: More natural multi-turn conversations with multiple documents
 - [ ] Parallel CVE lookups (if memory permits)
 - [ ] Progress bars for long-running operations
 - [ ] Batch processing for multiple PDFs

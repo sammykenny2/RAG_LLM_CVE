@@ -311,6 +311,29 @@ AI: [Retrieves from knowledge base and responds with context]
 - View all sources with chunk counts
 - Click refresh to update statistics
 
+#### Current Limitations
+
+⚠️ **Phase 2 (LangChain) - Known Issues**:
+- **LLM response quality problems**: Frequent "I don't know" responses despite relevant KB content
+- **Occasional hangs**: Frontend becomes unresponsive, waiting 5+ minutes for response
+- **Root cause unknown**: Under investigation (see `docs/PROGRESS.md` - "Known Issues")
+- **Workaround**: Use Phase 1 (web_ui.py, port 7860) which works reliably
+- **Status**: Phase 1 (Pure Python) does not have these issues
+
+**Chat File Upload (Left Panel)**:
+- **Single file mode**: Uploading a new file replaces the previous one
+- Files are deleted after sending message or manual removal
+- No persistence across conversation turns
+- **Planned improvement**: Multi-file conversation context (see `docs/PROGRESS.md` - "Upcoming Features")
+  - Future: Retain multiple files in conversation session
+  - Future: Generate temporary embeddings without persisting to Chroma
+  - Future: Query both permanent KB and session files simultaneously
+
+**Knowledge Base Upload (Right Panel)**:
+- Files are permanently added with embeddings stored in Chroma
+- No deletion after use
+- Supports multiple files (no single-file limitation)
+
 #### Comparison: Phase 1 vs Phase 2
 
 | Feature | Phase 1 (Pure Python) | Phase 2 (LangChain) |

@@ -66,7 +66,8 @@ class EmbeddingModel:
 
         self.model = SentenceTransformer(
             model_name_or_path=self.model_name,
-            device=self.device
+            device=self.device,
+            local_files_only=True  # Use local cache only, no network required
         )
 
         self._initialized = True
