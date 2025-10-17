@@ -69,11 +69,12 @@ def split(input_list, chunk_size):
     """Split a list into chunks of specified size."""
     return [input_list[i:i + chunk_size] for i in range(0, len(input_list), chunk_size)]
 
-def process_cve_file(cve_file_path):
+def process_cve_file(cve_file_path, keyword_filter=None):
     """Read CVE data from text or JSONL file.
 
     Args:
         cve_file_path: Path to TXT or JSONL file
+        keyword_filter: Optional keyword to filter CVE descriptions (case-insensitive)
 
     Returns:
         list: List of CVE data dictionaries with sentence_chunk and metadata
@@ -81,6 +82,8 @@ def process_cve_file(cve_file_path):
     print(f"\n{'='*60}")
     print(f"Processing CVE File")
     print(f"  File: {cve_file_path}")
+    if keyword_filter:
+        print(f"  Filter: '{keyword_filter}' (case-insensitive)")
     print(f"{'='*60}\n")
 
     cve_data = []
@@ -103,6 +106,11 @@ def process_cve_file(cve_file_path):
                         f"Product: {record['product']}, "
                         f"Description: {record['description']}"
                     )
+
+                    # Apply keyword filter if specified
+                    if keyword_filter and keyword_filter.lower() not in cve_text.lower():
+                        continue
+
                     cve_data.append({
                         "sentence_chunk": cve_text,
                         "source_type": "cve",
@@ -144,6 +152,10 @@ def process_cve_file(cve_file_path):
                     f"Description: {description}"
                 )
 
+                # Apply keyword filter if specified
+                if keyword_filter and keyword_filter.lower() not in cve_text.lower():
+                    continue
+
                 cve_data.append({
                     "sentence_chunk": cve_text,
                     "source_type": "cve",
@@ -159,15 +171,20 @@ def process_cve_file(cve_file_path):
         print(f"❌ Unsupported file format: {file_ext}. Use .txt or .jsonl")
         return []
 
-    print(f"\nExtracted {len(cve_data)} CVE descriptions")
+    if keyword_filter:
+        print(f"\n✅ Extracted {len(cve_data)} CVE descriptions (filtered by '{keyword_filter}')")
+    else:
+        print(f"\nExtracted {len(cve_data)} CVE descriptions")
     return cve_data
 
-def process_cve_data(year, schema, batch_size, precision):
+def process_cve_data(year, schema, batch_size, precision, keyword_filter=None):
     """Extract CVE data and return texts with metadata."""
     print(f"\n{'='*60}")
     print(f"Processing CVE Data")
     print(f"  Year: {year}")
     print(f"  Schema: {schema}")
+    if keyword_filter:
+        print(f"  Filter: '{keyword_filter}' (case-insensitive)")
     print(f"{'='*60}\n")
 
     # Determine paths based on schema
@@ -210,6 +227,10 @@ def process_cve_data(year, schema, batch_size, precision):
                         f"Description: {description}"
                     )
 
+                    # Apply keyword filter if specified
+                    if keyword_filter and keyword_filter.lower() not in cve_text.lower():
+                        continue
+
                     cve_data.append({
                         "sentence_chunk": cve_text,
                         "source_type": "cve",
@@ -220,7 +241,10 @@ def process_cve_data(year, schema, batch_size, precision):
                 except Exception as e:
                     continue
 
-    print(f"\nExtracted {len(cve_data)} CVE descriptions")
+    if keyword_filter:
+        print(f"\n✅ Extracted {len(cve_data)} CVE descriptions (filtered by '{keyword_filter}')")
+    else:
+        print(f"\nExtracted {len(cve_data)} CVE descriptions")
     return cve_data
 
 def process_pdf(pdf_path, sentence_size, output_path, batch_size, precision, extension):
@@ -352,9 +376,11 @@ if __name__ == "__main__":
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python localEmbedding.py                              # Default (fast, pkl)
-  python localEmbedding.py --speed=normal --extension=csv   # High quality, CSV
-  python localEmbedding.py --speed=fastest --extension=parquet  # Maximum speed, smallest file
+  python build_embeddings.py                                    # Default (fast, pkl)
+  python build_embeddings.py --speed=normal --extension=csv     # High quality, CSV
+  python build_embeddings.py --speed=fastest --extension=parquet # Maximum speed, smallest file
+  python build_embeddings.py --filter=snmp                      # Only include CVEs containing 'snmp'
+  python build_embeddings.py --filter=Windows --extension=chroma # Filter for Windows CVEs in Chroma DB
         """
     )
     parser.add_argument(
@@ -370,6 +396,12 @@ Examples:
         choices=['csv', 'pkl', 'parquet', 'chroma'],
         default=DEFAULT_EMBEDDING_FORMAT,
         help=f'Output format: csv (text), pkl (pickle), parquet (optimal), chroma (vector database) (default: {DEFAULT_EMBEDDING_FORMAT})'
+    )
+    parser.add_argument(
+        '--filter',
+        type=str,
+        default=None,
+        help='Filter CVEs by keyword (case-insensitive). Only CVEs containing this keyword will be included. Example: --filter=snmp'
     )
     args = parser.parse_args()
 
@@ -419,7 +451,7 @@ Examples:
         source_type = 'cve'
         pdf_path = None
         cve_file = None
-        year_input = input("\nEnter year for CVE data (e.g., 2024): ").strip()
+        year_input = input("\nEnter year for CVE data (e.g., 2025): ").strip()
         try:
             year = int(year_input)
         except ValueError:
@@ -433,6 +465,12 @@ Examples:
         schema_choice = input("Enter your choice (1-3, default=3): ").strip() or '3'
         schema_map = {'1': 'v5', '2': 'v4', '3': 'all'}
         schema = schema_map.get(schema_choice, 'all')
+
+        # Ask for filter keyword
+        filter_input = input("\nFilter CVEs by keyword (leave empty for all): ").strip()
+        if filter_input:
+            args.filter = filter_input
+        # else keep args.filter from command line or default (None)
 
     elif choice == '3':
         # CVE file mode (TXT or JSONL)
@@ -456,8 +494,12 @@ Examples:
     elif source_type == 'cve':
         print(f"Year:        {year}")
         print(f"Schema:      {schema}")
+        if args.filter:
+            print(f"Filter:      '{args.filter}' (case-insensitive)")
     elif source_type == 'cve_file':
         print(f"File:        {cve_file}")
+        if args.filter:
+            print(f"Filter:      '{args.filter}' (case-insensitive)")
     print(f"Speed:       {speed_desc}")
     print(f"Chunk size:  {SENTENCE_SIZE} sentences")
     print(f"Batch size:  {BATCH_SIZE}")
@@ -472,7 +514,7 @@ Examples:
 
     elif source_type == 'cve_file':
         # Process CVE from file
-        dic_chunks = process_cve_file(cve_file)
+        dic_chunks = process_cve_file(cve_file, keyword_filter=args.filter)
 
         if not dic_chunks:
             print("❌ No CVE data found to process")
@@ -552,7 +594,7 @@ Examples:
 
     else:  # CVE JSON mode
         # Process CVE data
-        dic_chunks = process_cve_data(year, schema, BATCH_SIZE, PRECISION)
+        dic_chunks = process_cve_data(year, schema, BATCH_SIZE, PRECISION, keyword_filter=args.filter)
 
         if not dic_chunks:
             print("❌ No CVE data found to process")

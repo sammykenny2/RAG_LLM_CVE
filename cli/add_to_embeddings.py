@@ -64,7 +64,8 @@ def process_cve_file(
     chroma_manager: ChromaManager,
     embedding_model: EmbeddingModel,
     batch_size: int,
-    precision: str
+    precision: str,
+    keyword_filter: str = None
 ):
     """
     Read CVE data from text or JSONL file and add to Chroma database.
@@ -75,6 +76,7 @@ def process_cve_file(
         embedding_model: EmbeddingModel instance
         batch_size: Batch size for embedding generation
         precision: 'float32' or 'float16'
+        keyword_filter: Optional keyword to filter CVE descriptions (case-insensitive)
 
     Returns:
         int: Number of CVEs added
@@ -84,6 +86,8 @@ def process_cve_file(
     print(f"\n{'='*60}")
     print(f"Processing CVE File")
     print(f"  File: {cve_file_path}")
+    if keyword_filter:
+        print(f"  Filter: '{keyword_filter}' (case-insensitive)")
     print(f"{'='*60}\n")
 
     cve_file_path = Path(cve_file_path)
@@ -109,6 +113,11 @@ def process_cve_file(
                         f"Product: {record['product']}, "
                         f"Description: {record['description']}"
                     )
+
+                    # Apply keyword filter if specified
+                    if keyword_filter and keyword_filter.lower() not in cve_text.lower():
+                        continue
+
                     cve_texts.append(cve_text)
                     cve_metadata.append({
                         'source_type': 'cve',
@@ -152,6 +161,10 @@ def process_cve_file(
                     f"Product: {product}, "
                     f"Description: {description}"
                 )
+
+                # Apply keyword filter if specified
+                if keyword_filter and keyword_filter.lower() not in cve_text.lower():
+                    continue
 
                 cve_texts.append(cve_text)
                 cve_metadata.append({
@@ -301,19 +314,21 @@ def process_cve_data(
     embedding_model: EmbeddingModel,
     batch_size: int,
     precision: str,
-    schema: str
+    schema: str,
+    keyword_filter: str = None
 ):
     """
     Process CVE data and add to Chroma database.
 
     Args:
-        year: Year to process (e.g., 2024)
+        year: Year to process (e.g., 2025)
         month_range: Tuple of (start_month, end_month) or None for all
         chroma_manager: ChromaManager instance
         embedding_model: EmbeddingModel instance
         batch_size: Batch size for embedding generation
         precision: 'float32' or 'float16'
         schema: 'v5', 'v4', or 'all'
+        keyword_filter: Optional keyword to filter CVE descriptions (case-insensitive)
     """
     # Determine paths based on schema
     paths_to_check = []
@@ -340,6 +355,8 @@ def process_cve_data(
     if month_range:
         print(f"Month range: {month_range[0]}-{month_range[1]}")
     print(f"Schema: {schema}")
+    if keyword_filter:
+        print(f"Filter: '{keyword_filter}' (case-insensitive)")
     print(f"{'='*60}\n")
 
     for schema_type, year_path in paths_to_check:
@@ -374,6 +391,10 @@ def process_cve_data(
                         f"Product: {product}, "
                         f"Description: {description}"
                     )
+
+                    # Apply keyword filter if specified
+                    if keyword_filter and keyword_filter.lower() not in cve_text.lower():
+                        continue
 
                     cve_texts.append(cve_text)
                     cve_metadata.append({
@@ -442,10 +463,11 @@ def main():
         month_range = None
         schema = DEFAULT_SCHEMA
         cve_file = None
+        filter_keyword = None
     elif choice == '2':
         source_type = 'cve'
         # Ask for year
-        year_input = input("\nEnter year for CVE data (e.g., 2024): ").strip()
+        year_input = input("\nEnter year for CVE data (e.g., 2025): ").strip()
         try:
             year = int(year_input)
         except ValueError:
@@ -461,6 +483,9 @@ def main():
         schema_map = {'1': 'v5', '2': 'v4', '3': 'all'}
         schema = schema_map.get(schema_choice, 'all')
 
+        # Ask for filter keyword
+        filter_keyword = input("\nFilter CVEs by keyword (leave empty for all): ").strip() or None
+
         pdf_files = None
         month_range = None
         cve_file = None
@@ -472,6 +497,7 @@ def main():
         year = None
         month_range = None
         schema = None
+        filter_keyword = None  # File should be pre-filtered by extract_cve.py
     else:
         print(f"❌ Invalid choice: {choice}")
         sys.exit(1)
@@ -491,6 +517,8 @@ def main():
     elif source_type == 'cve':
         print(f"Year:        {year}")
         print(f"Schema:      {schema}")
+        if filter_keyword:
+            print(f"Filter:      '{filter_keyword}' (case-insensitive)")
     elif source_type == 'cve_file':
         print(f"File:        {cve_file}")
     print(f"Chunk size:  {chunk_size} sentences")
@@ -527,7 +555,8 @@ def main():
                 embedding_model,
                 batch_size,
                 precision,
-                schema
+                schema,
+                filter_keyword
             )
 
         elif source_type == 'cve_file':
@@ -536,7 +565,8 @@ def main():
                 chroma_manager,
                 embedding_model,
                 batch_size,
-                precision
+                precision,
+                filter_keyword
             )
 
         # Show final statistics

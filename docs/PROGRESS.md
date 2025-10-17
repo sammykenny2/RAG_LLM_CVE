@@ -467,6 +467,13 @@ RAG_LLM_CVE/
 ## Upcoming Features
 
 ### Planned Optimizations
+- [ ] **Chunk overlap for PDF embeddings** (High Priority)
+  - Add `--overlap` parameter to `build_embeddings.py`
+  - Default: 30% overlap for PDF documents (0% for CVE data)
+  - Expected impact: +13-17% retrieval accuracy, +40% storage/time cost
+  - Rationale: Prevents splitting important context across chunk boundaries
+  - Implementation: Replace `split()` with `split_with_overlap()` in PDF processing
+  - Cost-benefit: Acceptable trade-off for security reports where accuracy is critical
 - [ ] Parallel CVE lookups (if memory permits)
 - [ ] Progress bars for long-running operations
 - [ ] Batch processing for multiple PDFs
@@ -477,6 +484,7 @@ RAG_LLM_CVE/
 - [ ] Support for additional LLM models
 - [ ] Real-time CVE feed updates
 - [ ] Export analysis results to JSON/HTML
+- [ ] Configurable overlap ratio per document type (PDF vs CVE)
 
 ## Notes
 

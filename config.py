@@ -50,6 +50,9 @@ DEFAULT_SCHEMA = os.getenv('DEFAULT_SCHEMA', 'all')
 DEFAULT_EMBEDDING_FORMAT = os.getenv('DEFAULT_EMBEDDING_FORMAT', 'chroma')
 EMBEDDING_PRECISION = os.getenv('EMBEDDING_PRECISION', 'float16')
 
+# CVE filter keyword (case-insensitive, empty string means no filter)
+CVE_FILTER = os.getenv('CVE_FILTER', '').strip()
+
 # Validate choices
 assert DEFAULT_SPEED in ['normal', 'fast', 'fastest'], f"Invalid DEFAULT_SPEED: {DEFAULT_SPEED}"
 assert DEFAULT_MODE in ['demo', 'full'], f"Invalid DEFAULT_MODE: {DEFAULT_MODE}"

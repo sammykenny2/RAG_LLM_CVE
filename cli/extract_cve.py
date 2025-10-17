@@ -35,16 +35,17 @@ def get_available_years(base_path: str) -> list[int]:
     return sorted(years)
 
 
-def process_cve_directory(folder_path: str, source_label: str, output_file: str, processed_cves: set, extension: str, verbose: bool = False):
+def process_cve_directory(folder_path: str, source_label: str, output_file: str, processed_cves: set, extension: str, verbose: bool = False, keyword_filter: str = None):
     """Process CVE files from a directory and append to output file.
 
     Args:
         folder_path: Path to CVE directory
-        source_label: Label for logging (e.g., "V5 CVE Schema (2024)")
+        source_label: Label for logging (e.g., "V5 CVE Schema (2025)")
         output_file: Output file path
         processed_cves: Set of already processed CVE IDs (for deduplication)
         extension: Output format ('txt' or 'jsonl')
         verbose: Enable detailed logging (default: False)
+        keyword_filter: Optional keyword to filter CVE descriptions (case-insensitive)
 
     Returns:
         tuple: (processed_count, skipped_count)
@@ -86,6 +87,15 @@ def process_cve_directory(folder_path: str, source_label: str, output_file: str,
                     print(f"Skipped (already processed): {cve_number}")
                 skipped_count += 1
                 continue
+
+            # Apply keyword filter if specified
+            if keyword_filter:
+                cve_text = f"CVE Number: {cve_number}, Vendor: {vendor_name}, Product: {product_name}, Description: {description}"
+                if keyword_filter.lower() not in cve_text.lower():
+                    if verbose:
+                        print(f"Skipped (filtered): {cve_number}")
+                    skipped_count += 1
+                    continue
 
             # Format output based on extension
             if extension == 'txt':
@@ -140,17 +150,19 @@ def main():
         epilog="""
 Examples:
   python extract_cve.py                       # Extract current year from V5 (fastest)
-  python extract_cve.py --year=2024           # Extract 2024 from V5
+  python extract_cve.py --year=2025           # Extract 2025 from V5
   python extract_cve.py --schema=all          # Extract from both V5 and V4 (with dedup)
   python extract_cve.py --schema=v4           # Extract from V4 only
   python extract_cve.py --year=all --schema=all  # Extract all years from both schemas
+  python extract_cve.py --filter=snmp         # Extract only SNMP-related CVEs
+  python extract_cve.py --filter=Windows --year=2025  # Extract 2025 Windows CVEs
         """
     )
     parser.add_argument(
         '--year',
         type=str,
         default=str(datetime.now().year),
-        help='Year(s) to process: single year (2024), comma-separated (2023,2024), or "all" (default: current year)'
+        help='Year(s) to process: single year (2025), comma-separated (2024,2025), or "all" (default: current year)'
     )
     parser.add_argument(
         '--schema',
@@ -171,6 +183,12 @@ Examples:
         default='jsonl',
         help='Output format: txt (human-readable, lossy) or jsonl (machine-readable, lossless) (default: jsonl)'
     )
+    parser.add_argument(
+        '--filter',
+        type=str,
+        default=None,
+        help='Filter CVEs by keyword (case-insensitive). Only CVEs containing this keyword will be included. Example: --filter=snmp'
+    )
     args = parser.parse_args()
 
     # Determine which years to process
@@ -188,7 +206,7 @@ Examples:
         try:
             years = [int(y.strip()) for y in args.year.split(',')]
         except ValueError:
-            print(f"Error: Invalid year format '{args.year}'. Use single year (2024), comma-separated (2023,2024), or 'all'")
+            print(f"Error: Invalid year format '{args.year}'. Use single year (2025), comma-separated (2024,2025), or 'all'")
             return
 
     # Determine output file name using config path
@@ -216,6 +234,8 @@ Examples:
     print(f"{'='*60}\n")
     print(f"Years:       {years}")
     print(f"Schema:      {args.schema}")
+    if args.filter:
+        print(f"Filter:      '{args.filter}' (case-insensitive)")
     print(f"Format:      {args.extension} ({'human-readable' if args.extension == 'txt' else 'machine-readable'})")
     print(f"Output:      {output_file}")
     print(f"{'='*60}")
@@ -233,20 +253,20 @@ Examples:
         if args.schema in ['v5', 'all']:
             # Process V5 schema
             if processed_cves is not None:
-                v5_count, _ = process_cve_directory(v5_folder, f"V5 CVE Schema ({year})", output_file, processed_cves, args.extension, args.verbose)
+                v5_count, _ = process_cve_directory(v5_folder, f"V5 CVE Schema ({year})", output_file, processed_cves, args.extension, args.verbose, args.filter)
             else:
                 # No dedup needed for v5-only
-                v5_count, _ = process_cve_directory(v5_folder, f"V5 CVE Schema ({year})", output_file, set(), args.extension, args.verbose)
+                v5_count, _ = process_cve_directory(v5_folder, f"V5 CVE Schema ({year})", output_file, set(), args.extension, args.verbose, args.filter)
             total_v5_count += v5_count
 
         if args.schema in ['v4', 'all']:
             # Process V4 schema
             if processed_cves is not None:
-                v4_count, v4_skipped = process_cve_directory(v4_folder, f"V4 CVE Schema ({year})", output_file, processed_cves, args.extension, args.verbose)
+                v4_count, v4_skipped = process_cve_directory(v4_folder, f"V4 CVE Schema ({year})", output_file, processed_cves, args.extension, args.verbose, args.filter)
                 total_v4_skipped += v4_skipped
             else:
                 # No dedup needed for v4-only
-                v4_count, _ = process_cve_directory(v4_folder, f"V4 CVE Schema ({year})", output_file, set(), args.extension, args.verbose)
+                v4_count, _ = process_cve_directory(v4_folder, f"V4 CVE Schema ({year})", output_file, set(), args.extension, args.verbose, args.filter)
             total_v4_count += v4_count
 
         # Print summary based on schema
