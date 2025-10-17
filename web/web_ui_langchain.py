@@ -374,6 +374,54 @@ def format_kb_display() -> str:
     except Exception as e:
         return f"<p>❌ Error loading sources: {str(e)}</p>"
 
+def get_source_names() -> list:
+    """
+    Get list of source names for dropdown.
+
+    Returns:
+        list: List of source names
+    """
+    try:
+        stats = rag_system.get_kb_stats()
+        if not stats:
+            return []
+        sources = stats.get('sources', {})
+        return list(sources.keys())
+    except Exception as e:
+        print(f"Error getting source names: {e}")
+        return []
+
+def delete_source(source_name: str) -> tuple:
+    """
+    Delete a single source from knowledge base.
+
+    Args:
+        source_name: Name of source to delete
+
+    Returns:
+        tuple: (status_message, updated_kb_display, updated_dropdown_choices)
+    """
+    if not source_name:
+        return "⚠️ No source selected", format_kb_display(), get_source_names()
+
+    try:
+        # Delete the source using chroma_manager
+        n_deleted = rag_system.chroma_manager.delete_by_source(source_name)
+
+        if n_deleted > 0:
+            status = f"✅ Deleted {n_deleted} chunks from '{source_name}'"
+        else:
+            status = f"⚠️ Source '{source_name}' not found"
+
+        # Get updated displays
+        updated_display = format_kb_display()
+        updated_choices = get_source_names()
+
+        return status, updated_display, updated_choices
+
+    except Exception as e:
+        return f"❌ Error deleting source: {str(e)}", format_kb_display(), get_source_names()
+
 # =============================================================================
 # Gradio interface
 # =============================================================================
@@ -446,16 +494,26 @@ def create_interface():
                         label="Sources"
                     )
 
-                    refresh_kb_btn = gr.Button("🔄 Refresh", size="sm")
+                    with gr.Row():
+                        refresh_kb_btn = gr.Button("🔄 Refresh", size="sm", scale=1)
 
+                    # Delete section
+                    gr.Markdown("**Remove Source:**")
+                    source_dropdown = gr.Dropdown(
+                        choices=[],
+                        label="Select source to remove",
+                        interactive=True
+                    )
+                    delete_btn = gr.Button("🗑️ Delete Selected Source", size="sm", variant="stop")
+
+                    # Add section
+                    gr.Markdown("**Add New Source:**")
                     add_kb_file = gr.File(
-                        label="Add Files to Knowledge Base",
+                        label="Select PDF File",
                         file_types=[".pdf"],
                         type="filepath"
                     )
                     add_kb_btn = gr.Button("➕ Add to Knowledge Base", variant="primary")
-
-                    kb_message = gr.Textbox(label="Status", interactive=False)
 
         # Modal for file upload (Claude Projects style)
         with gr.Row(visible=False) as upload_modal:
@@ -511,20 +569,31 @@ def create_interface():
         def handle_add_to_kb_modal(file):
             """Handle add to KB action from modal."""
             if file is None:
-                return "⚠️ Please select a file first", gr.update(visible=True), format_kb_display()
+                return "⚠️ Please select a file first", gr.update(visible=True), format_kb_display(), gr.update()
             result = add_pdf_to_kb(file)
             updated_display = format_kb_display()
-            return result, gr.update(visible=False), updated_display
+            updated_sources = get_source_names()
+            return result, gr.update(visible=False), updated_display, gr.update(choices=updated_sources)
 
         def handle_add_to_kb(file):
             """Handle add to KB from right panel."""
             result = add_pdf_to_kb(file)
+            print(result)  # Print to console instead of UI
             updated_display = format_kb_display()
-            return result, updated_display
+            updated_sources = get_source_names()
+            return updated_display, gr.update(choices=updated_sources)
 
         def handle_refresh_kb():
-            """Refresh knowledge base display."""
-            return format_kb_display()
+            """Refresh knowledge base display and source dropdown."""
+            updated_display = format_kb_display()
+            updated_sources = get_source_names()
+            return updated_display, gr.update(choices=updated_sources)
+
+        def handle_delete_source(source_name):
+            """Handle delete source button click."""
+            status, updated_display, updated_sources = delete_source(source_name)
+            print(status)  # Print to console instead of UI
+            return updated_display, gr.update(choices=updated_sources, value=None)
 
         def handle_speed_change(new_speed):
             """Handle speed dropdown change - reload model."""
@@ -548,7 +617,7 @@ def create_interface():
 
         summarize_btn.click(handle_summarize, inputs=[upload_file], outputs=[upload_status, upload_modal])
         validate_btn.click(handle_validate, inputs=[upload_file], outputs=[upload_status, upload_modal])
-        add_to_kb_btn_modal.click(handle_add_to_kb_modal, inputs=[upload_file], outputs=[upload_status, upload_modal, kb_display])
+        add_to_kb_btn_modal.click(handle_add_to_kb_modal, inputs=[upload_file], outputs=[upload_status, upload_modal, kb_display, source_dropdown])
 
         # Settings change handlers
         speed_dropdown.change(
@@ -563,11 +632,12 @@ def create_interface():
         )
 
         # Knowledge base handlers
-        add_kb_btn.click(handle_add_to_kb, [add_kb_file], [kb_message, kb_display])
-        refresh_kb_btn.click(handle_refresh_kb, outputs=[kb_display])
+        add_kb_btn.click(handle_add_to_kb, [add_kb_file], [kb_display, source_dropdown])
+        refresh_kb_btn.click(handle_refresh_kb, outputs=[kb_display, source_dropdown])
+        delete_btn.click(handle_delete_source, [source_dropdown], [kb_display, source_dropdown])
 
         # Auto-refresh knowledge base on page load
-        demo.load(handle_refresh_kb, outputs=[kb_display])
+        demo.load(handle_refresh_kb, outputs=[kb_display, source_dropdown])
 
         # Custom JavaScript for Enter to submit
         demo.load(None, None, None, js="""
