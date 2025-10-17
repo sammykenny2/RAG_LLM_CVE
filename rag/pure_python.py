@@ -5,6 +5,7 @@ Provides conversational AI interface without LangChain dependencies.
 
 from typing import List, Dict, Optional, Tuple
 from collections import deque
+import re
 
 # Import core modules
 from core.models import LlamaModel
@@ -128,6 +129,61 @@ class PureRAG:
         if VERBOSE_LOGGING:
             print("✅ RAG system initialized")
 
+    def _hybrid_search(self, query: str, top_k: int = RETRIEVAL_TOP_K) -> List[str]:
+        """
+        Hybrid search: exact CVE ID match + semantic search.
+
+        If query contains CVE ID(s), use metadata filtering for exact match.
+        Otherwise, use semantic search.
+
+        Args:
+            query: User query
+            top_k: Number of results to return
+
+        Returns:
+            list: Retrieved document chunks
+        """
+        # Check for CVE IDs in query
+        cve_pattern = r'CVE-\d{4}-\d{4,7}'
+        cve_ids = re.findall(cve_pattern, query, re.IGNORECASE)
+
+        if cve_ids:
+            # Try exact match first
+            if VERBOSE_LOGGING:
+                print(f"[Hybrid Search] Detected CVE IDs: {cve_ids}")
+
+            for cve_id in cve_ids:
+                results = self.chroma.query_by_metadata(
+                    where={"cve_id": cve_id.upper()},
+                    limit=top_k
+                )
+
+                if results and results.get('documents') and len(results['documents']) > 0:
+                    if VERBOSE_LOGGING:
+                        print(f"[Hybrid Search] Exact match found for {cve_id}: {len(results['documents'])} result(s)")
+                    # Return exact matches (query_by_metadata returns flat list)
+                    return results['documents']
+
+            if VERBOSE_LOGGING:
+                print(f"[Hybrid Search] No exact match, falling back to semantic search")
+
+        # Fallback to semantic search
+        if VERBOSE_LOGGING:
+            print(f"[Hybrid Search] Using semantic search")
+
+        query_embedding = self.embedder.encode(
+            query,
+            convert_to_numpy=True,
+            show_progress_bar=False
+        )
+
+        results = self.chroma.query(
+            query_embedding=query_embedding.tolist(),
+            top_k=top_k
+        )
+
+        return results['documents'][0]
+
     def query(
         self,
         question: str,
@@ -138,6 +194,7 @@ class PureRAG:
     ) -> str:
         """
         Query knowledge base with conversation history.
+        Uses hybrid search: exact match (if CVE ID detected) + semantic search.
 
         Args:
             question: User question
@@ -152,21 +209,8 @@ class PureRAG:
         if not self._initialized:
             raise RuntimeError("RAG system not initialized. Call initialize() first.")
 
-        # Encode query
-        query_embedding = self.embedder.encode(
-            question,
-            convert_to_numpy=True,
-            show_progress_bar=False
-        )
-
-        # Query Chroma
-        results = self.chroma.query(
-            query_embedding=query_embedding.tolist(),
-            top_k=top_k
-        )
-
-        # Extract context
-        context_items = results['documents'][0]
+        # Extract context using hybrid search
+        context_items = self._hybrid_search(question, top_k)
         context_str = "\n- ".join(context_items)
 
         # Build messages
@@ -314,7 +358,8 @@ class PureRAG:
     def process_report_for_cve_validation(
         self,
         pdf_path: str,
-        schema: str = 'all'
+        schema: str = 'all',
+        max_pages: Optional[int] = None
     ) -> Tuple[str, List[str], str]:
         """
         Process a PDF report and lookup CVE information for validation.
@@ -322,13 +367,14 @@ class PureRAG:
         Args:
             pdf_path: Path to PDF file
             schema: CVE schema to use ('v5', 'v4', or 'all')
+            max_pages: Maximum pages to process (None for all)
 
         Returns:
             tuple: (report_text, cve_list, cve_descriptions_text)
         """
         # Extract text from PDF
         pdf_processor = PDFProcessor()
-        report_text = pdf_processor.extract_text(pdf_path)
+        report_text = pdf_processor.extract_text(pdf_path, max_pages=max_pages)
 
         # Extract CVEs using regex
         cves = extract_cves_regex(report_text)

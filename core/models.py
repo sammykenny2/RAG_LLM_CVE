@@ -5,7 +5,7 @@ Provides unified interface for loading Meta's Llama 3.2-1B-Instruct model.
 
 import torch
 import gc
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from transformers.utils import logging as transformers_logging
 
 # Suppress transformers warnings
@@ -37,7 +37,8 @@ class LlamaModel:
         model_name: str = None,
         use_fp16: bool = False,
         use_low_cpu_mem: bool = False,
-        use_sdpa: bool = False
+        use_sdpa: bool = False,
+        use_4bit_quantization: bool = None
     ):
         """
         Initialize Llama model wrapper.
@@ -47,15 +48,45 @@ class LlamaModel:
             use_fp16: Use float16 precision for GPU speedup
             use_low_cpu_mem: Enable low CPU memory usage mode
             use_sdpa: Enable Scaled Dot-Product Attention (if available)
+            use_4bit_quantization: Use 4-bit quantization (auto-enabled for 3B+ models on CUDA)
         """
         self.model_name = model_name or LLAMA_MODEL_NAME
         self.use_fp16 = use_fp16
         self.use_low_cpu_mem = use_low_cpu_mem
         self.use_sdpa = use_sdpa
 
+        # Auto-enable 4-bit quantization for 3B+ models on CUDA
+        if use_4bit_quantization is None:
+            self.use_4bit_quantization = self._should_use_quantization()
+        else:
+            self.use_4bit_quantization = use_4bit_quantization
+
         self.tokenizer = None
         self.model = None
         self._initialized = False
+
+    def _should_use_quantization(self) -> bool:
+        """
+        Determine if 4-bit quantization should be used based on model size and device.
+
+        Returns:
+            bool: True if quantization is recommended
+        """
+        # Check if CUDA is available
+        if not torch.cuda.is_available():
+            return False
+
+        # Check model size from name (3B, 8B, 70B, etc.)
+        model_name_lower = self.model_name.lower()
+        large_model_indicators = ["3b", "8b", "13b", "70b"]
+
+        for indicator in large_model_indicators:
+            if indicator in model_name_lower:
+                if VERBOSE_LOGGING:
+                    print(f"🔍 Detected large model ({indicator.upper()}), enabling 4-bit quantization")
+                return True
+
+        return False
 
     def initialize(self):
         """Load tokenizer and model with specified optimizations."""
@@ -79,8 +110,19 @@ class LlamaModel:
             "trust_remote_code": True,
         }
 
-        # Precision setting
-        if self.use_fp16:
+        # 4-bit quantization (takes priority over FP16)
+        if self.use_4bit_quantization:
+            quantization_config = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_compute_dtype=torch.float16,
+                bnb_4bit_use_double_quant=True,
+                bnb_4bit_quant_type="nf4"
+            )
+            model_kwargs["quantization_config"] = quantization_config
+            if VERBOSE_LOGGING:
+                print("  └─ 4-bit quantization enabled (NF4 + double quant)")
+        # Precision setting (only if not using quantization)
+        elif self.use_fp16:
             model_kwargs["torch_dtype"] = torch.float16
             if VERBOSE_LOGGING:
                 print("  └─ FP16 precision enabled")
@@ -204,7 +246,7 @@ class LlamaModel:
 # Utility functions (backward compatible with theRag.py)
 # =============================================================================
 
-def initialize_model(use_fp16=False, use_low_cpu_mem=False, use_sdpa=False):
+def initialize_model(use_fp16=False, use_low_cpu_mem=False, use_sdpa=False, use_4bit_quantization=None):
     """
     Initialize Llama model (backward compatible function).
 
@@ -212,6 +254,7 @@ def initialize_model(use_fp16=False, use_low_cpu_mem=False, use_sdpa=False):
         use_fp16: Use float16 precision
         use_low_cpu_mem: Enable low CPU memory usage
         use_sdpa: Enable SDPA attention
+        use_4bit_quantization: Use 4-bit quantization (auto-enabled for 3B+ on CUDA)
 
     Returns:
         tuple: (tokenizer, model)
@@ -219,7 +262,8 @@ def initialize_model(use_fp16=False, use_low_cpu_mem=False, use_sdpa=False):
     llm = LlamaModel(
         use_fp16=use_fp16,
         use_low_cpu_mem=use_low_cpu_mem,
-        use_sdpa=use_sdpa
+        use_sdpa=use_sdpa,
+        use_4bit_quantization=use_4bit_quantization
     )
     return llm.initialize()
 

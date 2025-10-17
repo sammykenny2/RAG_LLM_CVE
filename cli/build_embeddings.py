@@ -314,13 +314,27 @@ def process_pdf(pdf_path, sentence_size, output_path, batch_size, precision, ext
         embeddings_list = [item["embedding"].tolist() for item in dic_chunks]
         documents = [item["sentence_chunk"] for item in dic_chunks]
 
+        # Prepare metadata for PDF
+        pdf_name = Path(pdf_path).name
+        metadatas = [
+            {
+                "source_type": "pdf",
+                "source_name": pdf_name,
+                "added_date": datetime.now().isoformat(),
+                "chunk_index": i,
+                "precision": precision
+            }
+            for i in range(len(dic_chunks))
+        ]
+
         # Add to collection in batches (Chroma has batch size limits)
         batch_size = 5000
         for i in range(0, len(ids), batch_size):
             collection.add(
                 ids=ids[i:i+batch_size],
                 embeddings=embeddings_list[i:i+batch_size],
-                documents=documents[i:i+batch_size]
+                documents=documents[i:i+batch_size],
+                metadatas=metadatas[i:i+batch_size]
             )
 
         print(f"  └─ Stored {len(dic_chunks)} embeddings in Chroma database")

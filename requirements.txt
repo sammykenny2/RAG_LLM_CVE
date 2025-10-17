@@ -36,4 +36,5 @@ psycopg2-binary
 reportlab
 spacy
 
-# bitsandbytes - Not used in current implementation, Linux-only
+# Model quantization (required for 3B+ models on GTX 1660 Ti)
+bitsandbytes

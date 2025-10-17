@@ -203,6 +203,34 @@ class ChromaManager:
 
         return results
 
+    def query_by_metadata(
+        self,
+        where: Dict,
+        limit: int = None
+    ) -> Dict:
+        """
+        Query documents by metadata filter only (no embedding search).
+        Useful for exact CVE ID lookup.
+
+        Args:
+            where: Metadata filter dict (e.g., {"cve_id": "CVE-2024-1234"})
+            limit: Maximum number of results (default: all matches)
+
+        Returns:
+            dict: Results with keys: ids, documents, metadatas
+        """
+        if not self._initialized:
+            self.initialize()
+
+        # Use get() for metadata-only queries (faster than query())
+        results = self.collection.get(
+            where=where,
+            limit=limit,
+            include=['documents', 'metadatas']
+        )
+
+        return results
+
     def delete_by_source(self, source_name: str, source_type: str = None) -> int:
         """
         Delete all documents from a specific source.

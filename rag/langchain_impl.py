@@ -6,6 +6,7 @@ Provides conversational AI interface using LangChain chains and memory.
 from typing import List, Dict, Optional, Tuple
 import torch
 from pathlib import Path
+import re
 
 # LangChain imports
 from langchain.chains import ConversationalRetrievalChain
@@ -45,6 +46,8 @@ class LangChainRAG:
     def __init__(self):
         """Initialize LangChain RAG system."""
         self.llm = None
+        self.tokenizer = None
+        self.model = None
         self.embeddings = None
         self.vectorstore = None
         self.memory = None
@@ -75,7 +78,7 @@ class LangChainRAG:
 
         # 1. Initialize Llama model as HuggingFacePipeline
         print("Loading Llama model...")
-        tokenizer = AutoTokenizer.from_pretrained(
+        self.tokenizer = AutoTokenizer.from_pretrained(
             LLAMA_MODEL_NAME,
             trust_remote_code=True
         )
@@ -99,27 +102,27 @@ class LangChainRAG:
                 if VERBOSE_LOGGING:
                     print(f"  └─ SDPA not available: {e}")
 
-        model = AutoModelForCausalLM.from_pretrained(
+        self.model = AutoModelForCausalLM.from_pretrained(
             LLAMA_MODEL_NAME,
             **model_kwargs
         )
 
-        # Create text generation pipeline
+        # Create default text generation pipeline (for ConversationalRetrievalChain)
         pipe = pipeline(
             "text-generation",
-            model=model,
-            tokenizer=tokenizer,
+            model=self.model,
+            tokenizer=self.tokenizer,
             max_new_tokens=512,
             temperature=LLM_TEMPERATURE,
             top_p=LLM_TOP_P,
             do_sample=True,
-            pad_token_id=tokenizer.eos_token_id,
+            pad_token_id=self.tokenizer.eos_token_id,
             return_full_text=False  # Only return generated text, not prompt
         )
 
         self.llm = HuggingFacePipeline(pipeline=pipe)
         if VERBOSE_LOGGING:
-            print("✅ Llama loaded as HuggingFacePipeline")
+            print("✅ Llama loaded as HuggingFacePipeline (tokenizer and model saved for dynamic pipelines)")
 
         # 2. Initialize embeddings
         print("Loading embedding model...")
@@ -171,9 +174,33 @@ class LangChainRAG:
         self._initialized = True
         print("✅ LangChain RAG system ready")
 
+    def _create_pipeline(self, max_new_tokens: int = 512) -> HuggingFacePipeline:
+        """
+        Create a new HuggingFacePipeline with custom max_new_tokens.
+
+        Args:
+            max_new_tokens: Maximum tokens to generate
+
+        Returns:
+            HuggingFacePipeline: Pipeline with specified settings
+        """
+        pipe = pipeline(
+            "text-generation",
+            model=self.model,
+            tokenizer=self.tokenizer,
+            max_new_tokens=max_new_tokens,
+            temperature=LLM_TEMPERATURE,
+            top_p=LLM_TOP_P,
+            do_sample=True,
+            pad_token_id=self.tokenizer.eos_token_id,
+            return_full_text=False
+        )
+        return HuggingFacePipeline(pipeline=pipe)
+
     def query(self, question: str, return_sources: bool = False) -> str | Dict:
         """
         Query knowledge base with automatic conversation history.
+        Uses hybrid search: exact CVE ID match + semantic search.
 
         Args:
             question: User question
@@ -185,7 +212,49 @@ class LangChainRAG:
         if not self._initialized:
             raise RuntimeError("RAG system not initialized. Call initialize() first.")
 
-        # Query chain (memory is managed automatically)
+        # Check for CVE IDs and try exact match first
+        cve_pattern = r'CVE-\d{4}-\d{4,7}'
+        cve_ids = re.findall(cve_pattern, question, re.IGNORECASE)
+
+        if cve_ids and self.chroma_manager:
+            # Try exact CVE ID match
+            if VERBOSE_LOGGING:
+                print(f"[Hybrid Search] Detected CVE IDs: {cve_ids}")
+
+            for cve_id in cve_ids:
+                results = self.chroma_manager.query_by_metadata(
+                    where={"cve_id": cve_id.upper()},
+                    limit=RETRIEVAL_TOP_K
+                )
+
+                if results and results.get('documents') and len(results['documents']) > 0:
+                    if VERBOSE_LOGGING:
+                        print(f"[Hybrid Search] Exact match found for {cve_id}")
+
+                    # Format direct answer from exact match
+                    context = "\n\n".join(results['documents'][:3])  # Use top 3
+                    prompt = f"Based on the following information, answer this question: {question}\n\nInformation:\n{context}"
+
+                    response = self.llm(prompt)
+
+                    if return_sources:
+                        # Convert to source document format
+                        from langchain.docstore.document import Document
+                        source_docs = [
+                            Document(page_content=doc, metadata=meta)
+                            for doc, meta in zip(results['documents'], results.get('metadatas', []))
+                        ]
+                        return {
+                            "answer": response,
+                            "sources": source_docs
+                        }
+                    else:
+                        return response
+
+            if VERBOSE_LOGGING:
+                print(f"[Hybrid Search] No exact match, using semantic search")
+
+        # Fallback to normal chain (semantic search)
         result = self.qa_chain({"question": question})
 
         if return_sources:
@@ -214,12 +283,13 @@ class LangChainRAG:
             return self.memory.chat_memory.messages
         return []
 
-    def summarize_report(self, report_text: str) -> str:
+    def summarize_report(self, report_text: str, max_tokens: int = 512) -> str:
         """
         Generate executive summary (non-conversational, single-shot).
 
         Args:
             report_text: Full report text
+            max_tokens: Maximum tokens to generate (dynamically applied)
 
         Returns:
             str: Summary
@@ -227,16 +297,19 @@ class LangChainRAG:
         if not self._initialized:
             raise RuntimeError("RAG system not initialized. Call initialize() first.")
 
-        # Use LLM directly without memory
+        # Create pipeline with custom max_tokens
+        llm = self._create_pipeline(max_new_tokens=max_tokens)
+
         prompt = f"Summarize the following threat intelligence report:\n\n{report_text}"
-        response = self.llm(prompt)
+        response = llm(prompt)
 
         return response
 
     def validate_cve_usage(
         self,
         report_text: str,
-        cve_descriptions: str
+        cve_descriptions: str,
+        max_tokens: int = 512
     ) -> str:
         """
         Validate CVE usage (non-conversational, single-shot).
@@ -244,12 +317,16 @@ class LangChainRAG:
         Args:
             report_text: Security report text
             cve_descriptions: Official CVE descriptions
+            max_tokens: Maximum tokens to generate (dynamically applied)
 
         Returns:
             str: Validation result
         """
         if not self._initialized:
             raise RuntimeError("RAG system not initialized. Call initialize() first.")
+
+        # Create pipeline with custom max_tokens
+        llm = self._create_pipeline(max_new_tokens=max_tokens)
 
         prompt = (
             f"Verify if the CVEs in the following report are used correctly.\n\n"
@@ -258,7 +335,7 @@ class LangChainRAG:
             f"Provide detailed verification with quotes."
         )
 
-        response = self.llm(prompt)
+        response = llm(prompt)
         return response
 
     def answer_question_about_report(
@@ -287,7 +364,8 @@ class LangChainRAG:
     def process_report_for_cve_validation(
         self,
         pdf_path: str,
-        schema: str = 'all'
+        schema: str = 'all',
+        max_pages: Optional[int] = None
     ) -> Tuple[str, List[str], str]:
         """
         Process PDF report and lookup CVE information.
@@ -295,13 +373,14 @@ class LangChainRAG:
         Args:
             pdf_path: Path to PDF file
             schema: CVE schema ('v5', 'v4', or 'all')
+            max_pages: Maximum pages to process (None for all)
 
         Returns:
             tuple: (report_text, cve_list, cve_descriptions_text)
         """
         # Extract text
         pdf_processor = PDFProcessor()
-        report_text = pdf_processor.extract_text(pdf_path)
+        report_text = pdf_processor.extract_text(pdf_path, max_pages=max_pages)
 
         # Extract CVEs
         cves = extract_cves_regex(report_text)
@@ -378,9 +457,21 @@ class LangChainRAG:
             # LangChain handles cleanup internally
             self.llm = None
 
+        if self.model:
+            del self.model
+            self.model = None
+
+        if self.tokenizer:
+            del self.tokenizer
+            self.tokenizer = None
+
         if self.memory:
             self.memory.clear()
             self.memory = None
+
+        # Clear CUDA cache if available
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
         self._initialized = False
 

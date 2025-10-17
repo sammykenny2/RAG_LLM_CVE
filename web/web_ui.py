@@ -71,12 +71,22 @@ rag_system = None
 chroma_manager = None
 embedding_model = None
 
-def initialize_system(speed_level: str = DEFAULT_SPEED):
-    """Initialize RAG system based on speed level."""
-    global rag_system, chroma_manager, embedding_model
+# Track current settings
+current_speed = DEFAULT_SPEED
+current_mode = DEFAULT_MODE
 
-    if rag_system is not None:
-        return  # Already initialized
+def initialize_system(speed_level: str = DEFAULT_SPEED, force_reload: bool = False):
+    """Initialize RAG system based on speed level."""
+    global rag_system, chroma_manager, embedding_model, current_speed
+
+    if rag_system is not None and not force_reload:
+        return f"⚠️ System already initialized with speed={current_speed}"
+
+    # Clean up existing model if reloading
+    if force_reload and rag_system is not None:
+        print(f"Reloading model with new speed: {speed_level}")
+        rag_system.cleanup()
+        rag_system = None
 
     print("Initializing RAG system for web UI...")
 
@@ -92,7 +102,57 @@ def initialize_system(speed_level: str = DEFAULT_SPEED):
     chroma_manager = rag_system.chroma
     embedding_model = rag_system.embedder
 
-    print("✅ RAG system ready")
+    # Update current speed
+    current_speed = speed_level
+
+    print(f"✅ RAG system ready (speed={current_speed})")
+    return f"✅ System initialized with speed={current_speed}"
+
+def reload_model(new_speed: str) -> str:
+    """
+    Reload model with new speed settings.
+
+    Args:
+        new_speed: New speed level (normal/fast/fastest)
+
+    Returns:
+        str: Status message
+    """
+    try:
+        result = initialize_system(speed_level=new_speed, force_reload=True)
+        return result
+    except Exception as e:
+        return f"❌ Reload failed: {str(e)}"
+
+def update_mode(new_mode: str) -> str:
+    """
+    Update mode setting (no reload needed).
+
+    Args:
+        new_mode: New mode (demo/full)
+
+    Returns:
+        str: Status message
+    """
+    global current_mode
+    current_mode = new_mode
+    return f"✅ Mode updated to: {current_mode}"
+
+def get_current_status() -> str:
+    """Get current system status as formatted string."""
+    model_name = 'Not loaded'
+    if rag_system and hasattr(rag_system, 'llama') and rag_system.llama:
+        model_name = rag_system.llama.model_name
+
+    status = f"""
+    <div style='padding: 10px; background-color: #f0f0f0; border-radius: 5px;'>
+        <h4>📊 Current Settings</h4>
+        <p><b>Speed:</b> {current_speed}</p>
+        <p><b>Mode:</b> {current_mode}</p>
+        <p><b>Model:</b> {model_name}</p>
+    </div>
+    """
+    return status
 
 # =============================================================================
 # Chat interface handlers
@@ -167,7 +227,8 @@ def upload_for_validation(file) -> str:
 def process_uploaded_report(
     file,
     action: str,
-    schema: str = DEFAULT_SCHEMA
+    schema: str = DEFAULT_SCHEMA,
+    mode: str = None
 ) -> str:
     """
     Process uploaded report based on user action.
@@ -176,6 +237,7 @@ def process_uploaded_report(
         file: Gradio File object
         action: 'summarize', 'validate', or 'add'
         schema: CVE schema to use
+        mode: Processing mode (demo/full), uses global current_mode if None
 
     Returns:
         str: Processing result
@@ -183,28 +245,44 @@ def process_uploaded_report(
     if file is None:
         return "⚠️ No file uploaded"
 
+    # Use global mode if not specified
+    mode = mode or current_mode
+
+    # Mode-specific settings
+    if mode == 'demo':
+        max_tokens = 256
+        max_pages = 10
+        top_k = 3
+    else:  # full mode
+        max_tokens = 700
+        max_pages = None
+        top_k = 5
+
     try:
         file_path = Path(file.name)
 
         if action == 'summarize':
             # Extract text and summarize
             pdf_processor = PDFProcessor()
-            text = pdf_processor.extract_text(file_path)
-            summary = rag_system.summarize_report(text, max_tokens=700)
-            return f"📝 Summary:\n\n{summary}"
+            text = pdf_processor.extract_text(file_path, max_pages=max_pages)
+            summary = rag_system.summarize_report(text, max_tokens=max_tokens)
+            mode_info = f" (mode={mode}, max_tokens={max_tokens})"
+            return f"📝 Summary{mode_info}:\n\n{summary}"
 
         elif action == 'validate':
             # Process report and validate CVE usage
             report_text, cves, cve_descriptions = rag_system.process_report_for_cve_validation(
                 str(file_path),
-                schema=schema
+                schema=schema,
+                max_pages=max_pages
             )
             validation = rag_system.validate_cve_usage(
                 report_text,
                 cve_descriptions,
-                max_tokens=700
+                max_tokens=max_tokens
             )
-            return f"✅ Validation Result:\n\n{validation}\n\n📋 Found CVEs: {', '.join(cves)}"
+            mode_info = f" (mode={mode}, max_tokens={max_tokens})"
+            return f"✅ Validation Result{mode_info}:\n\n{validation}\n\n📋 Found CVEs: {', '.join(cves)}"
 
         elif action == 'add':
             # Add to knowledge base
@@ -385,45 +463,42 @@ def create_interface():
                     type='messages'  # Use OpenAI-style message format
                 )
 
-                with gr.Row():
-                    msg_input = gr.Textbox(
-                        label="Your message",
-                        placeholder="Ask about CVEs, security reports, or upload a file for validation...",
-                        scale=4
-                    )
-                    send_btn = gr.Button("Send", scale=1, variant="primary")
+                msg_input = gr.Textbox(
+                    label="Your message",
+                    placeholder="Ask about CVEs, security reports, or upload a file for validation...",
+                    lines=2,
+                    show_label=False,
+                    elem_id="msg_input"
+                )
 
+                # Action buttons row (Claude Projects style)
                 with gr.Row():
-                    upload_file = gr.File(
-                        label="Upload Report for Validation",
-                        file_types=[".pdf"],
-                        type="filepath"
-                    )
-
-                gr.Markdown("**After uploading:** Type 'summarize', 'validate', or 'add to kb'")
+                    upload_modal_btn = gr.Button("➕ Add File", size="sm", scale=1)
+                    send_btn = gr.Button("Send →", size="sm", scale=1, variant="primary", elem_id="send_btn")
+                    with gr.Column(scale=8):
+                        pass  # Spacer
 
             # Right column: Settings and Knowledge Base (5/12 width)
             with gr.Column(scale=5):
-                # Instructions panel
+                # Current Status Display
                 gr.Markdown("### ⚙️ Analysis Settings")
                 with gr.Group():
+                    status_display = gr.HTML(
+                        value=get_current_status(),
+                        label="Current Settings"
+                    )
+
                     speed_dropdown = gr.Dropdown(
                         choices=['normal', 'fast', 'fastest'],
                         value=DEFAULT_SPEED,
                         label="Speed Level",
-                        info="normal: FP32 baseline | fast: FP16 (recommended) | fastest: FP16+SDPA"
+                        info="⚠️ Changing speed will reload the model (takes 1-2 min)"
                     )
                     mode_dropdown = gr.Dropdown(
                         choices=['demo', 'full'],
                         value=DEFAULT_MODE,
                         label="Mode",
-                        info="demo: Memory-optimized | full: Complete features"
-                    )
-                    schema_dropdown = gr.Dropdown(
-                        choices=['v5', 'v4', 'all'],
-                        value=DEFAULT_SCHEMA,
-                        label="CVE Schema",
-                        info="v5: CVE 5.0 only | v4: CVE 4.0 only | all: Fallback"
+                        info="demo: 10 pages, 256 tokens | full: All pages, 700 tokens"
                     )
 
                 gr.Markdown("---")
@@ -447,39 +522,136 @@ def create_interface():
 
                     kb_message = gr.Textbox(label="Status", interactive=False)
 
+        # Modal for file upload (Claude Projects style)
+        with gr.Row(visible=False) as upload_modal:
+            with gr.Column(scale=1):
+                pass  # Left spacer
+            with gr.Column(scale=10):
+                with gr.Group():
+                    gr.Markdown("### 📄 Upload File")
+
+                    upload_file = gr.File(
+                        label="Select PDF File",
+                        file_types=[".pdf"],
+                        type="filepath"
+                    )
+
+                    gr.Markdown("**What would you like to do?**")
+
+                    with gr.Row():
+                        summarize_btn = gr.Button("📝 Summarize", variant="secondary")
+                        validate_btn = gr.Button("✅ Validate CVEs", variant="secondary")
+                        add_to_kb_btn_modal = gr.Button("📚 Add to Knowledge Base", variant="primary")
+
+                    upload_status = gr.Textbox(label="Status", interactive=False)
+
+                    with gr.Row():
+                        close_modal_btn = gr.Button("Close", size="sm")
+            with gr.Column(scale=1):
+                pass  # Right spacer
+
         # Event handlers
-        def handle_upload(file):
-            # Show instructions when file is uploaded
-            instruction_msg = upload_for_validation(file)
-            return instruction_msg
+        def show_upload_modal():
+            """Show the upload modal."""
+            return gr.update(visible=True)
+
+        def hide_upload_modal():
+            """Hide the upload modal."""
+            return gr.update(visible=False)
+
+        def handle_summarize(file):
+            """Handle summarize action from modal."""
+            if file is None:
+                return "⚠️ Please select a file first", gr.update(visible=True)
+            result = process_uploaded_report(file, action='summarize', mode=current_mode)
+            return result, gr.update(visible=True)
+
+        def handle_validate(file):
+            """Handle validate action from modal."""
+            if file is None:
+                return "⚠️ Please select a file first", gr.update(visible=True)
+            result = process_uploaded_report(file, action='validate', schema=DEFAULT_SCHEMA, mode=current_mode)
+            return result, gr.update(visible=True)
+
+        def handle_add_to_kb_modal(file):
+            """Handle add to KB action from modal."""
+            if file is None:
+                return "⚠️ Please select a file first", gr.update(visible=True), format_kb_display()
+            result = add_pdf_to_kb(file)
+            updated_display = format_kb_display()
+            return result, gr.update(visible=False), updated_display
 
         def handle_add_to_kb(file):
+            """Handle add to KB from right panel."""
             result = add_pdf_to_kb(file)
             updated_display = format_kb_display()
             return result, updated_display
 
         def handle_refresh_kb():
+            """Refresh knowledge base display."""
             return format_kb_display()
 
-        # Connect events - directly bind chat_respond (it's a generator)
+        def handle_speed_change(new_speed):
+            """Handle speed dropdown change - reload model."""
+            reload_model(new_speed)
+            updated_status = get_current_status()
+            return updated_status
+
+        def handle_mode_change(new_mode):
+            """Handle mode dropdown change - no reload needed."""
+            update_mode(new_mode)
+            updated_status = get_current_status()
+            return updated_status
+
+        # Connect events - chat
         msg_input.submit(chat_respond, [msg_input, chatbot], [msg_input, chatbot])
         send_btn.click(chat_respond, [msg_input, chatbot], [msg_input, chatbot])
 
-        upload_file.change(handle_upload, [upload_file], [msg_input])
+        # Modal handlers
+        upload_modal_btn.click(show_upload_modal, outputs=[upload_modal])
+        close_modal_btn.click(hide_upload_modal, outputs=[upload_modal])
 
+        summarize_btn.click(handle_summarize, inputs=[upload_file], outputs=[upload_status, upload_modal])
+        validate_btn.click(handle_validate, inputs=[upload_file], outputs=[upload_status, upload_modal])
+        add_to_kb_btn_modal.click(handle_add_to_kb_modal, inputs=[upload_file], outputs=[upload_status, upload_modal, kb_display])
+
+        # Settings change handlers
+        speed_dropdown.change(
+            handle_speed_change,
+            inputs=[speed_dropdown],
+            outputs=[status_display]
+        )
+        mode_dropdown.change(
+            handle_mode_change,
+            inputs=[mode_dropdown],
+            outputs=[status_display]
+        )
+
+        # Knowledge base handlers
         add_kb_btn.click(handle_add_to_kb, [add_kb_file], [kb_message, kb_display])
         refresh_kb_btn.click(handle_refresh_kb, outputs=[kb_display])
 
-        # Welcome message
-        gr.Markdown("""
-        ---
-        **Quick Start:**
-        1. Ask questions about CVEs in the chat
-        2. Upload a PDF report for validation (left side)
-        3. Add files to knowledge base for future queries (right side)
+        # Auto-refresh knowledge base on page load
+        demo.load(handle_refresh_kb, outputs=[kb_display])
 
-        *🤖 Powered by Llama 3.2-1B-Instruct + RAG*
+        # Custom JavaScript for Enter to submit
+        demo.load(None, None, None, js="""
+        function() {
+            setTimeout(function() {
+                const textarea = document.querySelector('#msg_input textarea');
+                if (textarea) {
+                    textarea.addEventListener('keydown', function(e) {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            const submitBtn = document.querySelector('#send_btn');
+                            if (submitBtn) submitBtn.click();
+                        }
+                    });
+                }
+            }, 1000);
+        }
         """)
+
 
     return demo
 
@@ -502,6 +674,17 @@ def main():
     print(f"\nLaunching web UI...")
     print(f"  Server: {GRADIO_SERVER_NAME}:{GRADIO_SERVER_PORT}")
     print(f"  Share: {GRADIO_SHARE}")
+
+    # Print database status
+    print(f"\nKnowledge Base Status:")
+    try:
+        stats = chroma_manager.get_stats()
+        print(f"  Total documents: {stats['total_docs']}")
+        print(f"  Sources: {len(stats['sources'])}")
+        for name, info in list(stats['sources'].items())[:5]:
+            print(f"    - {name}: {info['count']} chunks")
+    except Exception as e:
+        print(f"  ⚠️ Error loading stats: {e}")
 
     demo.launch(
         server_name=GRADIO_SERVER_NAME,
