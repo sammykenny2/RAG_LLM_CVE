@@ -80,8 +80,7 @@ class PureRAG:
         llama_model: LlamaModel = None,
         embedding_model: EmbeddingModel = None,
         chroma_manager: ChromaManager = None,
-        conversation_history: ConversationHistory = None,
-        session_manager = None
+        conversation_history: ConversationHistory = None
     ):
         """
         Initialize RAG system.
@@ -91,13 +90,11 @@ class PureRAG:
             embedding_model: EmbeddingModel instance (creates new if None)
             chroma_manager: ChromaManager instance (creates new if None)
             conversation_history: ConversationHistory instance (creates new if None)
-            session_manager: SessionManager instance for multi-file context (optional)
         """
         self.llama = llama_model or LlamaModel()
         self.embedder = embedding_model or EmbeddingModel()
         self.chroma = chroma_manager or ChromaManager()
         self.history = conversation_history or ConversationHistory()
-        self.session_manager = session_manager  # Optional: for multi-file conversations
 
         self._initialized = False
 
@@ -187,67 +184,6 @@ class PureRAG:
 
         return results['documents'][0]
 
-    def _merge_results(
-        self,
-        kb_results: List[str],
-        session_results: List[Dict] = None
-    ) -> List[Dict]:
-        """
-        Merge results from permanent KB and session files.
-
-        Args:
-            kb_results: Results from permanent knowledge base (list of strings)
-            session_results: Results from session manager (list of dicts with 'text', 'source', 'score')
-
-        Returns:
-            list: Merged results sorted by score, with dict format:
-                {'text': str, 'source': str, 'source_type': str, 'score': float}
-        """
-        merged = []
-
-        # Add KB results (convert to dict format)
-        for text in kb_results:
-            merged.append({
-                'text': text,
-                'source': 'Knowledge Base',
-                'source_type': 'permanent',
-                'score': 1.0  # KB results from hybrid search don't have scores
-            })
-
-        # Add session results (already in dict format)
-        if session_results:
-            for result in session_results:
-                merged.append({
-                    'text': result['text'],
-                    'source': result['source'],
-                    'source_type': result['source_type'],
-                    'score': result.get('score', 0.0)
-                })
-
-        # Sort by score (descending) - session results have real scores
-        merged.sort(key=lambda x: x['score'], reverse=True)
-
-        return merged
-
-    def _build_prompt_with_sources(self, context_items: List[Dict]) -> str:
-        """
-        Build context string with source attribution.
-
-        Args:
-            context_items: List of dicts with 'text' and 'source' keys
-
-        Returns:
-            str: Formatted context string with source attribution
-        """
-        formatted_items = []
-
-        for item in context_items:
-            source = item.get('source', 'Unknown')
-            text = item.get('text', '')
-            formatted_items.append(f"From {source}: {text}")
-
-        return "\n\n".join(formatted_items)
-
     def query(
         self,
         question: str,
@@ -258,7 +194,7 @@ class PureRAG:
     ) -> str:
         """
         Query knowledge base with conversation history.
-        Uses hybrid search and dual-source retrieval (permanent KB + session files).
+        Uses hybrid search: exact match (if CVE ID detected) + semantic search.
 
         Args:
             question: User question
@@ -273,45 +209,15 @@ class PureRAG:
         if not self._initialized:
             raise RuntimeError("RAG system not initialized. Call initialize() first.")
 
-        # 1. Query session files first if session_manager exists (prioritize uploaded files)
-        session_results = None
-        if self.session_manager:
-            try:
-                session_results = self.session_manager.query(question, top_k=top_k)
-                if VERBOSE_LOGGING and session_results:
-                    print(f"[Dual-Source] Retrieved {len(session_results)} results from session files")
-            except Exception as e:
-                if VERBOSE_LOGGING:
-                    print(f"[Dual-Source] Session query failed: {e}")
-
-        # 2. If session has enough results, use them; otherwise supplement with KB
-        if session_results and len(session_results) >= top_k:
-            # Use only session results (user uploaded files are most relevant)
-            top_results = self._merge_results([], session_results)[:top_k]
-            if VERBOSE_LOGGING:
-                print(f"[Dual-Source] Using {len(top_results)} results from session files only")
-        else:
-            # Supplement with KB results
-            kb_count = top_k - (len(session_results) if session_results else 0)
-            kb_results = self._hybrid_search(question, top_k=kb_count) if kb_count > 0 else []
-
-            # 3. Merge and rank results
-            merged_results = self._merge_results(kb_results, session_results)
-            top_results = merged_results[:top_k]
-
-            if VERBOSE_LOGGING:
-                session_count = len(session_results) if session_results else 0
-                kb_count_actual = len(kb_results) if kb_results else 0
-                print(f"[Dual-Source] Using {session_count} session + {kb_count_actual} KB results")
-
-        # 4. Build prompt with source attribution
-        context_str = self._build_prompt_with_sources(top_results)
+        # Extract context using hybrid search
+        context_items = self._hybrid_search(question, top_k)
+        context_str = "\n- ".join(context_items)
 
         # Build messages
         system_prompt = (
             "You are a helpful AI assistant with access to a knowledge base about CVEs and security reports. "
             "Answer questions based on the provided context.\n\n"
-            f"Context:\n{context_str}"
+            f"Context:\n- {context_str}"
         )
 
         messages = [{"role": "system", "content": system_prompt}]

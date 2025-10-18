@@ -43,13 +43,8 @@ class LangChainRAG:
     ConversationBufferWindowMemory for history management.
     """
 
-    def __init__(self, session_manager = None):
-        """
-        Initialize LangChain RAG system.
-
-        Args:
-            session_manager: SessionManager instance for multi-file context (optional)
-        """
+    def __init__(self):
+        """Initialize LangChain RAG system."""
         self.llm = None
         self.tokenizer = None
         self.model = None
@@ -58,7 +53,6 @@ class LangChainRAG:
         self.memory = None
         self.qa_chain = None
         self.chroma_manager = None
-        self.session_manager = session_manager  # Optional: for multi-file conversations
         self._initialized = False
 
     def initialize(
@@ -291,71 +285,10 @@ class LangChainRAG:
         formatted_parts.append("Assistant:")
         return "\n".join(formatted_parts)
 
-    def _merge_results(
-        self,
-        kb_results: List[str],
-        session_results: List[Dict] = None
-    ) -> List[Dict]:
-        """
-        Merge results from permanent KB and session files.
-
-        Args:
-            kb_results: Results from permanent knowledge base (list of strings)
-            session_results: Results from session manager (list of dicts with 'text', 'source', 'score')
-
-        Returns:
-            list: Merged results sorted by score, with dict format:
-                {'text': str, 'source': str, 'source_type': str, 'score': float}
-        """
-        merged = []
-
-        # Add KB results (convert to dict format)
-        for text in kb_results:
-            merged.append({
-                'text': text,
-                'source': 'Knowledge Base',
-                'source_type': 'permanent',
-                'score': 1.0  # KB results from hybrid search don't have scores
-            })
-
-        # Add session results (already in dict format)
-        if session_results:
-            for result in session_results:
-                merged.append({
-                    'text': result['text'],
-                    'source': result['source'],
-                    'source_type': result['source_type'],
-                    'score': result.get('score', 0.0)
-                })
-
-        # Sort by score (descending) - session results have real scores
-        merged.sort(key=lambda x: x['score'], reverse=True)
-
-        return merged
-
-    def _build_prompt_with_sources(self, context_items: List[Dict]) -> str:
-        """
-        Build context string with source attribution.
-
-        Args:
-            context_items: List of dicts with 'text' and 'source' keys
-
-        Returns:
-            str: Formatted context string with source attribution
-        """
-        formatted_items = []
-
-        for item in context_items:
-            source = item.get('source', 'Unknown')
-            text = item.get('text', '')
-            formatted_items.append(f"From {source}: {text}")
-
-        return "\n\n".join(formatted_items)
-
     def query(self, question: str, return_sources: bool = False) -> str | Dict:
         """
         Query knowledge base with automatic conversation history.
-        Uses dual-source retrieval (permanent KB + session files) with hybrid search.
+        Uses unified hybrid search approach (consistent with pure_python.py).
 
         Args:
             question: User question
@@ -367,41 +300,14 @@ class LangChainRAG:
         if not self._initialized:
             raise RuntimeError("RAG system not initialized. Call initialize() first.")
 
-        # 1. Query session files first if session_manager exists (prioritize uploaded files)
-        session_results = None
-        if self.session_manager:
-            try:
-                session_results = self.session_manager.query(question, top_k=RETRIEVAL_TOP_K)
-                if VERBOSE_LOGGING and session_results:
-                    print(f"[Dual-Source] Retrieved {len(session_results)} results from session files")
-            except Exception as e:
-                if VERBOSE_LOGGING:
-                    print(f"[Dual-Source] Session query failed: {e}")
+        # 1. Unified hybrid search to get context
+        context_items = self._hybrid_search_unified(question, top_k=RETRIEVAL_TOP_K)
+        context_str = "\n\n".join(context_items)
 
-        # 2. If session has enough results, use them; otherwise supplement with KB
-        if session_results and len(session_results) >= RETRIEVAL_TOP_K:
-            # Use only session results (user uploaded files are most relevant)
-            top_results = self._merge_results([], session_results)[:RETRIEVAL_TOP_K]
-            if VERBOSE_LOGGING:
-                print(f"[Dual-Source] Using {len(top_results)} results from session files only")
-        else:
-            # Supplement with KB results
-            kb_count = RETRIEVAL_TOP_K - (len(session_results) if session_results else 0)
-            kb_results = self._hybrid_search_unified(question, top_k=kb_count) if kb_count > 0 else []
+        if VERBOSE_LOGGING:
+            print(f"[Query] Retrieved {len(context_items)} context items")
 
-            # 3. Merge and rank results
-            merged_results = self._merge_results(kb_results, session_results)
-            top_results = merged_results[:RETRIEVAL_TOP_K]
-
-            if VERBOSE_LOGGING:
-                session_count = len(session_results) if session_results else 0
-                kb_count_actual = len(kb_results) if kb_results else 0
-                print(f"[Dual-Source] Using {session_count} session + {kb_count_actual} KB results")
-
-        # 4. Build prompt with source attribution
-        context_str = self._build_prompt_with_sources(top_results)
-
-        # 5. Build system prompt with context
+        # 2. Build system prompt with context (consistent with pure_python.py)
         system_prompt = (
             "You are a helpful AI assistant with access to a knowledge base about CVEs and security reports. "
             "Answer questions based on the provided context.\n\n"
@@ -445,18 +351,7 @@ class LangChainRAG:
         # 6. Return response (with sources if requested)
         if return_sources:
             from langchain.docstore.document import Document
-            # Create Document objects with metadata from merged results
-            source_docs = [
-                Document(
-                    page_content=item['text'],
-                    metadata={
-                        'source': item['source'],
-                        'source_type': item['source_type'],
-                        'score': item['score']
-                    }
-                )
-                for item in top_results
-            ]
+            source_docs = [Document(page_content=item) for item in context_items]
             return {
                 "answer": response,
                 "sources": source_docs

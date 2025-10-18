@@ -77,4 +77,3 @@ huggingface/
 # Logs
 *.log
 logs/
-temp_uploads/

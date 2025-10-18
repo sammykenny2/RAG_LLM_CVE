@@ -328,50 +328,16 @@ AI: [Retrieves from knowledge base and responds with context]
 - **Status**: Both Phase 1 and Phase 2 now provide comparable response quality
 - **Testing**: Real-world validation recommended (see `docs/PROGRESS.md` for technical details)
 
-#### Multi-file Conversation Context ✅ (Implemented 2025-01-18)
+#### Current Limitations
 
-**Chat File Upload (Left Panel)** - Multi-file Support:
-- **Multi-file mode**: Upload multiple PDFs that persist across conversation
-- **File persistence**: Files remain available until explicitly removed or page reload
-- **Visual status indicators**: Color-coded chips show file status (✅ ready, 🔄 processing, ❌ error)
-- **Dropdown removal**: Select individual files to remove via dropdown menu
-- **Dual-source retrieval**: Queries both permanent knowledge base and session files simultaneously
-- **File provenance**: Each response shows which files contributed to the answer
-- **Session-scoped**: Temporary files with automatic cleanup on page reload
-
-**How to use**:
-1. Click "➕ Add File" to upload PDF (can upload multiple)
-2. Wait for processing (file chip turns green when ready)
-3. Ask questions that reference any uploaded files
-4. Remove individual files via dropdown if needed
-5. Page reload clears session (new session created automatically)
-
-**Features**:
-- Upload up to 10 files per session (configurable via SESSION_MAX_FILES)
-- File size limit: 10 MB per file (configurable via SESSION_MAX_FILE_SIZE_MB)
-- Status tracking: Each file shows processing status and chunk count
-- Error handling: Failed uploads shown with error message in red chip
-- Cross-document queries: Ask questions spanning multiple uploaded files
-- Source attribution: Responses indicate which file(s) were used
-
-**Technical Implementation**:
-- Session-scoped Chroma collections (`session_{uuid}`)
-- Automatic embedding generation for uploaded files
-- Dual-source retrieval combines permanent KB + session files
-- SessionManager handles lifecycle (add/remove/query/cleanup)
-- Implemented in both Phase 1 (Pure Python) and Phase 2 (LangChain)
-
-**Benefits**:
-- ✅ Multi-document comparison and analysis
-- ✅ Temporary file uploads without polluting permanent knowledge base
-- ✅ Context-aware conversations spanning multiple documents
-- ✅ No need to re-upload files for follow-up questions
-
-**Constraints**:
-- Max 10 files per session (default, configurable)
-- Max 10 MB per file (default, configurable)
-- Session timeout: Automatic cleanup on page reload
-- Files stored in temp_uploads/ directory
+**Chat File Upload (Left Panel)**:
+- **Single file mode**: Uploading a new file replaces the previous one
+- Files are deleted after sending message or manual removal
+- No persistence across conversation turns
+- **Planned improvement**: Multi-file conversation context (see `docs/PROGRESS.md` - "Upcoming Features")
+  - Future: Retain multiple files in conversation session
+  - Future: Generate temporary embeddings without persisting to Chroma
+  - Future: Query both permanent KB and session files simultaneously
 
 **Knowledge Base Upload (Right Panel)**:
 - Files are permanently added with embeddings stored in Chroma
@@ -383,9 +349,6 @@ AI: [Retrieves from knowledge base and responds with context]
 | Feature | Phase 1 (Pure Python) | Phase 2 (LangChain) |
 |---------|----------------------|---------------------|
 | **Port** | 7860 | 7861 |
-| **Multi-file Support** | ✅ Yes | ✅ Yes |
-| **SessionManager** | ✅ Integrated | ✅ Integrated |
-| **Dual-source Retrieval** | ✅ Yes | ✅ Yes |
 | **History Management** | Manual (deque, 10 rounds) | Automatic (ConversationBufferWindowMemory) |
 | **RAG Workflow** | Custom logic | ConversationalRetrievalChain |
 | **Embeddings** | Direct SentenceTransformer | HuggingFaceEmbeddings wrapper |
