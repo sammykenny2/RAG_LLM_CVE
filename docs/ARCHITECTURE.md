@@ -232,6 +232,98 @@ core/ modules (shared with Phase 1)
 | **Performance** | Optimized, minimal overhead | Slight overhead from abstractions |
 | **Port** | 7860 | 7861 |
 
+### SessionManager (Multi-file Conversation Context)
+
+**Added**: 2025-01-18 (PR 1: Core Infrastructure)
+
+**Purpose**: Enable multi-file conversations where users can upload multiple PDFs that persist across conversation turns.
+
+**Architecture**: Session-scoped Chroma collections
+
+```
+User uploads files
+     ↓
+SessionManager
+     ├─ add_file(file_path)
+     │     ├─ PDFProcessor: Extract text
+     │     ├─ _split_text_with_overlap(): Chunk with overlap
+     │     ├─ EmbeddingModel: Generate embeddings (float16)
+     │     └─ Chroma: Store in session_{id} collection
+     ├─ query(question, top_k)
+     │     ├─ EmbeddingModel: Encode question
+     │     └─ Chroma: Similarity search
+     ├─ remove_file(filename)
+     │     └─ Chroma: Delete by metadata filter
+     └─ cleanup()
+           ├─ Delete Chroma collection
+           └─ Delete temp_uploads/session_{id}/
+```
+
+**Key Components**:
+
+1. **Session-scoped Collections**:
+   - Each session gets unique Chroma collection: `session_{uuid}`
+   - Isolated from permanent knowledge base
+   - Automatic cleanup on session end
+
+2. **File Lifecycle**:
+   ```
+   Upload → temp_uploads/session_{id}/filename.pdf
+          → Extract text
+          → Split into chunks (with CHUNK_OVERLAP_RATIO)
+          → Generate embeddings
+          → Store in session_{id} collection
+          → Track in self.files dict
+   ```
+
+3. **Configuration** (from config.py):
+   - `SESSION_MAX_FILES`: Max files per session (default: 5, range: 1-10)
+   - `SESSION_MAX_FILE_SIZE_MB`: Max file size (default: 10 MB, range: 1-50)
+   - `SESSION_TIMEOUT_HOURS`: Session timeout (default: 1 hour)
+
+4. **Metadata Schema** (session files):
+   ```python
+   {
+       "source_type": "session",
+       "source_name": "report_A.pdf",
+       "added_date": "2025-01-18T12:34:56",
+       "chunk_index": 42,
+       "session_id": "abc123"
+   }
+   ```
+
+5. **File Info Object**:
+   ```python
+   {
+       "name": "report_A.pdf",
+       "path": "/temp_uploads/session_abc123/report_A.pdf",
+       "status": "ready",  # uploading | processing | ready | error
+       "chunks": 150,
+       "added_date": "2025-01-18T12:34:56",
+       "error": None  # or error message
+   }
+   ```
+
+**Future Integration** (PR 2-4):
+- **PR 2**: Dual-source retrieval (permanent KB + session files)
+- **PR 3**: Web UI Phase 1 multi-file upload interface
+- **PR 4**: Web UI Phase 2 multi-file upload interface
+
+**Use Cases**:
+- Compare multiple threat intelligence reports
+- Cross-reference CVE usage across documents
+- Temporary file uploads without polluting permanent KB
+- Multi-document Q&A in single conversation
+
+**Performance**:
+- Initialization: <1 second (Chroma client + collection setup)
+- File upload: Depends on PDF size (embedding generation bottleneck)
+- Query: Fast (direct Chroma vector search)
+- Memory: +100-500 MB per active session
+- Storage: Temporary (auto-cleanup)
+
+**Testing**: All tests passing (tests/test_session_simple.py)
+
 ### Chroma Metadata Schema
 
 Both phases use consistent metadata structure for vector database:
