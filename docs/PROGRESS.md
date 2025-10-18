@@ -242,6 +242,64 @@ RAG_LLM_CVE/
 - **Phase 2 (langchain_impl.py)**: Best for production, standardized patterns, community support
 - **Both**: Keep both for comparison and fallback options
 
+## [2025-01] Chunk Overlap Implementation
+
+### Added (Configuration)
+- **CHUNK_OVERLAP_RATIO** environment variable in `.env` and `.env.example`
+  - Type: float (0.0 - 1.0)
+  - Default: 0.3 (30% overlap)
+  - Applies to PDF documents only; CVE data uses 0.0 (no overlap)
+  - Example: CHUNK_SIZE=10 with CHUNK_OVERLAP_RATIO=0.3 results in 3-sentence overlap
+- **config.py** updated to load `CHUNK_OVERLAP_RATIO`
+  - Validates as float type
+  - Displays in `print_config()` debug output
+
+### Added (build_embeddings.py)
+- **split_with_overlap()** function for overlapping chunks
+  - Configurable overlap ratio (default: 0.3)
+  - Step size calculation: `step_size = max(1, int(chunk_size * (1 - overlap_ratio)))`
+  - Prevents context loss at chunk boundaries
+  - Comprehensive docstring with examples
+- **Updated process_pdf()** to use `split_with_overlap()`
+  - Displays overlap configuration: "Chunk overlap: 30.0% (3 sentences)"
+  - Preserves backward compatibility (overlap_ratio=0.0 behaves like split())
+- **Preserved split()** for CVE data (no overlap needed for atomic descriptions)
+
+### Added (add_to_embeddings.py)
+- **split_list_with_overlap()** function mirroring build_embeddings.py
+- **Updated process_pdf_files()** to use overlap for incremental PDF additions
+- Consistent overlap behavior across all PDF processing tools
+
+### Performance Impact
+- **Chunk count increase**: +40% with 30% overlap (e.g., 50 → 71 chunks for 500 sentences)
+- **Storage increase**: +40% embedding storage
+- **Generation time**: +40% embedding generation time
+- **Retrieval accuracy**: +13-17% improvement (based on ARCHITECTURE.md analysis)
+
+### Design Rationale
+- **30% overlap chosen as default**: Best ROI (88% accuracy vs 75% with no overlap)
+- **50% overlap**: Only +4% accuracy improvement but +100% storage cost (poor ROI)
+- **CVE data exemption**: Atomic descriptions don't benefit from overlap
+- **Configurable**: Users can adjust via `.env` for specific needs
+
+### Verified Testing
+✅ **Configuration loading** (2025-01-18):
+- `config.py` correctly loads `CHUNK_OVERLAP_RATIO: 0.3`
+- Displays in debug output
+
+✅ **Overlap functionality** (2025-01-18):
+- Test with 30 sentences, chunk_size=10, overlap_ratio=0.3
+- Generated 4 chunks with correct 3-sentence overlap:
+  - Chunk 0: Sentences 1-10
+  - Chunk 1: Sentences 8-17 (3 overlap)
+  - Chunk 2: Sentences 15-24 (3 overlap)
+  - Chunk 3: Sentences 22-30 (3 overlap)
+- 0.0 overlap correctly produces non-overlapping chunks
+
+### Changed
+- Default chunking behavior for PDFs now uses 30% overlap
+- CVE processing unchanged (still uses non-overlapping chunks)
+
 ## [2025-01] Embedding Optimization & File Format Support
 
 ### Added (build_embeddings.py)
@@ -523,13 +581,6 @@ RAG_LLM_CVE/
 ## Upcoming Features
 
 ### Planned Optimizations
-- [ ] **Chunk overlap for PDF embeddings** (High Priority)
-  - Add `--overlap` parameter to `build_embeddings.py`
-  - Default: 30% overlap for PDF documents (0% for CVE data)
-  - Expected impact: +13-17% retrieval accuracy, +40% storage/time cost
-  - Rationale: Prevents splitting important context across chunk boundaries
-  - Implementation: Replace `split()` with `split_with_overlap()` in PDF processing
-  - Cost-benefit: Acceptable trade-off for security reports where accuracy is critical
 - [ ] **Multi-file conversation context** (High Priority)
   - Allow chat interface to retain multiple uploaded files across conversation
   - Current limitation: New file upload clears previous file

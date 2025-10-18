@@ -29,6 +29,7 @@ from config import (
     CVE_V5_PATH,
     CVE_V4_PATH,
     CHUNK_SIZE,
+    CHUNK_OVERLAP_RATIO,
     EMBEDDING_BATCH_SIZE,
     EMBEDDING_PRECISION,
     DEFAULT_SCHEMA
@@ -56,8 +57,52 @@ def split_sentences(text):
     return [s.strip() for s in sentences if s.strip()]
 
 def split_list(input_list, chunk_size):
-    """Split a list into chunks of specified size."""
+    """
+    Split a list into chunks of specified size (no overlap).
+
+    Used for CVE data where each description is an atomic unit.
+    """
     return [input_list[i:i + chunk_size] for i in range(0, len(input_list), chunk_size)]
+
+def split_list_with_overlap(input_list, chunk_size, overlap_ratio=0.3):
+    """
+    Split a list into chunks with configurable overlap between consecutive chunks.
+
+    Used for PDF documents to avoid splitting important context across boundaries.
+
+    Args:
+        input_list: List to split (e.g., sentences)
+        chunk_size: Number of items per chunk (e.g., 10 sentences)
+        overlap_ratio: Ratio of overlap between chunks (0.0 = no overlap, 0.3 = 30% overlap)
+
+    Returns:
+        list: List of overlapping chunks
+
+    Example:
+        chunk_size=10, overlap_ratio=0.3
+        - Each chunk has 10 sentences
+        - Step size = 10 * (1 - 0.3) = 7 sentences
+        - Chunk 0: sentences 0-9
+        - Chunk 1: sentences 7-16 (3-sentence overlap with Chunk 0)
+        - Chunk 2: sentences 14-23 (3-sentence overlap with Chunk 1)
+    """
+    if overlap_ratio <= 0:
+        # No overlap, use standard split
+        return split_list(input_list, chunk_size)
+
+    # Calculate step size (how far to move forward for each chunk)
+    step_size = max(1, int(chunk_size * (1 - overlap_ratio)))
+
+    chunks = []
+    for i in range(0, len(input_list), step_size):
+        chunk = input_list[i:i + chunk_size]
+        if len(chunk) > 0:
+            chunks.append(chunk)
+        # Stop if we've covered the entire list
+        if i + chunk_size >= len(input_list):
+            break
+
+    return chunks
 
 def process_cve_file(
     cve_file_path: str,
@@ -256,9 +301,14 @@ def process_pdf_files(
         print("Splitting into sentences...")
         sentences = split_sentences(all_text)
 
-        # Create chunks
-        print(f"Creating chunks (size={chunk_size})...")
-        sentence_chunks = split_list(sentences, chunk_size)
+        # Create chunks with overlap (for PDF documents)
+        overlap_sentences = int(chunk_size * CHUNK_OVERLAP_RATIO)
+        print(f"Creating chunks (size={chunk_size}, overlap={CHUNK_OVERLAP_RATIO:.1%} or {overlap_sentences} sentences)...")
+        sentence_chunks = split_list_with_overlap(
+            sentences,
+            chunk_size,
+            overlap_ratio=CHUNK_OVERLAP_RATIO
+        )
 
         # Prepare text chunks
         text_chunks = []

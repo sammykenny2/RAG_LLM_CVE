@@ -67,7 +67,7 @@ assert EMBEDDING_PRECISION in ['float32', 'float16'], f"Invalid EMBEDDING_PRECIS
 CONVERSATION_HISTORY_LENGTH = int(os.getenv('CONVERSATION_HISTORY_LENGTH', '10'))
 RETRIEVAL_TOP_K = int(os.getenv('RETRIEVAL_TOP_K', '5'))
 CHUNK_SIZE = int(os.getenv('CHUNK_SIZE', '10'))
-CHUNK_OVERLAP = int(os.getenv('CHUNK_OVERLAP', '200'))
+CHUNK_OVERLAP_RATIO = float(os.getenv('CHUNK_OVERLAP_RATIO', '0.3'))
 EMBEDDING_BATCH_SIZE = int(os.getenv('EMBEDDING_BATCH_SIZE', '64'))
 
 # =============================================================================
@@ -170,7 +170,7 @@ def print_config():
     print(f"  CONVERSATION_HISTORY_LENGTH: {CONVERSATION_HISTORY_LENGTH}")
     print(f"  RETRIEVAL_TOP_K: {RETRIEVAL_TOP_K}")
     print(f"  CHUNK_SIZE: {CHUNK_SIZE}")
-    print(f"  CHUNK_OVERLAP: {CHUNK_OVERLAP}")
+    print(f"  CHUNK_OVERLAP_RATIO: {CHUNK_OVERLAP_RATIO}")
     print(f"  EMBEDDING_BATCH_SIZE: {EMBEDDING_BATCH_SIZE}")
 
     print("\nWeb UI:")
