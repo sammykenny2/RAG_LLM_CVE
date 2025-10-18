@@ -103,6 +103,17 @@ LLM_TEMPERATURE = float(os.getenv('LLM_TEMPERATURE', '0.3'))
 LLM_TOP_P = float(os.getenv('LLM_TOP_P', '0.9'))
 
 # =============================================================================
+# Summary Configuration
+# =============================================================================
+
+SUMMARY_CHUNK_TOKENS = int(os.getenv('SUMMARY_CHUNK_TOKENS', '1500'))
+SUMMARY_CHUNK_OVERLAP_TOKENS = int(os.getenv('SUMMARY_CHUNK_OVERLAP_TOKENS', '200'))
+SUMMARY_TOKENS_PER_CHUNK = int(os.getenv('SUMMARY_TOKENS_PER_CHUNK', '150'))
+SUMMARY_FINAL_TOKENS = int(os.getenv('SUMMARY_FINAL_TOKENS', '300'))
+SUMMARY_CHUNK_THRESHOLD_CHARS = int(os.getenv('SUMMARY_CHUNK_THRESHOLD_CHARS', '3000'))
+SUMMARY_ENABLE_SECOND_STAGE = os.getenv('SUMMARY_ENABLE_SECOND_STAGE', 'True').lower() == 'true'
+
+# =============================================================================
 # Path Validation
 # =============================================================================
 
@@ -186,6 +197,14 @@ def print_config():
     print(f"  MAX_EMBEDDING_ROWS: {MAX_EMBEDDING_ROWS or '(all)'}")
     print(f"  LLM_TEMPERATURE: {LLM_TEMPERATURE}")
     print(f"  LLM_TOP_P: {LLM_TOP_P}")
+
+    print("\nSummary:")
+    print(f"  SUMMARY_CHUNK_TOKENS: {SUMMARY_CHUNK_TOKENS}")
+    print(f"  SUMMARY_CHUNK_OVERLAP_TOKENS: {SUMMARY_CHUNK_OVERLAP_TOKENS}")
+    print(f"  SUMMARY_TOKENS_PER_CHUNK: {SUMMARY_TOKENS_PER_CHUNK}")
+    print(f"  SUMMARY_FINAL_TOKENS: {SUMMARY_FINAL_TOKENS}")
+    print(f"  SUMMARY_CHUNK_THRESHOLD_CHARS: {SUMMARY_CHUNK_THRESHOLD_CHARS}")
+    print(f"  SUMMARY_ENABLE_SECOND_STAGE: {SUMMARY_ENABLE_SECOND_STAGE}")
     print("=" * 60)
 
 if __name__ == "__main__":

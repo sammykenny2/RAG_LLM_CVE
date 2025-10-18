@@ -20,7 +20,13 @@ from config import (
     RETRIEVAL_TOP_K,
     LLM_TEMPERATURE,
     LLM_TOP_P,
-    VERBOSE_LOGGING
+    VERBOSE_LOGGING,
+    SUMMARY_CHUNK_TOKENS,
+    SUMMARY_CHUNK_OVERLAP_TOKENS,
+    SUMMARY_TOKENS_PER_CHUNK,
+    SUMMARY_FINAL_TOKENS,
+    SUMMARY_CHUNK_THRESHOLD_CHARS,
+    SUMMARY_ENABLE_SECOND_STAGE
 )
 
 
@@ -242,48 +248,105 @@ class PureRAG:
 
         return response
 
+    def _chunk_text_by_tokens(
+        self,
+        text: str,
+        chunk_tokens: int = SUMMARY_CHUNK_TOKENS,
+        overlap_tokens: int = SUMMARY_CHUNK_OVERLAP_TOKENS
+    ) -> List[str]:
+        """
+        Split text into chunks based on token count (more accurate than character-based).
+
+        Args:
+            text: Text to chunk
+            chunk_tokens: Target tokens per chunk
+            overlap_tokens: Overlap between chunks
+
+        Returns:
+            list: List of text chunks
+        """
+        if not self.llama.tokenizer:
+            raise RuntimeError("Tokenizer not initialized")
+
+        # Encode text to tokens
+        token_ids = self.llama.tokenizer.encode(text, add_special_tokens=False)
+
+        if len(token_ids) == 0:
+            return []
+
+        if len(token_ids) <= chunk_tokens:
+            return [text]
+
+        # Ensure overlap doesn't exceed half of chunk size
+        overlap_tokens = min(overlap_tokens, chunk_tokens // 2)
+        stride = max(chunk_tokens - overlap_tokens, 1)
+
+        # Create chunks with overlap
+        chunks = []
+        for start in range(0, len(token_ids), stride):
+            end = start + chunk_tokens
+            chunk_token_ids = token_ids[start:end]
+            chunk_text = self.llama.tokenizer.decode(chunk_token_ids, skip_special_tokens=True)
+            chunks.append(chunk_text)
+
+            if end >= len(token_ids):
+                break
+
+        return chunks
+
     def summarize_report(
         self,
         report_text: str,
-        max_tokens: int = 700
+        max_tokens: int = None
     ) -> str:
         """
         Generate executive summary of a security report.
 
-        Uses intelligent chunking for long texts to avoid hallucination.
-        - Short texts (<3000 chars): Direct summarization
-        - Long texts (>=3000 chars): Chunk-by-chunk summarization
+        Uses intelligent token-based chunking for long texts to avoid hallucination.
+        - Short texts: Direct summarization
+        - Long texts: Two-stage summarization (chunk-by-chunk + final condensing)
 
         Args:
             report_text: Full report text
-            max_tokens: Maximum tokens to generate per chunk
+            max_tokens: Maximum tokens for single-pass summary (default from config)
 
         Returns:
-            str: Summary
+            str: Summary (concise if second-stage enabled, detailed if disabled)
         """
         if not self._initialized:
             raise RuntimeError("RAG system not initialized. Call initialize() first.")
 
-        # Threshold for chunking (3000 chars ~ 750 tokens)
-        CHUNK_THRESHOLD = 3000
+        # Use config defaults if not specified
+        if max_tokens is None:
+            max_tokens = SUMMARY_FINAL_TOKENS
 
-        if len(report_text) < CHUNK_THRESHOLD:
+        # Check if text is short enough for single-pass summarization
+        if len(report_text) < SUMMARY_CHUNK_THRESHOLD_CHARS:
             # Short text: direct summarization
             return self._generate_single_summary(report_text, max_tokens)
         else:
-            # Long text: chunk-based summarization
-            return self._generate_chunked_summary(report_text, max_tokens)
+            # Long text: two-stage summarization
+            return self._generate_two_stage_summary(report_text)
 
-    def _generate_single_summary(self, text: str, max_tokens: int = 700) -> str:
-        """Generate summary for a single text chunk."""
+    def _generate_single_summary(self, text: str, max_tokens: int = SUMMARY_FINAL_TOKENS) -> str:
+        """
+        Generate summary for a single text chunk (used for short documents).
+
+        Args:
+            text: Text to summarize
+            max_tokens: Maximum tokens to generate
+
+        Returns:
+            str: Summary
+        """
         system_prompt = (
             "You are a ChatBot that summarizes threat intelligence reports. "
-            "Your task is to summarize the report given to you by the user."
+            "Provide a clear and concise executive summary."
         )
 
         messages = [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Please summarize the following Threat Intelligence Report: {text}"}
+            {"role": "user", "content": f"Please summarize the following Threat Intelligence Report:\n\n{text}"}
         ]
 
         response = self.llama.generate(
@@ -293,61 +356,40 @@ class PureRAG:
 
         return response
 
-    def _generate_chunked_summary(self, text: str, max_tokens_per_chunk: int = 300) -> str:
+    def _generate_two_stage_summary(self, text: str) -> str:
         """
-        Generate summary for long text using chunking strategy.
+        Generate summary using two-stage approach for long documents.
 
-        Strategy:
-        1. Split text into manageable chunks (~2500 chars each)
-        2. Summarize each chunk
-        3. Combine summaries with section markers
+        Stage 1: Split into token-based chunks and summarize each
+        Stage 2 (optional): Condense all chunk summaries into final executive summary
 
         Args:
             text: Long text to summarize
-            max_tokens_per_chunk: Tokens to generate per chunk
 
         Returns:
-            str: Combined summary from all chunks
+            str: Final summary (concise if second-stage enabled, detailed if disabled)
         """
-        # Split text into sentences for intelligent chunking
-        import re
-        sentences = re.split(r'[.!?。！？]+\s*', text)
+        # Stage 1: Chunk and summarize
+        chunks = self._chunk_text_by_tokens(
+            text,
+            chunk_tokens=SUMMARY_CHUNK_TOKENS,
+            overlap_tokens=SUMMARY_CHUNK_OVERLAP_TOKENS
+        )
 
-        # Create chunks of ~2500 chars
-        chunks = []
-        current_chunk = []
-        current_length = 0
-        CHUNK_SIZE = 2500
+        if not chunks:
+            return "Error: Could not chunk text for summarization."
 
-        for sentence in sentences:
-            sentence = sentence.strip()
-            if not sentence:
-                continue
+        if VERBOSE_LOGGING:
+            print(f"📝 Summarizing {len(chunks)} chunks (Stage 1)...")
 
-            sentence_length = len(sentence)
-
-            if current_length + sentence_length > CHUNK_SIZE and current_chunk:
-                # Save current chunk and start new one
-                chunks.append(". ".join(current_chunk) + ".")
-                current_chunk = [sentence]
-                current_length = sentence_length
-            else:
-                current_chunk.append(sentence)
-                current_length += sentence_length
-
-        # Add final chunk
-        if current_chunk:
-            chunks.append(". ".join(current_chunk) + ".")
-
-        # Summarize each chunk
-        summaries = []
+        chunk_summaries = []
         for i, chunk in enumerate(chunks, 1):
             if VERBOSE_LOGGING:
-                print(f"📝 Summarizing section {i}/{len(chunks)}...")
+                print(f"   Processing chunk {i}/{len(chunks)}...")
 
             system_prompt = (
                 "You are a ChatBot that summarizes threat intelligence reports. "
-                "Provide a concise summary of the key points."
+                "Provide a concise summary of the key points in this section."
             )
 
             messages = [
@@ -357,15 +399,45 @@ class PureRAG:
 
             summary = self.llama.generate(
                 messages=messages,
-                max_new_tokens=max_tokens_per_chunk
+                max_new_tokens=SUMMARY_TOKENS_PER_CHUNK
             )
 
-            summaries.append(f"Section {i}: {summary}")
+            chunk_summaries.append(summary)
 
-        # Combine all summaries
-        combined = "\n\n".join(summaries)
+        # Stage 2: Optional final condensing
+        if SUMMARY_ENABLE_SECOND_STAGE:
+            if VERBOSE_LOGGING:
+                print(f"📝 Condensing summaries into executive summary (Stage 2)...")
 
-        return combined
+            # Combine all chunk summaries
+            combined_summaries = "\n\n".join([
+                f"Part {i+1}: {summary}"
+                for i, summary in enumerate(chunk_summaries)
+            ])
+
+            system_prompt = (
+                "You are a ChatBot that creates executive summaries. "
+                "Condense the following section summaries into a single, coherent executive summary. "
+                "Focus on the most important findings and eliminate redundancy."
+            )
+
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"Create an executive summary from these sections:\n\n{combined_summaries}"}
+            ]
+
+            final_summary = self.llama.generate(
+                messages=messages,
+                max_new_tokens=SUMMARY_FINAL_TOKENS
+            )
+
+            return final_summary
+        else:
+            # Return all chunk summaries without condensing
+            return "\n\n".join([
+                f"Section {i+1}:\n{summary}"
+                for i, summary in enumerate(chunk_summaries)
+            ])
 
     def validate_cve_usage(
         self,
