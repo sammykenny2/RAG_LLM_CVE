@@ -417,15 +417,16 @@ def process_uploaded_report(
     # Use global mode if not specified
     mode = mode or current_mode
 
-    # Mode-specific settings
+    # Mode-specific settings (for PDF extraction and validation only)
+    # Note: Summary token limits are now controlled by .env (SUMMARY_* parameters)
     if mode == 'demo':
-        max_tokens = 256
         max_pages = 10
         top_k = 3
+        validation_tokens = 256
     else:  # full mode
-        max_tokens = 700
         max_pages = None
         top_k = 5
+        validation_tokens = 700
 
     try:
         # Handle both string paths and Gradio File objects
@@ -435,11 +436,11 @@ def process_uploaded_report(
             file_path = Path(file.name)
 
         if action == 'summarize':
-            # Extract text and summarize
+            # Extract text and summarize (uses .env SUMMARY_* configuration)
             from core.pdf_processor import PDFProcessor
             pdf_processor = PDFProcessor()
             text = pdf_processor.extract_text(file_path, max_pages=max_pages)
-            summary = rag_system.summarize_report(text, max_tokens=max_tokens)
+            summary = rag_system.summarize_report(text)  # Let RAG class use .env config
             return f"📝 Summary:\n\n{summary}"
 
         elif action == 'validate':
@@ -449,7 +450,7 @@ def process_uploaded_report(
                 schema=schema,
                 max_pages=max_pages
             )
-            validation = rag_system.validate_cve_usage(report_text, cve_descriptions, max_tokens=max_tokens)
+            validation = rag_system.validate_cve_usage(report_text, cve_descriptions, max_tokens=validation_tokens)
             return f"✅ Validation Result:\n\n{validation}\n\n📋 Found CVEs: {', '.join(cves)}"
 
         elif action == 'add':
