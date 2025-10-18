@@ -255,16 +255,16 @@ def chat_respond(message: str, history: list):
         intent = detect_user_intent(message, has_file=bool(chat_uploaded_file))
 
         # Handle file-specific actions based on detected intent
-        if chat_uploaded_file and intent:
+        if chat_uploaded_file:
             if intent == 'summarize':
                 response = process_uploaded_report(chat_uploaded_file, action='summarize', mode=current_mode)
             elif intent == 'validate':
                 response = process_uploaded_report(chat_uploaded_file, action='validate', schema=DEFAULT_SCHEMA, mode=current_mode)
             else:
-                # Fallback to RAG query
-                response = rag_system.query(question=message)
+                # Default to Q&A on file content (Plan A approach)
+                response = process_uploaded_report(chat_uploaded_file, action='qa', question=message, mode=current_mode)
         else:
-            # Normal RAG query (no file or no special intent detected)
+            # Normal RAG query (no file attached)
             response = rag_system.query(question=message)
 
         # Delete uploaded file from disk if exists
@@ -397,16 +397,18 @@ def process_uploaded_report(
     file,
     action: str,
     schema: str = DEFAULT_SCHEMA,
-    mode: str = None
+    mode: str = None,
+    question: str = None
 ) -> str:
     """
     Process uploaded report based on user action.
 
     Args:
         file: Gradio File object or file path string
-        action: 'summarize', 'validate', or 'add'
+        action: 'summarize', 'validate', 'add', or 'qa'
         schema: CVE schema to use
         mode: Processing mode (demo/full), uses global current_mode if None
+        question: User question (required for 'qa' action)
 
     Returns:
         str: Processing result
@@ -452,6 +454,17 @@ def process_uploaded_report(
             )
             validation = rag_system.validate_cve_usage(report_text, cve_descriptions, max_tokens=validation_tokens)
             return f"✅ Validation Result:\n\n{validation}\n\n📋 Found CVEs: {', '.join(cves)}"
+
+        elif action == 'qa':
+            # Answer question about report (uses .env QA_* configuration)
+            if not question:
+                return "⚠️ No question provided for Q&A"
+
+            from core.pdf_processor import PDFProcessor
+            pdf_processor = PDFProcessor()
+            text = pdf_processor.extract_text(file_path, max_pages=max_pages)
+            answer = rag_system.answer_question_about_report(text, question)  # Let RAG class use .env config
+            return f"💬 Answer:\n\n{answer}"
 
         elif action == 'add':
             # Add to knowledge base

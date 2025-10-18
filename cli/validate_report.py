@@ -70,7 +70,9 @@ from config import (
     EMBEDDING_PATH,
     CVE_V5_PATH,
     CVE_V4_PATH,
-    VALIDATION_ENABLE_SECOND_STAGE
+    SUMMARY_ENABLE_SECOND_STAGE,
+    VALIDATION_ENABLE_SECOND_STAGE,
+    QA_ENABLE_SECOND_STAGE
 )
 
 # Parse command-line arguments
@@ -701,7 +703,32 @@ for cve in cves:
 # ============================================================================
 
 def menu_option_1(all_text, tokenizer, model):
-    """Summarize the report."""
+    """
+    Summarize the report using unified RAG class logic.
+
+    Uses the same implementation as Web UI for consistency:
+    - Token-based chunking
+    - Optional second-stage consolidation
+    - Controlled by .env SUMMARY_* configuration
+    """
+    print("\n📝 Generating summary...")
+
+    if SUMMARY_ENABLE_SECOND_STAGE:
+        print("   └─ Using two-stage summarization (chunk-level + final consolidation)")
+    else:
+        print("   └─ Using chunk-level summarization only")
+
+    # Use RAG class method (unified logic with Web UI)
+    summary = rag_system.summarize_report(all_text)
+
+    print("\n" + "="*80)
+    print("SUMMARY")
+    print("="*80)
+    print(summary)
+    print("="*80)
+
+def menu_option_1_legacy(all_text, tokenizer, model):
+    """Legacy summarization (kept for reference)."""
     if DEMO_MODE:
         # Demo mode: truncate text
         limited_text = all_text[:2000] if len(all_text) > 2000 else all_text
@@ -893,7 +920,35 @@ def menu_option_2_legacy(all_text, cve_description, tokenizer, model):
         print(llamaSug)
 
 def menu_option_3(all_text, user_question, tokenizer, model):
-    """Answer questions about the report."""
+    """
+    Answer questions about the report using unified RAG class logic.
+
+    Uses the same implementation as Web UI for consistency:
+    - Token-based chunking
+    - Optional second-stage consolidation
+    - Controlled by .env QA_* configuration
+    """
+    print(f"\n💬 Answering question: {user_question}")
+
+    if QA_ENABLE_SECOND_STAGE:
+        print("   └─ Using two-stage Q&A (chunk-level + final consolidation)")
+    else:
+        print("   └─ Using chunk-level Q&A only")
+
+    # Use RAG class method (unified logic with Web UI)
+    answer = rag_system.answer_question_about_report(
+        report_text=all_text,
+        question=user_question
+    )
+
+    print("\n" + "="*80)
+    print("ANSWER")
+    print("="*80)
+    print(answer)
+    print("="*80)
+
+def menu_option_3_legacy(all_text, user_question, tokenizer, model):
+    """Legacy Q&A (kept for reference)."""
     if DEMO_MODE:
         # Demo mode: truncate text
         limited_text = all_text[:2000] if len(all_text) > 2000 else all_text

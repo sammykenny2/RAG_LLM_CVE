@@ -44,7 +44,13 @@ from config import (
     VALIDATION_CHUNK_THRESHOLD_CHARS,
     VALIDATION_ENABLE_CVE_FILTERING,
     VALIDATION_FINAL_TOKENS,
-    VALIDATION_ENABLE_SECOND_STAGE
+    VALIDATION_ENABLE_SECOND_STAGE,
+    QA_CHUNK_TOKENS,
+    QA_CHUNK_OVERLAP_TOKENS,
+    QA_TOKENS_PER_CHUNK,
+    QA_CHUNK_THRESHOLD_CHARS,
+    QA_FINAL_TOKENS,
+    QA_ENABLE_SECOND_STAGE
 )
 
 
@@ -752,25 +758,143 @@ class LangChainRAG:
     def answer_question_about_report(
         self,
         report_text: str,
-        question: str
+        question: str,
+        max_tokens: int = None
     ) -> str:
         """
-        Answer question about report (non-conversational, single-shot).
+        Answer a specific question about a report.
+
+        For long documents, uses two-stage approach:
+        - Stage 1: Answer question for each chunk (QA_TOKENS_PER_CHUNK tokens)
+        - Stage 2: Consolidate all chunk answers into final response (QA_FINAL_TOKENS tokens)
 
         Args:
             report_text: Security report text
             question: User question
+            max_tokens: Maximum tokens to generate (if None, uses QA_FINAL_TOKENS)
 
         Returns:
-            str: Answer
+            str: Answer (consolidated if document is long, direct if short)
         """
         if not self._initialized:
             raise RuntimeError("RAG system not initialized. Call initialize() first.")
 
-        prompt = f"{question}\n\nReport:\n{report_text}"
-        response = self.llm(prompt)
+        if max_tokens is None:
+            max_tokens = QA_FINAL_TOKENS
+
+        # Short document: use single-pass
+        if len(report_text) <= QA_CHUNK_THRESHOLD_CHARS:
+            if VERBOSE_LOGGING:
+                print(f"📝 Q&A on short document ({len(report_text)} chars, single-pass)...")
+
+            return self._answer_question_single_pass(report_text, question, max_tokens)
+
+        # Long document: use two-stage chunked approach
+        if VERBOSE_LOGGING:
+            print(f"📝 Q&A on long document ({len(report_text)} chars, two-stage chunking)...")
+
+        return self._answer_question_chunked(report_text, question, max_tokens)
+
+    def _answer_question_single_pass(self, text: str, question: str, max_tokens: int) -> str:
+        """Single-pass Q&A for short documents."""
+        # Build prompt using tokenizer's chat template
+        messages = [
+            {"role": "system", "content": "You are a chatbot that answers questions based on the text provided to you."},
+            {"role": "user", "content": f"{question}\n\nReport: {text}"}
+        ]
+
+        prompt = self.tokenizer.apply_chat_template(
+            messages,
+            tokenize=False,
+            add_generation_prompt=True
+        )
+
+        # Generate using HuggingFacePipeline
+        response = self.llm(prompt, max_new_tokens=max_tokens)
 
         return response
+
+    def _answer_question_chunked(self, report_text: str, question: str, max_tokens: int) -> str:
+        """
+        Two-stage Q&A for long documents.
+
+        Stage 1: Answer question for each chunk
+        Stage 2 (optional): Consolidate all chunk answers into final response
+
+        Args:
+            report_text: Long security report text
+            question: User question
+            max_tokens: Maximum tokens for final response
+
+        Returns:
+            str: Final answer (consolidated if second-stage enabled, concatenated if disabled)
+        """
+        # Stage 1: Chunk and answer question for each
+        chunks = self._chunk_text_by_tokens(
+            report_text,
+            chunk_tokens=QA_CHUNK_TOKENS,
+            overlap_tokens=QA_CHUNK_OVERLAP_TOKENS
+        )
+
+        if not chunks:
+            return "Error: Could not chunk text for Q&A."
+
+        if VERBOSE_LOGGING:
+            print(f"📝 Answering question on {len(chunks)} chunks (Stage 1)...")
+
+        chunk_answers = []
+        for i, chunk in enumerate(chunks, 1):
+            if VERBOSE_LOGGING:
+                print(f"   Processing chunk {i}/{len(chunks)}...")
+
+            messages = [
+                {"role": "system", "content": (
+                    "You are a chatbot that answers questions based on the text provided to you. "
+                    "If this section does not contain information relevant to the question, say 'Not found in this section.'"
+                )},
+                {"role": "user", "content": f"{question}\n\nText section: {chunk}"}
+            ]
+
+            prompt = self.tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True
+            )
+
+            answer = self.llm(prompt, max_new_tokens=QA_TOKENS_PER_CHUNK)
+            chunk_answers.append(f"Section {i}: {answer}")
+
+        # Stage 2: Optional consolidation
+        if QA_ENABLE_SECOND_STAGE:
+            if VERBOSE_LOGGING:
+                print(f"📝 Consolidating {len(chunk_answers)} answers (Stage 2)...")
+
+            all_answers = "\n\n".join(chunk_answers)
+
+            messages = [
+                {"role": "system", "content": (
+                    "You are a chatbot that consolidates multiple answers into one coherent response. "
+                    "Remove redundant information and provide a clear, comprehensive answer to the question."
+                )},
+                {"role": "user", "content": (
+                    f"Original question: {question}\n\n"
+                    f"Answers from different sections:\n{all_answers}\n\n"
+                    f"Please consolidate these answers into one comprehensive response. "
+                    f"If multiple sections say 'Not found', respond with 'Information not found in the document.'"
+                )}
+            ]
+
+            prompt = self.tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True
+            )
+
+            final_answer = self.llm(prompt, max_new_tokens=max_tokens)
+            return final_answer
+        else:
+            # Return all chunk answers concatenated
+            return "\n\n".join(chunk_answers)
 
     def process_report_for_cve_validation(
         self,
