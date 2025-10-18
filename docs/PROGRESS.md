@@ -49,12 +49,23 @@ This file tracks completed changes and upcoming features for the project.
 - ✅ Multi-file context still works: all uploaded files contribute to RAG queries
 - ✅ SessionManager integration preserved: files accumulate across conversation
 
-### Known Issues (To Be Fixed)
-- ⚠️ **RAG responses are often irrelevant** ("答非所問")
-  - Symptoms: LLM provides answers that don't match the question
-  - Scope: Affects both Phase 1 (Pure Python) and Phase 2 (LangChain)
-  - Status: Identified, fix planned for next iteration
-  - Workaround: Use 'summarize'/'validate' commands for uploaded files instead of RAG queries
+### Known Issues (Fixed)
+- ✅ **RAG responses were often irrelevant** ("答非所問") - FIXED
+  - **Root cause**: Dual-source retrieval logic gave permanent KB results fixed score of 1.0, causing them to always rank higher than session files
+  - **Previous behavior**:
+    - KB results: top_k=3, score=1.0 (fixed)
+    - Session results: top_k=2, score=0.0-1.0 (actual similarity)
+    - After merge, KB results always appeared first due to higher scores
+    - User uploaded files were ignored even when more relevant
+  - **Fixed behavior**:
+    - Session files queried first with full top_k (default: 5)
+    - If session has enough results (>=5), use session only
+    - Otherwise, supplement with KB results to reach top_k
+    - Priority: Session files >> KB (uploaded content takes precedence)
+  - **Files modified**:
+    - `rag/pure_python.py`: query() method - prioritize session files
+    - `rag/langchain_impl.py`: query() method - same logic as pure_python.py
+  - **Impact**: Uploaded files now correctly dominate RAG responses
 
 ## [2025-10] Phase 1: Web UI and Knowledge Base Enhancement
 

@@ -273,25 +273,36 @@ class PureRAG:
         if not self._initialized:
             raise RuntimeError("RAG system not initialized. Call initialize() first.")
 
-        # 1. Query permanent knowledge base (top_k=3)
-        kb_results = self._hybrid_search(question, top_k=3)
-
-        # 2. Query session files if session_manager exists (top_k=2)
+        # 1. Query session files first if session_manager exists (prioritize uploaded files)
         session_results = None
         if self.session_manager:
             try:
-                session_results = self.session_manager.query(question, top_k=2)
+                session_results = self.session_manager.query(question, top_k=top_k)
                 if VERBOSE_LOGGING and session_results:
                     print(f"[Dual-Source] Retrieved {len(session_results)} results from session files")
             except Exception as e:
                 if VERBOSE_LOGGING:
                     print(f"[Dual-Source] Session query failed: {e}")
 
-        # 3. Merge and rank results
-        merged_results = self._merge_results(kb_results, session_results)
+        # 2. If session has enough results, use them; otherwise supplement with KB
+        if session_results and len(session_results) >= top_k:
+            # Use only session results (user uploaded files are most relevant)
+            top_results = self._merge_results([], session_results)[:top_k]
+            if VERBOSE_LOGGING:
+                print(f"[Dual-Source] Using {len(top_results)} results from session files only")
+        else:
+            # Supplement with KB results
+            kb_count = top_k - (len(session_results) if session_results else 0)
+            kb_results = self._hybrid_search(question, top_k=kb_count) if kb_count > 0 else []
 
-        # Take top-k from merged results
-        top_results = merged_results[:top_k]
+            # 3. Merge and rank results
+            merged_results = self._merge_results(kb_results, session_results)
+            top_results = merged_results[:top_k]
+
+            if VERBOSE_LOGGING:
+                session_count = len(session_results) if session_results else 0
+                kb_count_actual = len(kb_results) if kb_results else 0
+                print(f"[Dual-Source] Using {session_count} session + {kb_count_actual} KB results")
 
         # 4. Build prompt with source attribution
         context_str = self._build_prompt_with_sources(top_results)
