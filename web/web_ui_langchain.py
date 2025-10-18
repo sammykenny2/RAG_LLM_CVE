@@ -440,8 +440,7 @@ def process_uploaded_report(
             pdf_processor = PDFProcessor()
             text = pdf_processor.extract_text(file_path, max_pages=max_pages)
             summary = rag_system.summarize_report(text, max_tokens=max_tokens)
-            mode_info = f" (mode={mode}, max_tokens={max_tokens})"
-            return f"📝 Summary{mode_info}:\n\n{summary}"
+            return f"📝 Summary:\n\n{summary}"
 
         elif action == 'validate':
             # Process report and validate CVE usage
@@ -451,8 +450,7 @@ def process_uploaded_report(
                 max_pages=max_pages
             )
             validation = rag_system.validate_cve_usage(report_text, cve_descriptions, max_tokens=max_tokens)
-            mode_info = f" (mode={mode}, max_tokens={max_tokens})"
-            return f"✅ Validation Result{mode_info}:\n\n{validation}\n\n📋 Found CVEs: {', '.join(cves)}"
+            return f"✅ Validation Result:\n\n{validation}\n\n📋 Found CVEs: {', '.join(cves)}"
 
         elif action == 'add':
             # Add to knowledge base
