@@ -31,7 +31,9 @@ from config import (
     VALIDATION_CHUNK_OVERLAP_TOKENS,
     VALIDATION_TOKENS_PER_CHUNK,
     VALIDATION_CHUNK_THRESHOLD_CHARS,
-    VALIDATION_ENABLE_CVE_FILTERING
+    VALIDATION_ENABLE_CVE_FILTERING,
+    VALIDATION_FINAL_TOKENS,
+    VALIDATION_ENABLE_SECOND_STAGE
 )
 
 
@@ -616,13 +618,49 @@ class PureRAG:
 
             chunk_results.append(result)
 
-        # Combine all chunk results
-        combined = "\n\n".join([
-            f"Chunk {i+1} validation:\n{result}"
-            for i, result in enumerate(chunk_results)
-        ])
+        # Stage 2: Optional final consolidation
+        if VALIDATION_ENABLE_SECOND_STAGE:
+            if VERBOSE_LOGGING:
+                print(f"🔍 Consolidating validation results into final report (Stage 2)...")
 
-        return combined
+            # Combine all chunk results for consolidation
+            combined_results = "\n\n".join([
+                f"Chunk {i+1} validation:\n{result}"
+                for i, result in enumerate(chunk_results)
+            ])
+
+            system_prompt = (
+                "You are creating a final CVE validation report. "
+                "Consolidate the following chunk-level validation results into a single, coherent report. "
+                "For each CVE mentioned across all chunks:\n"
+                "1. Indicate whether it is used correctly (✓) or incorrectly (✗)\n"
+                "2. Provide a brief explanation with direct quotes\n"
+                "3. If the same CVE appears in multiple chunks, deduplicate and create one consolidated verdict\n"
+                "4. List all CVEs in order\n\n"
+                "Format:\n"
+                "CVE-YYYY-NNNNN: [✓/✗] Verdict\n"
+                "Explanation: ...\n\n"
+                "Chunk validation results:\n"
+                f"{combined_results}"
+            )
+
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": "Please consolidate these chunk-level validation results into a final validation report."}
+            ]
+
+            final_report = self.llama.generate(
+                messages=messages,
+                max_new_tokens=VALIDATION_FINAL_TOKENS
+            )
+
+            return final_report
+        else:
+            # Return all chunk results without consolidation
+            return "\n\n".join([
+                f"Chunk {i+1} validation:\n{result}"
+                for i, result in enumerate(chunk_results)
+            ])
 
     def answer_question_about_report(
         self,
