@@ -620,49 +620,336 @@ RAG_LLM_CVE/
   - No more "I don't know" for valid KB content
   - Reduced hangs from simplified execution path
 
-### Next Steps
-- [ ] Real-world testing with web_ui_langchain.py
-- [ ] A/B comparison: Phase 1 vs Phase 2 response quality
-- [ ] Monitor for any regressions or edge cases
+### Validation
+✅ **Real-world testing confirmed** (2025-01-18):
+- User reported issue resolved
+- Phase 2 now provides correct responses
+- No more "I don't know" errors for valid KB content
+- Conversation history working correctly
 
 ## Known Issues
 
 ### Phase 2: LangChain Web UI (web_ui_langchain.py)
 - **No known critical issues** (as of 2025-01-18)
-  - Previous LLM response quality issues have been fixed (see above)
-  - Further testing needed to confirm complete resolution
+  - LLM response quality issues have been fixed and validated
+  - Both Phase 1 and Phase 2 provide comparable performance
 
 ## Upcoming Features
 
-### Planned Optimizations
-- [ ] **Multi-file conversation context** (High Priority)
-  - Allow chat interface to retain multiple uploaded files across conversation
-  - Current limitation: New file upload clears previous file
-  - Use case: User uploads File A, asks questions, then uploads File B but needs to reference File A
-  - Technical challenges:
-    - **File management**: Maintain list of active files in conversation session
-    - **Temporary embeddings**: Generate embeddings for uploaded files without persisting to Chroma
-      - Option 1: In-memory embeddings (fast, memory-intensive)
-      - Option 2: Session-scoped temporary Chroma collection (persistent across chat, deleted on exit)
-    - **RAG workflow refactor**:
-      - Dual-source retrieval: Query both KB (permanent) and session files (temporary)
-      - Merge and rank results from multiple sources
-      - File-aware context: Track which file each retrieved chunk comes from
-    - **LLM prompt engineering**:
-      - Include file provenance in context ("From File A: ...", "From File B: ...")
-      - Manage context window limits with multiple file contents
-      - Smart truncation when files exceed token budget
-    - **UI/UX considerations**:
-      - Display list of active files in conversation
-      - Allow individual file removal
-      - Clear visual indication of which files are in context
-  - Implementation approach:
-    1. Replace single `chat_uploaded_file` with `chat_uploaded_files[]` list
-    2. Create `TemporaryEmbeddingManager` class for session-scoped embeddings
-    3. Refactor `rag_system.query()` to accept `session_sources` parameter
-    4. Update prompt templates to include file provenance metadata
-    5. Add file list UI component with remove buttons
-  - Expected impact: More natural multi-turn conversations with multiple documents
+### [PLANNED] Multi-file Conversation Context (High Priority)
+
+**Status**: Detailed implementation plan completed (2025-01-18)
+
+#### Overview
+Enable chat interface to retain multiple uploaded files across conversation, allowing users to ask questions that reference multiple documents simultaneously.
+
+#### Use Case
+User uploads `report_A.pdf` and asks questions about it. Then uploads `report_B.pdf` but still needs to reference information from `report_A.pdf` for comparison or cross-referencing.
+
+#### Architecture Decision
+
+**Selected Strategy**: Session-scoped Chroma collection
+- ✅ Supports large files (no memory limits)
+- ✅ Efficient vector search (repeatable queries)
+- ✅ Automatic cleanup on session end
+- ✅ Consistent with existing Chroma architecture
+
+**Rejected Alternatives**:
+- ❌ In-memory embeddings: High memory usage, problematic for large files
+- ❌ Permanent Chroma: Complex cleanup logic, unnecessary persistence
+
+#### System Architecture
+
+```
+Session Files (Temporary)          Permanent Knowledge Base
+┌─────────────────────┐           ┌─────────────────────┐
+│ session_abc123/     │           │ cve_embeddings/     │
+│ ├─ report_A.pdf     │           │ ├─ CVE data         │
+│ ├─ report_B.pdf     │           │ └─ Permanent docs   │
+│ └─ report_C.pdf     │           └─────────────────────┘
+└─────────────────────┘                      │
+         │                                   │
+         └──────────┬────────────────────────┘
+                    ▼
+           Dual-Source Retrieval
+           (Merge & Rank Results)
+                    │
+                    ▼
+              LLM with Context
+           (File provenance tracked)
+```
+
+#### Implementation Plan (4 PRs)
+
+**PR 1: Core Infrastructure** (`core/session_manager.py`)
+- [ ] Create `SessionManager` class
+  - `__init__(session_id)`: Initialize session with unique ID
+  - `add_file(file_path)`: Process and embed single file
+  - `remove_file(file_name)`: Remove file from session
+  - `query(question, top_k)`: Query session collections
+  - `cleanup()`: Delete session collection and temp files
+- [ ] File lifecycle management:
+  - Upload → temp_uploads/session_{id}/
+  - Extract text → split sentences → generate embeddings
+  - Store in Chroma collection `session_{id}`
+  - Delete on session end or manual removal
+- [ ] Unit tests for session operations
+
+**PR 2: RAG Integration** (`rag/pure_python.py`, `rag/langchain_impl.py`)
+- [ ] Add `session_manager` parameter to `query()` methods
+- [ ] Implement `_merge_results()`: Combine permanent KB + session results
+- [ ] Implement `_build_prompt_with_sources()`: Format context with file attribution
+- [ ] Dual-source retrieval:
+  - Query permanent KB (top_k=3)
+  - Query session files (top_k=2, if session_manager exists)
+  - Merge and rank by similarity score
+  - Format: `"From {source}: {text}"`
+- [ ] Integration tests for dual-source queries
+
+**PR 3: Web UI Phase 1** (`web/web_ui.py`)
+- [ ] Global state changes:
+  - `chat_uploaded_files = []` (list instead of single file)
+  - `session_manager = SessionManager(uuid)` (initialized on load)
+- [ ] File upload handlers:
+  - `handle_chat_file_upload()`: Add file to session (async processing)
+  - `handle_remove_file()`: Remove individual file
+  - `format_file_list()`: Display HTML chips `[📄 filename ✅] [🗑️]`
+- [ ] UI layout updates:
+  - File list display above chat input
+  - Individual remove buttons per file
+  - Status indicators (uploading/processing/ready/error)
+- [ ] Session cleanup on page reload
+- [ ] UI/UX tests
+
+**PR 4: Web UI Phase 2** (`web/web_ui_langchain.py`)
+- [ ] Mirror Phase 1 implementation
+- [ ] Maintain behavioral consistency
+- [ ] End-to-end tests
+- [ ] Performance benchmarks
+
+#### Data Structures
+
+**File Info Object**:
+```python
+{
+    "name": "report_A.pdf",
+    "path": "/temp_uploads/session_abc123/report_A.pdf",
+    "status": "ready",  # uploading | processing | ready | error
+    "chunks": 150,
+    "added_date": "2025-01-18T12:34:56",
+    "error": None  # or error message
+}
+```
+
+**Retrieval Result Object**:
+```python
+{
+    "text": "CVE-2024-1234 affects...",
+    "source": "report_A.pdf",  # or "Knowledge Base"
+    "source_type": "session",  # or "permanent"
+    "score": 0.85,
+    "metadata": {...}
+}
+```
+
+#### Testing Strategy
+
+**Test Cases**:
+1. **Single file**: Upload 1 PDF, verify backward compatibility
+2. **Multi-file**: Upload 3 PDFs, test cross-reference queries
+3. **File removal**: Remove middle file, verify others unaffected
+4. **Session cleanup**: Reload page, verify temp files deleted
+5. **Large files**: Test with 10+ MB PDFs, monitor memory
+6. **Concurrency**: Multiple browser tabs don't interfere
+
+#### Performance Impact
+
+**Estimates**:
+- Query time: +30-50% (dual-source retrieval + merging)
+- Memory: +100-500 MB per active session
+- Storage: Temporary files (auto-cleanup)
+
+**Optimizations**:
+- Parallel queries to both sources
+- Caching for frequently accessed files
+- Lazy loading (embeddings generated on-demand)
+
+#### Constraints & Limits
+
+**Limits** (to prevent resource exhaustion):
+- Maximum 5 files per session
+- Maximum 10 MB per file
+- Session timeout: 1 hour of inactivity
+
+**Cleanup**:
+- Automatic cleanup on session end (page reload)
+- Periodic cleanup of orphaned collections (cronjob)
+- Error handling with detailed logging
+
+#### Expected Benefits
+
+- ✅ Natural multi-document conversations
+- ✅ Cross-reference analysis between reports
+- ✅ Compare multiple threat intelligence documents
+- ✅ No need to re-upload files for follow-up questions
+
+#### Implementation Checklist
+
+**PR 1: Core Infrastructure** (Estimated: 4-6 hours)
+- [ ] Create `core/session_manager.py`
+  - [ ] Import dependencies (chromadb, config, embeddings, pdf_processor)
+  - [ ] Define `SessionManager` class with `__init__(session_id)`
+  - [ ] Implement `add_file(file_path)`:
+    - [ ] Validate file size (<=10 MB)
+    - [ ] Extract text using PDFProcessor
+    - [ ] Split into chunks with overlap
+    - [ ] Generate embeddings using EmbeddingModel
+    - [ ] Store in Chroma collection `session_{id}`
+    - [ ] Return file info object
+  - [ ] Implement `remove_file(file_name)`:
+    - [ ] Query Chroma for documents with matching source
+    - [ ] Delete documents by IDs
+    - [ ] Update internal file tracking
+  - [ ] Implement `query(question, top_k=5)`:
+    - [ ] Generate query embedding
+    - [ ] Query Chroma collection
+    - [ ] Format results with file attribution
+    - [ ] Return list of result objects
+  - [ ] Implement `list_files()`: Return current session files
+  - [ ] Implement `cleanup()`:
+    - [ ] Delete Chroma collection
+    - [ ] Delete temp files from disk
+  - [ ] Add comprehensive docstrings
+- [ ] Create `tests/test_session_manager.py`
+  - [ ] Test session initialization
+  - [ ] Test file upload with sample PDF
+  - [ ] Test file removal
+  - [ ] Test query retrieval
+  - [ ] Test cleanup
+  - [ ] Test file size limit enforcement
+  - [ ] Test max files limit enforcement
+- [ ] Update `config.py`:
+  - [ ] Add `SESSION_MAX_FILES=5`
+  - [ ] Add `SESSION_MAX_FILE_SIZE_MB=10`
+  - [ ] Add `SESSION_TIMEOUT_HOURS=1`
+- [ ] Update `.env.example` with session configuration
+- [ ] Git commit: "Add SessionManager for multi-file conversation context"
+
+**PR 2: RAG Integration** (Estimated: 3-4 hours)
+- [ ] Update `rag/pure_python.py`:
+  - [ ] Add `session_manager=None` parameter to `__init__()`
+  - [ ] Add `_merge_results(kb_results, session_results)`:
+    - [ ] Combine both result lists
+    - [ ] Sort by similarity score (descending)
+    - [ ] Return top-k merged results
+  - [ ] Add `_build_prompt_with_sources(context_items)`:
+    - [ ] Format each item as "From {source}: {text}"
+    - [ ] Join with newlines
+    - [ ] Return formatted string
+  - [ ] Update `query()` method:
+    - [ ] Query permanent KB (top_k=3)
+    - [ ] If session_manager exists, query session files (top_k=2)
+    - [ ] Call `_merge_results()` to combine
+    - [ ] Call `_build_prompt_with_sources()` for context
+    - [ ] Build system prompt with attributed context
+    - [ ] Generate response as before
+- [ ] Update `rag/langchain_impl.py`:
+  - [ ] Mirror changes from pure_python.py
+  - [ ] Maintain behavioral consistency
+  - [ ] Use same `_merge_results()` logic
+  - [ ] Use same `_build_prompt_with_sources()` logic
+- [ ] Create `tests/test_rag_dual_source.py`:
+  - [ ] Test query with session_manager=None (backward compatibility)
+  - [ ] Test query with active session_manager
+  - [ ] Test merging and ranking logic
+  - [ ] Test source attribution in prompts
+  - [ ] Compare Phase 1 vs Phase 2 output
+- [ ] Git commit: "Integrate SessionManager into RAG systems"
+
+**PR 3: Web UI Phase 1** (Estimated: 5-6 hours)
+- [ ] Update `web/web_ui.py`:
+  - [ ] Import SessionManager and uuid
+  - [ ] Initialize global state:
+    - [ ] `session_id = str(uuid.uuid4())`
+    - [ ] `session_manager = SessionManager(session_id)`
+    - [ ] `chat_uploaded_files = []` (list, not single file)
+  - [ ] Create `handle_chat_file_upload(file)`:
+    - [ ] Check max files limit (5)
+    - [ ] Add file to session_manager
+    - [ ] Append to chat_uploaded_files list
+    - [ ] Return formatted file list HTML
+  - [ ] Create `handle_remove_file(file_name)`:
+    - [ ] Call session_manager.remove_file()
+    - [ ] Remove from chat_uploaded_files list
+    - [ ] Return updated file list HTML
+  - [ ] Create `format_file_list()`:
+    - [ ] Generate HTML chips: `[📄 filename ✅] [🗑️]`
+    - [ ] Include status indicators
+    - [ ] Return HTML string
+  - [ ] Update `chat_query(message, history)`:
+    - [ ] Pass session_manager to rag_system.query()
+    - [ ] Handle session_manager=None gracefully
+  - [ ] Update UI layout:
+    - [ ] Replace single file upload with multi-file component
+    - [ ] Add file list display area
+    - [ ] Add remove buttons per file
+    - [ ] Update upload status display
+  - [ ] Add cleanup handler:
+    - [ ] Call session_manager.cleanup() on demo.load
+  - [ ] Update docstrings and comments
+- [ ] Test Web UI manually:
+  - [ ] Upload 1 file, verify display
+  - [ ] Upload 2nd file, verify both persist
+  - [ ] Ask cross-reference question
+  - [ ] Remove 1 file, verify other unaffected
+  - [ ] Reload page, verify cleanup
+  - [ ] Test max files limit (try uploading 6th file)
+- [ ] Git commit: "Add multi-file support to Phase 1 Web UI"
+
+**PR 4: Web UI Phase 2** (Estimated: 3-4 hours)
+- [ ] Update `web/web_ui_langchain.py`:
+  - [ ] Mirror all changes from PR 3 (web_ui.py)
+  - [ ] Use LangChainRAG instead of PureRAG
+  - [ ] Maintain behavioral consistency
+  - [ ] Keep port 7861
+- [ ] Test Web UI manually:
+  - [ ] Run same test cases as PR 3
+  - [ ] Compare behavior with Phase 1
+  - [ ] Verify LangChain memory still works
+- [ ] End-to-end testing:
+  - [ ] Test both UIs side-by-side
+  - [ ] Upload same files to both
+  - [ ] Ask same questions
+  - [ ] Compare response quality
+  - [ ] Benchmark query times
+- [ ] Performance testing:
+  - [ ] Monitor memory usage with 5 files
+  - [ ] Test with large files (10 MB)
+  - [ ] Measure query time increase
+- [ ] Git commit: "Add multi-file support to Phase 2 Web UI"
+
+**Final Steps**
+- [ ] Update `CLAUDE.md`:
+  - [ ] Move multi-file feature from "Upcoming" to "Features"
+  - [ ] Add usage examples
+  - [ ] Document constraints and limits
+- [ ] Update `docs/ARCHITECTURE.md`:
+  - [ ] Add SessionManager architecture diagram
+  - [ ] Document dual-source retrieval algorithm
+  - [ ] Add performance impact section
+- [ ] Update `docs/PROGRESS.md`:
+  - [ ] Move from "Upcoming Features" to "Added"
+  - [ ] Document actual performance metrics
+  - [ ] Add lessons learned
+- [ ] Create demo video or screenshots
+- [ ] Git commit: "Update documentation for multi-file feature"
+- [ ] Final review and cleanup
+
+**Estimated Total Time**: 15-20 hours
+
+---
+
+### Other Planned Optimizations
 - [ ] Parallel CVE lookups (if memory permits)
 - [ ] Progress bars for long-running operations
 - [ ] Batch processing for multiple PDFs

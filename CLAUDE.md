@@ -328,16 +328,26 @@ AI: [Retrieves from knowledge base and responds with context]
 - **Status**: Both Phase 1 and Phase 2 now provide comparable response quality
 - **Testing**: Real-world validation recommended (see `docs/PROGRESS.md` for technical details)
 
-#### Current Limitations
+#### Current Limitations & Upcoming Features
 
-**Chat File Upload (Left Panel)**:
+**Chat File Upload (Left Panel)** - Current Limitations:
 - **Single file mode**: Uploading a new file replaces the previous one
 - Files are deleted after sending message or manual removal
 - No persistence across conversation turns
-- **Planned improvement**: Multi-file conversation context (see `docs/PROGRESS.md` - "Upcoming Features")
-  - Future: Retain multiple files in conversation session
-  - Future: Generate temporary embeddings without persisting to Chroma
-  - Future: Query both permanent KB and session files simultaneously
+
+**Upcoming: Multi-file Conversation Context** (Planned - See `docs/PROGRESS.md`):
+- **What**: Allow users to upload multiple files (up to 5) that persist for the conversation session
+- **Architecture**: Session-scoped Chroma collections with automatic lifecycle management
+- **Features**:
+  - Dual-source retrieval: Query both permanent knowledge base and session files simultaneously
+  - File provenance tracking: See which uploaded file each answer comes from
+  - Automatic cleanup: Session files deleted after 1-hour timeout or manual clear
+- **Benefits**:
+  - Multi-document comparison and analysis
+  - Temporary file uploads without polluting permanent knowledge base
+  - Context-aware conversations spanning multiple uploaded documents
+- **Constraints**: Max 5 files per session, 10 MB per file, 1-hour session timeout
+- **Implementation**: 4-phase rollout across core infrastructure and both Web UIs
 
 **Knowledge Base Upload (Right Panel)**:
 - Files are permanently added with embeddings stored in Chroma
