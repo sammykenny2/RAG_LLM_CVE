@@ -161,6 +161,56 @@ def get_current_status() -> str:
 # Chat interface handlers
 # =============================================================================
 
+def detect_user_intent(message: str, has_file: bool) -> str:
+    """
+    Detect user intent from natural language message.
+
+    Supports Chinese and English phrases for:
+    - summarize: 總結, 摘要, 概括, 整理, 內容, 講什麼, summary, summarize
+    - validate: 驗證, 檢查, 核實, validate, verify, check
+
+    Args:
+        message: User message
+        has_file: Whether user has uploaded a file
+
+    Returns:
+        str: Intent ('summarize', 'validate', or None)
+    """
+    if not has_file:
+        return None
+
+    message_lower = message.lower()
+
+    # Summarize intent keywords (Chinese + English)
+    summarize_keywords = [
+        # Chinese
+        '總結', '摘要', '概括', '概要', '整理', '內容', '講什麼', '说什么',
+        '主要內容', '主要内容', '重點', '重点', '大意',
+        # English
+        'summarize', 'summary', 'summarise', 'what is this', 'what does',
+        'content', 'about', 'main point', 'key point', 'overview'
+    ]
+
+    # Validate intent keywords (Chinese + English)
+    validate_keywords = [
+        # Chinese
+        '驗證', '验证', '檢查', '检查', '核實', '核实', '確認', '确认',
+        # English
+        'validate', 'verify', 'check', 'correct', 'accuracy'
+    ]
+
+    # Check for summarize intent
+    for keyword in summarize_keywords:
+        if keyword in message_lower:
+            return 'summarize'
+
+    # Check for validate intent
+    for keyword in validate_keywords:
+        if keyword in message_lower:
+            return 'validate'
+
+    return None
+
 def chat_respond(message: str, history: list):
     """
     Handle chat messages with LangChain's automatic memory management.
@@ -199,17 +249,22 @@ def chat_respond(message: str, history: list):
     yield "", history, "", gr.update()
 
     try:
-        message_lower = message.strip().lower()
         import os
 
-        # Check if user is requesting to summarize or validate uploaded file
-        if chat_uploaded_file and message_lower in ['summarize', 'validate']:
-            if message_lower == 'summarize':
+        # Detect user intent using natural language processing
+        intent = detect_user_intent(message, has_file=bool(chat_uploaded_file))
+
+        # Handle file-specific actions based on detected intent
+        if chat_uploaded_file and intent:
+            if intent == 'summarize':
                 response = process_uploaded_report(chat_uploaded_file, action='summarize', mode=current_mode)
-            elif message_lower == 'validate':
+            elif intent == 'validate':
                 response = process_uploaded_report(chat_uploaded_file, action='validate', schema=DEFAULT_SCHEMA, mode=current_mode)
+            else:
+                # Fallback to RAG query
+                response = rag_system.query(question=message)
         else:
-            # Normal RAG query (LangChain memory managed automatically)
+            # Normal RAG query (no file or no special intent detected)
             response = rag_system.query(question=message)
 
         # Delete uploaded file from disk if exists
@@ -348,7 +403,7 @@ def process_uploaded_report(
     Process uploaded report based on user action.
 
     Args:
-        file: Gradio File object
+        file: Gradio File object or file path string
         action: 'summarize', 'validate', or 'add'
         schema: CVE schema to use
         mode: Processing mode (demo/full), uses global current_mode if None
@@ -373,7 +428,11 @@ def process_uploaded_report(
         top_k = 5
 
     try:
-        file_path = Path(file.name)
+        # Handle both string paths and Gradio File objects
+        if isinstance(file, str):
+            file_path = Path(file)
+        else:
+            file_path = Path(file.name)
 
         if action == 'summarize':
             # Extract text and summarize
@@ -484,7 +543,7 @@ def add_pdf_to_kb(file, source_name: str = None) -> str:
     Add PDF to knowledge base using LangChain.
 
     Args:
-        file: Gradio File object
+        file: Gradio File object or file path string
         source_name: Optional source name
 
     Returns:
@@ -496,7 +555,12 @@ def add_pdf_to_kb(file, source_name: str = None) -> str:
     try:
         from core.pdf_processor import PDFProcessor
 
-        file_path = Path(file.name)
+        # Handle both string paths and Gradio File objects
+        if isinstance(file, str):
+            file_path = Path(file)
+        else:
+            file_path = Path(file.name)
+
         source_name = source_name or file_path.name
 
         print(f"Adding {source_name} to knowledge base...")
