@@ -114,6 +114,16 @@ SUMMARY_CHUNK_THRESHOLD_CHARS = int(os.getenv('SUMMARY_CHUNK_THRESHOLD_CHARS', '
 SUMMARY_ENABLE_SECOND_STAGE = os.getenv('SUMMARY_ENABLE_SECOND_STAGE', 'True').lower() == 'true'
 
 # =============================================================================
+# Validation Configuration
+# =============================================================================
+
+VALIDATION_CHUNK_TOKENS = int(os.getenv('VALIDATION_CHUNK_TOKENS', '1500'))
+VALIDATION_CHUNK_OVERLAP_TOKENS = int(os.getenv('VALIDATION_CHUNK_OVERLAP_TOKENS', '200'))
+VALIDATION_TOKENS_PER_CHUNK = int(os.getenv('VALIDATION_TOKENS_PER_CHUNK', '300'))
+VALIDATION_CHUNK_THRESHOLD_CHARS = int(os.getenv('VALIDATION_CHUNK_THRESHOLD_CHARS', '3000'))
+VALIDATION_ENABLE_CVE_FILTERING = os.getenv('VALIDATION_ENABLE_CVE_FILTERING', 'True').lower() == 'true'
+
+# =============================================================================
 # Path Validation
 # =============================================================================
 
@@ -205,6 +215,13 @@ def print_config():
     print(f"  SUMMARY_FINAL_TOKENS: {SUMMARY_FINAL_TOKENS}")
     print(f"  SUMMARY_CHUNK_THRESHOLD_CHARS: {SUMMARY_CHUNK_THRESHOLD_CHARS}")
     print(f"  SUMMARY_ENABLE_SECOND_STAGE: {SUMMARY_ENABLE_SECOND_STAGE}")
+
+    print("\nValidation:")
+    print(f"  VALIDATION_CHUNK_TOKENS: {VALIDATION_CHUNK_TOKENS}")
+    print(f"  VALIDATION_CHUNK_OVERLAP_TOKENS: {VALIDATION_CHUNK_OVERLAP_TOKENS}")
+    print(f"  VALIDATION_TOKENS_PER_CHUNK: {VALIDATION_TOKENS_PER_CHUNK}")
+    print(f"  VALIDATION_CHUNK_THRESHOLD_CHARS: {VALIDATION_CHUNK_THRESHOLD_CHARS}")
+    print(f"  VALIDATION_ENABLE_CVE_FILTERING: {VALIDATION_ENABLE_CVE_FILTERING}")
     print("=" * 60)
 
 if __name__ == "__main__":
