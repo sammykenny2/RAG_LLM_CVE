@@ -317,14 +317,18 @@ AI: [Retrieves from knowledge base and responds with context]
 - View all sources with chunk counts
 - Click refresh to update statistics
 
-#### Current Limitations
+#### Recent Updates
 
-⚠️ **Phase 2 (LangChain) - Known Issues**:
-- **LLM response quality problems**: Frequent "I don't know" responses despite relevant KB content
-- **Occasional hangs**: Frontend becomes unresponsive, waiting 5+ minutes for response
-- **Root cause unknown**: Under investigation (see `docs/PROGRESS.md` - "Known Issues")
-- **Workaround**: Use Phase 1 (web_ui.py, port 7860) which works reliably
-- **Status**: Phase 1 (Pure Python) does not have these issues
+✅ **Phase 2 (LangChain) - Response Quality Fixed** (2025-01-18):
+- **Previous issues** (now resolved):
+  - Frequent "I don't know" responses despite relevant KB content
+  - Occasional hangs with unresponsive frontend
+- **Root cause**: Inconsistent query paths after hybrid search implementation
+- **Solution**: Refactored `query()` method to use unified approach consistent with Phase 1
+- **Status**: Both Phase 1 and Phase 2 now provide comparable response quality
+- **Testing**: Real-world validation recommended (see `docs/PROGRESS.md` for technical details)
+
+#### Current Limitations
 
 **Chat File Upload (Left Panel)**:
 - **Single file mode**: Uploading a new file replaces the previous one

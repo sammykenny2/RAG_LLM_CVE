@@ -197,10 +197,98 @@ class LangChainRAG:
         )
         return HuggingFacePipeline(pipeline=pipe)
 
+    def _hybrid_search_unified(self, query: str, top_k: int = RETRIEVAL_TOP_K) -> List[str]:
+        """
+        Unified hybrid search: exact CVE ID match + semantic search fallback.
+
+        This method mirrors the implementation in pure_python.py for consistency.
+
+        If query contains CVE ID(s), tries metadata filtering for exact match.
+        Falls back to semantic search if no exact match found.
+
+        Args:
+            query: User query
+            top_k: Number of results to return
+
+        Returns:
+            list: Retrieved document chunks
+        """
+        # Check for CVE IDs in query
+        cve_pattern = r'CVE-\d{4}-\d{4,7}'
+        cve_ids = re.findall(cve_pattern, query, re.IGNORECASE)
+
+        if cve_ids and self.chroma_manager:
+            # Try exact match first
+            if VERBOSE_LOGGING:
+                print(f"[Hybrid Search] Detected CVE IDs: {cve_ids}")
+
+            for cve_id in cve_ids:
+                results = self.chroma_manager.query_by_metadata(
+                    where={"cve_id": cve_id.upper()},
+                    limit=top_k
+                )
+
+                if results and results.get('documents') and len(results['documents']) > 0:
+                    if VERBOSE_LOGGING:
+                        print(f"[Hybrid Search] Exact match found for {cve_id}: {len(results['documents'])} result(s)")
+                    # Return exact matches (query_by_metadata returns flat list)
+                    return results['documents']
+
+            if VERBOSE_LOGGING:
+                print(f"[Hybrid Search] No exact match, falling back to semantic search")
+
+        # Fallback to semantic search
+        if VERBOSE_LOGGING:
+            print(f"[Hybrid Search] Using semantic search")
+
+        # Use vectorstore's retriever for semantic search
+        retriever = self.vectorstore.as_retriever(
+            search_type="similarity",
+            search_kwargs={"k": top_k}
+        )
+        docs = retriever.get_relevant_documents(query)
+
+        # Extract page_content from Document objects
+        return [doc.page_content for doc in docs]
+
+    def _format_messages_for_llama(self, messages: List[Dict[str, str]]) -> str:
+        """
+        Format messages into Llama 3.2 chat template format.
+
+        Args:
+            messages: List of message dicts with 'role' and 'content'
+
+        Returns:
+            str: Formatted prompt for Llama
+        """
+        # Use tokenizer's chat template if available
+        if hasattr(self.tokenizer, 'apply_chat_template'):
+            formatted = self.tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True
+            )
+            return formatted
+
+        # Fallback: simple formatting
+        formatted_parts = []
+        for msg in messages:
+            role = msg['role']
+            content = msg['content']
+            if role == 'system':
+                formatted_parts.append(f"System: {content}\n")
+            elif role == 'user':
+                formatted_parts.append(f"User: {content}\n")
+            elif role == 'assistant':
+                formatted_parts.append(f"Assistant: {content}\n")
+
+        formatted_parts.append("Assistant:")
+        return "\n".join(formatted_parts)
+
     def query(self, question: str, return_sources: bool = False) -> str | Dict:
         """
         Query knowledge base with automatic conversation history.
-        Uses hybrid search: exact CVE ID match + semantic search.
+        Uses unified hybrid search approach (consistent with pure_python.py).
 
         Args:
             question: User question
@@ -212,58 +300,64 @@ class LangChainRAG:
         if not self._initialized:
             raise RuntimeError("RAG system not initialized. Call initialize() first.")
 
-        # Check for CVE IDs and try exact match first
-        cve_pattern = r'CVE-\d{4}-\d{4,7}'
-        cve_ids = re.findall(cve_pattern, question, re.IGNORECASE)
+        # 1. Unified hybrid search to get context
+        context_items = self._hybrid_search_unified(question, top_k=RETRIEVAL_TOP_K)
+        context_str = "\n\n".join(context_items)
 
-        if cve_ids and self.chroma_manager:
-            # Try exact CVE ID match
-            if VERBOSE_LOGGING:
-                print(f"[Hybrid Search] Detected CVE IDs: {cve_ids}")
+        if VERBOSE_LOGGING:
+            print(f"[Query] Retrieved {len(context_items)} context items")
 
-            for cve_id in cve_ids:
-                results = self.chroma_manager.query_by_metadata(
-                    where={"cve_id": cve_id.upper()},
-                    limit=RETRIEVAL_TOP_K
-                )
+        # 2. Build system prompt with context (consistent with pure_python.py)
+        system_prompt = (
+            "You are a helpful AI assistant with access to a knowledge base about CVEs and security reports. "
+            "Answer questions based on the provided context.\n\n"
+            f"Context:\n{context_str}"
+        )
 
-                if results and results.get('documents') and len(results['documents']) > 0:
-                    if VERBOSE_LOGGING:
-                        print(f"[Hybrid Search] Exact match found for {cve_id}")
+        # 3. Build messages list with conversation history
+        messages = [{"role": "system", "content": system_prompt}]
 
-                    # Format direct answer from exact match
-                    context = "\n\n".join(results['documents'][:3])  # Use top 3
-                    prompt = f"Based on the following information, answer this question: {question}\n\nInformation:\n{context}"
+        # Add conversation history from memory
+        if self.memory and self.memory.chat_memory:
+            for msg in self.memory.chat_memory.messages:
+                if hasattr(msg, 'type'):
+                    # LangChain message format
+                    role = "user" if msg.type == "human" else "assistant"
+                    messages.append({"role": role, "content": msg.content})
+                elif isinstance(msg, dict):
+                    # Dict format
+                    messages.append(msg)
 
-                    response = self.llm(prompt)
+        # Add current question
+        messages.append({"role": "user", "content": question})
 
-                    if return_sources:
-                        # Convert to source document format
-                        from langchain.docstore.document import Document
-                        source_docs = [
-                            Document(page_content=doc, metadata=meta)
-                            for doc, meta in zip(results['documents'], results.get('metadatas', []))
-                        ]
-                        return {
-                            "answer": response,
-                            "sources": source_docs
-                        }
-                    else:
-                        return response
+        if VERBOSE_LOGGING:
+            print(f"[Query] Total messages in conversation: {len(messages)}")
 
-            if VERBOSE_LOGGING:
-                print(f"[Hybrid Search] No exact match, using semantic search")
+        # 4. Format messages for Llama and generate response
+        formatted_prompt = self._format_messages_for_llama(messages)
 
-        # Fallback to normal chain (semantic search)
-        result = self.qa_chain({"question": question})
+        # Use the default pipeline for generation
+        response = self.llm(formatted_prompt)
 
+        if VERBOSE_LOGGING:
+            print(f"[Query] Generated response length: {len(response)} chars")
+
+        # 5. Update memory with new interaction
+        from langchain.schema import HumanMessage, AIMessage
+        self.memory.chat_memory.add_message(HumanMessage(content=question))
+        self.memory.chat_memory.add_message(AIMessage(content=response))
+
+        # 6. Return response (with sources if requested)
         if return_sources:
+            from langchain.docstore.document import Document
+            source_docs = [Document(page_content=item) for item in context_items]
             return {
-                "answer": result["answer"],
-                "sources": result.get("source_documents", [])
+                "answer": response,
+                "sources": source_docs
             }
         else:
-            return result["answer"]
+            return response
 
     def clear_history(self):
         """Clear conversation history."""
