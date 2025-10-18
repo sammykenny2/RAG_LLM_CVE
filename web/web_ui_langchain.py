@@ -12,10 +12,12 @@ import gradio as gr
 from pathlib import Path
 from datetime import datetime
 import sys
+import uuid
 sys.path.append(str(Path(__file__).parent.parent))
 
-# Import LangChain RAG
+# Import LangChain RAG and SessionManager
 from rag.langchain_impl import LangChainRAG
+from core.session_manager import SessionManager
 import re
 import numpy as np
 
@@ -68,21 +70,26 @@ rag_system = None
 current_speed = DEFAULT_SPEED
 current_mode = DEFAULT_MODE
 
-# Track uploaded files
-chat_uploaded_file = None  # Left side: for chat validation
+# Track uploaded files (session-based accumulation)
+chat_uploaded_file = None  # Left side: current file (single file UI)
 chat_file_uploading = False  # Left side upload status
+session_id = str(uuid.uuid4())  # Unique session ID
+session_manager = None  # SessionManager instance (accumulates all files)
 
 # Upload directories
-TEMP_UPLOAD_DIR = Path("temp_uploads")  # For chat files (temporary, no embeddings)
+TEMP_UPLOAD_DIR = Path("temp_uploads")  # For chat files (temporary, session-scoped)
 KB_UPLOAD_DIR = Path("kb_uploads")  # For KB files (backup, generate embeddings)
 
 # Ensure upload directories exist
 TEMP_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 KB_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+# Session limits
+SESSION_MAX_FILES = 10  # Maximum files per session
+
 def initialize_system(speed_level: str = DEFAULT_SPEED, force_reload: bool = False):
     """Initialize LangChain RAG system based on speed level."""
-    global rag_system, current_speed
+    global rag_system, current_speed, session_manager
 
     if rag_system is not None and not force_reload:
         return f"⚠️ System already initialized with speed={current_speed}"
@@ -99,14 +106,19 @@ def initialize_system(speed_level: str = DEFAULT_SPEED, force_reload: bool = Fal
     use_fp16 = speed_level in ['fast', 'fastest']
     use_sdpa = speed_level == 'fastest'
 
-    # Initialize LangChain RAG
-    rag_system = LangChainRAG()
+    # Create SessionManager if not exists
+    if session_manager is None:
+        session_manager = SessionManager(session_id=session_id)
+        print(f"[OK] SessionManager created (session_id={session_id[:8]}...)")
+
+    # Initialize LangChain RAG with SessionManager
+    rag_system = LangChainRAG(session_manager=session_manager)
     rag_system.initialize(use_fp16=use_fp16, use_sdpa=use_sdpa)
 
     # Update current speed
     current_speed = speed_level
 
-    print(f"✅ LangChain RAG system ready (speed={current_speed})")
+    print(f"[OK] LangChain RAG system ready (speed={current_speed})")
     return f"✅ System initialized with speed={current_speed}"
 
 def reload_model(new_speed: str) -> str:
@@ -157,6 +169,7 @@ def get_current_status() -> str:
     """
     return status
 
+
 # =============================================================================
 # Chat interface handlers
 # =============================================================================
@@ -164,6 +177,7 @@ def get_current_status() -> str:
 def chat_respond(message: str, history: list):
     """
     Handle chat messages with LangChain's automatic memory management.
+    Current file (if exists) is added to session before query.
 
     Generator function that yields intermediate states for better UX.
 
@@ -172,7 +186,7 @@ def chat_respond(message: str, history: list):
         history: Gradio chat history (messages format: list of dicts with 'role' and 'content')
 
     Yields:
-        tuple: (empty string for input clear, updated history, empty string to clear file status, button update to disable)
+        tuple: (empty string for input clear, updated history, empty file status, button update)
     """
     global chat_uploaded_file, chat_file_uploading
 
@@ -199,53 +213,42 @@ def chat_respond(message: str, history: list):
     yield "", history, "", gr.update()
 
     try:
-        message_lower = message.strip().lower()
-        import os
+        # Save file reference before processing
+        current_file = chat_uploaded_file
 
-        # Check if user is requesting to summarize or validate uploaded file
-        if chat_uploaded_file and message_lower in ['summarize', 'validate']:
+        # If current file exists, add to SessionManager for multi-file context
+        if current_file:
+            session_manager.add_file(current_file)
+
+        message_lower = message.strip().lower()
+
+        # Check for special commands that require uploaded file
+        if current_file and message_lower in ['summarize', 'validate', 'add to kb']:
             if message_lower == 'summarize':
-                response = process_uploaded_report(chat_uploaded_file, action='summarize', mode=current_mode)
+                response = process_uploaded_report(current_file, action='summarize', mode=current_mode)
             elif message_lower == 'validate':
-                response = process_uploaded_report(chat_uploaded_file, action='validate', schema=DEFAULT_SCHEMA, mode=current_mode)
+                response = process_uploaded_report(current_file, action='validate', schema=DEFAULT_SCHEMA, mode=current_mode)
+            elif message_lower == 'add to kb':
+                response = process_uploaded_report(current_file, action='add', mode=current_mode)
         else:
-            # Normal RAG query (LangChain memory managed automatically)
+            # Normal RAG query (session_manager automatically includes all session files)
             response = rag_system.query(question=message)
 
-        # Delete uploaded file from disk if exists
-        if chat_uploaded_file and os.path.exists(chat_uploaded_file):
-            try:
-                os.remove(chat_uploaded_file)
-            except Exception as e:
-                print(f"Warning: Could not delete file {chat_uploaded_file}: {e}")
-
-        # Clear uploaded file reference after sending
+        # Clear current file after processing
         chat_uploaded_file = None
 
-        # Update history with actual response, clear file status, and disable remove button
+        # Update history with actual response, clear file status, disable remove button
         history[-1]["content"] = response
         yield "", history, "", gr.update(interactive=False)
 
     except Exception as e:
         error_msg = f"❌ Error: {str(e)}"
         history[-1]["content"] = error_msg
-
-        # Delete uploaded file from disk if exists (even on error)
-        import os
-        if chat_uploaded_file and os.path.exists(chat_uploaded_file):
-            try:
-                os.remove(chat_uploaded_file)
-            except Exception as e:
-                print(f"Warning: Could not delete file {chat_uploaded_file}: {e}")
-
-        # Clear uploaded file reference even on error
-        chat_uploaded_file = None
-
         yield "", history, "", gr.update(interactive=False)
 
 def handle_chat_file_upload(file):
     """
-    Handle file upload for chat (left side).
+    Handle file upload for chat (single file, stored for current message).
 
     Args:
         file: Gradio File object (path string)
@@ -276,7 +279,7 @@ def handle_chat_file_upload(file):
         </div>
         """
 
-        # Simulate upload delay (for demo purposes, can remove in production)
+        # Simulate upload delay
         time.sleep(0.5)
 
         # Copy file to temp_upload directory
@@ -316,7 +319,7 @@ def handle_chat_file_upload(file):
 
 def handle_remove_chat_file():
     """
-    Remove uploaded file from chat (left side).
+    Remove current uploaded file from chat (before sending message).
 
     Returns:
         tuple: (Empty HTML to clear status display, button update to disable)
@@ -468,13 +471,13 @@ def handle_kb_file_upload(file):
         # Add to knowledge base (LangChain handles embedding generation)
         rag_system.add_document_to_kb(texts=chunks, metadatas=metadatas)
 
-        print(f"✅ Added {len(chunks)} chunks from {file_name} to knowledge base")
+        print(f"[OK] Added {len(chunks)} chunks from {file_name} to knowledge base")
 
         # Return empty status (hide immediately), updated KB display, dropdown, and clear file input
         return "", format_kb_display(), gr.update(choices=get_source_names()), None
 
     except Exception as e:
-        print(f"❌ Error adding {file.name if file else 'file'} to knowledge base: {str(e)}")
+        print(f"[ERROR] Error adding {file.name if file else 'file'} to knowledge base: {str(e)}")
 
         # Return empty status even on error (hide immediately), and clear file input
         return "", format_kb_display(), gr.update(choices=get_source_names()), None
@@ -628,6 +631,21 @@ def delete_source(source_name: str) -> tuple:
     except Exception as e:
         return f"❌ Error deleting source: {str(e)}", format_kb_display(), get_source_names()
 
+def cleanup_session_on_load():
+    """
+    Clean up session state when page loads/reloads.
+
+    Returns:
+        tuple: (empty_file_status_html, disabled_remove_button)
+    """
+    global chat_uploaded_file, chat_file_uploading
+
+    # Clear current file state (SessionManager cleanup happens naturally with new session_id)
+    chat_uploaded_file = None
+    chat_file_uploading = False
+
+    return "", gr.update(interactive=False)
+
 # =============================================================================
 # Gradio interface
 # =============================================================================
@@ -671,10 +689,8 @@ def create_interface():
                     )
                     remove_file_btn = gr.Button("🗑️", size="sm", scale=0, min_width=40, interactive=False)
                     send_btn = gr.Button("Send →", size="sm", scale=1, variant="primary", elem_id="send_btn")
-                    with gr.Column(scale=8):
-                        pass  # Spacer
 
-                # File upload status display
+                # File upload status display (green/red blocks)
                 chat_file_status = gr.HTML(value="")
 
             # Right column: Settings and Knowledge Base (5/12 width)
@@ -762,7 +778,7 @@ def create_interface():
             updated_status = get_current_status()
             return updated_status
 
-        # Connect events - chat
+        # Connect events - chat (include file status output)
         msg_input.submit(chat_respond, [msg_input, chatbot], [msg_input, chatbot, chat_file_status, remove_file_btn])
         send_btn.click(chat_respond, [msg_input, chatbot], [msg_input, chatbot, chat_file_status, remove_file_btn])
 
@@ -806,8 +822,9 @@ def create_interface():
         refresh_kb_btn.click(handle_refresh_kb, outputs=[kb_display, source_dropdown])
         delete_btn.click(handle_delete_source, [source_dropdown], [kb_display, source_dropdown])
 
-        # Auto-refresh knowledge base on page load
+        # Auto-refresh knowledge base and cleanup session on page load
         demo.load(handle_refresh_kb, outputs=[kb_display, source_dropdown])
+        demo.load(cleanup_session_on_load, outputs=[chat_file_status, remove_file_btn])
 
         # Custom JavaScript for Enter to submit and hide empty containers
         demo.load(None, None, None, js="""
@@ -885,7 +902,7 @@ def main():
         for name, info in list(stats.get('sources', {}).items())[:5]:
             print(f"    - {name}: {info['count']} chunks")
     except Exception as e:
-        print(f"  ⚠️ Error loading stats: {e}")
+        print(f"  [WARNING] Error loading stats: {e}")
 
     demo.launch(
         server_name=GRADIO_SERVER_NAME,

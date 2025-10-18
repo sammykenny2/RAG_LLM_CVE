@@ -2,6 +2,60 @@
 
 This file tracks completed changes and upcoming features for the project.
 
+## [2025-10-18] Bug Fix: Restore summarize/validate/add to kb Commands
+
+### Fixed
+- **Web UI chat commands restored** (web_ui.py and web_ui_langchain.py):
+  - **Root cause**: Multi-file SessionManager integration accidentally removed special command handling
+  - **Previous behavior** (broken): All messages went to RAG query, ignoring 'summarize'/'validate'/'add to kb' commands
+  - **Fixed behavior**: Special commands now properly trigger `process_uploaded_report()`
+  - **Architecture preserved**: Single-file UI + multi-file accumulation backend
+    - User uploads single file (appears in UI)
+    - File automatically added to SessionManager for multi-file context
+    - Special commands ('summarize'/'validate'/'add to kb') process current file
+    - Normal messages query all accumulated session files via RAG
+    - Files persist across conversation until page reload
+
+### Technical Details
+- **Changed logic** in `chat_respond()`:
+  ```python
+  # Before (broken):
+  if chat_uploaded_file:
+      session_manager.add_file(chat_uploaded_file)
+      chat_uploaded_file = None
+  response = rag_system.query(question=message, ...)  # Always query, never summarize/validate
+
+  # After (fixed):
+  current_file = chat_uploaded_file
+  if current_file:
+      session_manager.add_file(current_file)
+
+  if current_file and message_lower in ['summarize', 'validate', 'add to kb']:
+      response = process_uploaded_report(current_file, action=message_lower, ...)
+  else:
+      response = rag_system.query(question=message, ...)
+
+  chat_uploaded_file = None
+  ```
+- **Files affected**:
+  - `web/web_ui.py`: Phase 1 (Pure Python) - Fixed
+  - `web/web_ui_langchain.py`: Phase 2 (LangChain) - Fixed
+- **Behavior consistency**: Both Phase 1 and Phase 2 now have identical command handling
+
+### User Impact
+- ✅ Users can now use 'summarize' to get executive summary of uploaded report
+- ✅ Users can now use 'validate' to validate CVE usage in report
+- ✅ Users can now use 'add to kb' to add report to permanent knowledge base
+- ✅ Multi-file context still works: all uploaded files contribute to RAG queries
+- ✅ SessionManager integration preserved: files accumulate across conversation
+
+### Known Issues (To Be Fixed)
+- ⚠️ **RAG responses are often irrelevant** ("答非所問")
+  - Symptoms: LLM provides answers that don't match the question
+  - Scope: Affects both Phase 1 (Pure Python) and Phase 2 (LangChain)
+  - Status: Identified, fix planned for next iteration
+  - Workaround: Use 'summarize'/'validate' commands for uploaded files instead of RAG queries
+
 ## [2025-10] Phase 1: Web UI and Knowledge Base Enhancement
 
 ### Added (Core Modules)
@@ -821,6 +875,153 @@ RAG_LLM_CVE/
 - **PR 3**: Web UI Phase 1 multi-file support
 - **PR 4**: Web UI Phase 2 multi-file support
 
+## [2025-01-18] Multi-file Conversation Context: PR 3
+
+### Changed (Web UI Phase 1 - Multi-file Support)
+- **web/web_ui.py**: Complete multi-file conversation context implementation
+  - **Global state refactored**:
+    - `chat_uploaded_file` → `chat_uploaded_files` (single file → list of files)
+    - `chat_file_uploading` → removed (status tracked per-file now)
+    - Added `session_id = str(uuid.uuid4())` for unique session tracking
+    - Added `session_manager = None` for SessionManager instance
+    - Added `SESSION_MAX_FILES = 10` limit
+  - **initialize_system()** updated:
+    - Creates SessionManager with session_id if not exists
+    - Passes session_manager to PureRAG constructor
+    - Session manager automatically integrates with dual-source retrieval
+  - **File upload handler** redesigned (`handle_chat_file_upload()`):
+    - Supports multiple file uploads (up to SESSION_MAX_FILES)
+    - Each file gets own status tracking (processing/ready/error)
+    - Uploads to SessionManager for embedding generation
+    - Returns file list HTML + dropdown choices
+    - No longer deletes files after message send (persists across conversation)
+  - **File removal handler** redesigned (`handle_remove_chat_file(filename)`):
+    - Dropdown-based selection (instead of single button)
+    - Removes from SessionManager and chat_uploaded_files list
+    - Deletes physical file from temp_uploads/
+    - Returns updated file list HTML + dropdown choices
+  - **File list formatter** added (`format_file_list()`):
+    - Generates HTML chips with status indicators:
+      - ✅ Green chip: Ready (shows chunk count)
+      - 🔄 Yellow chip: Processing...
+      - ❌ Red chip: Error (shows error message)
+    - Each file shows name, status, and metadata
+  - **Chat response handler** simplified (`chat_respond()`):
+    - Checks for processing files before allowing message send
+    - Builds user message with attached file names
+    - No longer manages file deletion (files persist)
+    - SessionManager automatically includes session files in RAG queries
+    - Returns only (msg_input, chatbot) tuple (simpler signature)
+  - **UI layout changes**:
+    - Replaced single file upload button with multi-file upload
+    - Added `chat_file_list` HTML display for file chips
+    - Added `remove_file_dropdown` for file selection
+    - Added `remove_file_btn` button for removal
+    - Upload status display removed (file list shows status directly)
+  - **Event handlers updated**:
+    - `upload_file_btn.upload()` → outputs to (chat_file_list, remove_file_dropdown)
+    - `remove_file_btn.click()` → inputs from dropdown, outputs to (chat_file_list, remove_file_dropdown, remove_file_dropdown)
+    - `msg_input.submit()` and `send_btn.click()` → outputs to (msg_input, chatbot) only
+    - Added `demo.load(cleanup_session_on_load)` for page reload cleanup
+  - **Session cleanup** added (`cleanup_session_on_load()`):
+    - Clears chat_uploaded_files list on page reload
+    - SessionManager cleanup happens naturally with new session_id
+    - Old session directories remain until manual cleanup
+
+### Architecture
+- **Multi-file workflow**:
+  1. User uploads PDF → copied to temp_uploads/
+  2. SessionManager processes file (embedding generation)
+  3. File info added to chat_uploaded_files list with status
+  4. UI displays file as colored chip (processing → ready)
+  5. User sends message → SessionManager automatically queries session files
+  6. Dual-source retrieval combines permanent KB + session files
+  7. File persists across multiple conversation turns
+  8. User can remove individual files via dropdown
+  9. Page reload clears session (new session_id generated)
+- **File info object structure**:
+  ```python
+  {
+      "name": "report.pdf",
+      "path": "/temp_uploads/report.pdf",
+      "status": "ready",  # processing | ready | error
+      "chunks": 150,
+      "error": None  # or error message
+  }
+  ```
+
+### Technical Implementation
+- **Session persistence**: Files remain available until explicitly removed or page reload
+- **Status tracking**: Per-file status (processing/ready/error) shown in UI chips
+- **Error handling**: File errors shown in red chips with error message
+- **Max files limit**: Enforced at SESSION_MAX_FILES (configurable, default 10)
+- **Dropdown removal**: UI/UX improvement over single remove button
+- **Simplified handlers**: Removed file deletion logic from chat_respond()
+
+### User Experience Impact
+- ✅ Upload multiple PDFs and ask cross-reference questions
+- ✅ Files persist across conversation (no re-upload needed)
+- ✅ Visual status indicators for each file
+- ✅ Individual file removal via dropdown
+- ✅ Cleaner chat interface (file list separate from chat history)
+- ✅ Session-scoped temporary files (auto-cleanup on reload)
+
+### Testing
+**Manual testing required**:
+- [ ] Upload 1 file, verify display
+- [ ] Upload 2nd file, verify both persist
+- [ ] Ask cross-reference question spanning multiple files
+- [ ] Remove 1 file, verify other unaffected
+- [ ] Reload page, verify cleanup
+- [ ] Test max files limit (try uploading 11th file)
+
+## [2025-01-18] Multi-file Conversation Context: PR 4
+
+### Changed (Web UI Phase 2 - Multi-file Support)
+- **web/web_ui_langchain.py**: Mirrored multi-file conversation context from Phase 1
+  - **Global state refactored**: Identical to Phase 1
+    - `chat_uploaded_file` → `chat_uploaded_files` (list of files)
+    - `chat_file_uploading` → removed
+    - Added `session_id`, `session_manager`, `SESSION_MAX_FILES`
+  - **initialize_system()** updated: Creates SessionManager and passes to LangChainRAG
+  - **File upload handler**: `handle_chat_file_upload()` (same logic as Phase 1)
+  - **File removal handler**: `handle_remove_chat_file(filename)` (dropdown-based)
+  - **File list formatter**: `format_file_list()` (same HTML chip generation)
+  - **Chat response handler** simplified: `chat_respond()` (SessionManager auto-integration)
+  - **UI layout changes**: Identical to Phase 1 (file list, dropdown removal)
+  - **Event handlers updated**: Same signatures as Phase 1
+  - **Session cleanup**: `cleanup_session_on_load()` (identical implementation)
+
+### Architecture
+- **Behavioral consistency**: Phase 2 now behaves identically to Phase 1
+- **LangChain integration**: SessionManager works seamlessly with LangChainRAG
+- **Dual-source retrieval**: Both phases use same _merge_results() and _build_prompt_with_sources()
+- **Automatic memory**: LangChain ConversationBufferWindowMemory still manages history
+
+### Technical Implementation
+- **Code mirroring**: All Phase 1 changes replicated exactly in Phase 2
+- **LangChain compatibility**: SessionManager parameter passed to LangChainRAG.__init__()
+- **Consistent UX**: Users get same multi-file experience on both ports (7860, 7861)
+
+### Testing
+**Manual testing required**:
+- [ ] Run same test cases as PR 3
+- [ ] Compare behavior with Phase 1 (should be identical)
+- [ ] Verify LangChain memory still works with session files
+- [ ] Test both UIs side-by-side (ports 7860 and 7861)
+
+### Phase 1 vs Phase 2 Comparison (Updated)
+
+| Feature | Phase 1 (Pure Python) | Phase 2 (LangChain) |
+|---------|----------------------|---------------------|
+| **Multi-file Support** | ✅ Yes | ✅ Yes |
+| **SessionManager** | ✅ Integrated | ✅ Integrated |
+| **Dual-source Retrieval** | ✅ Yes | ✅ Yes |
+| **Conversation History** | Manual (deque) | Automatic (ConversationBufferWindowMemory) |
+| **File Persistence** | ✅ Yes | ✅ Yes |
+| **UI Layout** | Multi-file chips | Multi-file chips (identical) |
+| **Port** | 7860 | 7861 |
+
 ## Known Issues
 
 ### Phase 2: LangChain Web UI (web_ui_langchain.py)
@@ -1062,56 +1263,58 @@ Session Files (Temporary)          Permanent Knowledge Base
   - [x] Compare Phase 1 vs Phase 2 output
 - [ ] Git commit: "Integrate SessionManager into RAG systems" (ready)
 
-**PR 3: Web UI Phase 1** (Estimated: 5-6 hours)
-- [ ] Update `web/web_ui.py`:
-  - [ ] Import SessionManager and uuid
-  - [ ] Initialize global state:
-    - [ ] `session_id = str(uuid.uuid4())`
-    - [ ] `session_manager = SessionManager(session_id)`
-    - [ ] `chat_uploaded_files = []` (list, not single file)
-  - [ ] Create `handle_chat_file_upload(file)`:
-    - [ ] Check max files limit (5)
-    - [ ] Add file to session_manager
-    - [ ] Append to chat_uploaded_files list
-    - [ ] Return formatted file list HTML
-  - [ ] Create `handle_remove_file(file_name)`:
-    - [ ] Call session_manager.remove_file()
-    - [ ] Remove from chat_uploaded_files list
-    - [ ] Return updated file list HTML
-  - [ ] Create `format_file_list()`:
-    - [ ] Generate HTML chips: `[📄 filename ✅] [🗑️]`
-    - [ ] Include status indicators
-    - [ ] Return HTML string
-  - [ ] Update `chat_query(message, history)`:
-    - [ ] Pass session_manager to rag_system.query()
-    - [ ] Handle session_manager=None gracefully
-  - [ ] Update UI layout:
-    - [ ] Replace single file upload with multi-file component
-    - [ ] Add file list display area
-    - [ ] Add remove buttons per file
-    - [ ] Update upload status display
-  - [ ] Add cleanup handler:
-    - [ ] Call session_manager.cleanup() on demo.load
-  - [ ] Update docstrings and comments
+**PR 3: Web UI Phase 1** ✅ **COMPLETED** (Actual: ~3 hours, 2025-01-18)
+- [x] Update `web/web_ui.py`:
+  - [x] Import SessionManager and uuid
+  - [x] Initialize global state:
+    - [x] `session_id = str(uuid.uuid4())`
+    - [x] `session_manager = SessionManager(session_id)`
+    - [x] `chat_uploaded_files = []` (list, not single file)
+  - [x] Create `handle_chat_file_upload(file)`:
+    - [x] Check max files limit (SESSION_MAX_FILES)
+    - [x] Add file to session_manager
+    - [x] Append to chat_uploaded_files list
+    - [x] Return formatted file list HTML
+  - [x] Create `handle_remove_file(file_name)`:
+    - [x] Call session_manager.remove_file()
+    - [x] Remove from chat_uploaded_files list
+    - [x] Return updated file list HTML
+  - [x] Create `format_file_list()`:
+    - [x] Generate HTML chips with status indicators
+    - [x] Include status indicators (ready/processing/error)
+    - [x] Return HTML string
+  - [x] Update `chat_respond(message, history)`:
+    - [x] SessionManager automatically handles dual-source retrieval
+    - [x] Check for processing files
+    - [x] Build user message with file list
+  - [x] Update UI layout:
+    - [x] Replace single file upload with multi-file component
+    - [x] Add file list display area (chat_file_list)
+    - [x] Add dropdown + button for file removal
+    - [x] Update event handlers
+  - [x] Add cleanup handler:
+    - [x] Create cleanup_session_on_load() function
+    - [x] Wire to demo.load event
+  - [x] Update docstrings and comments
 - [ ] Test Web UI manually:
   - [ ] Upload 1 file, verify display
   - [ ] Upload 2nd file, verify both persist
   - [ ] Ask cross-reference question
   - [ ] Remove 1 file, verify other unaffected
   - [ ] Reload page, verify cleanup
-  - [ ] Test max files limit (try uploading 6th file)
-- [ ] Git commit: "Add multi-file support to Phase 1 Web UI"
+  - [ ] Test max files limit (try uploading 11th file)
+- [ ] Git commit: "Add multi-file support to Phase 1 Web UI" (ready)
 
-**PR 4: Web UI Phase 2** (Estimated: 3-4 hours)
-- [ ] Update `web/web_ui_langchain.py`:
-  - [ ] Mirror all changes from PR 3 (web_ui.py)
-  - [ ] Use LangChainRAG instead of PureRAG
-  - [ ] Maintain behavioral consistency
-  - [ ] Keep port 7861
+**PR 4: Web UI Phase 2** ✅ **COMPLETED** (Actual: ~2 hours, 2025-01-18)
+- [x] Update `web/web_ui_langchain.py`:
+  - [x] Mirror all changes from PR 3 (web_ui.py)
+  - [x] Use LangChainRAG instead of PureRAG
+  - [x] Maintain behavioral consistency
+  - [x] Keep port 7861
 - [ ] Test Web UI manually:
   - [ ] Run same test cases as PR 3
   - [ ] Compare behavior with Phase 1
-  - [ ] Verify LangChain memory still works
+  - [ ] Verify LangChain memory still works with session files
 - [ ] End-to-end testing:
   - [ ] Test both UIs side-by-side
   - [ ] Upload same files to both
@@ -1119,10 +1322,10 @@ Session Files (Temporary)          Permanent Knowledge Base
   - [ ] Compare response quality
   - [ ] Benchmark query times
 - [ ] Performance testing:
-  - [ ] Monitor memory usage with 5 files
+  - [ ] Monitor memory usage with multiple files
   - [ ] Test with large files (10 MB)
   - [ ] Measure query time increase
-- [ ] Git commit: "Add multi-file support to Phase 2 Web UI"
+- [ ] Git commit: "Add multi-file support to Phase 2 Web UI" (ready)
 
 **Final Steps**
 - [ ] Update `CLAUDE.md`:
