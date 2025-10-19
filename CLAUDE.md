@@ -335,16 +335,24 @@ AI: [Uses exact metadata match for CVE ID, falls back to semantic search if not 
 - **Status**: Both Phase 1 and Phase 2 now provide comparable response quality
 - **Testing**: Real-world validation recommended (see `docs/PROGRESS.md` for technical details)
 
-#### Current Limitations
+#### Multi-File Conversation Context
 
-**Chat File Upload (Left Panel)**:
-- **Single file mode**: Uploading a new file replaces the previous one
-- Files are deleted after sending message or manual removal
-- No persistence across conversation turns
-- **Planned improvement**: Multi-file conversation context (see `docs/PROGRESS.md` - "Upcoming Features")
-  - Future: Retain multiple files in conversation session
-  - Future: Generate temporary embeddings without persisting to Chroma
-  - Future: Query both permanent KB and session files simultaneously
+**Chat File Upload (Left Panel)** - ✅ **Supported** (as of v2):
+- **Multi-file support**: Upload multiple files across conversation turns, all files retained in session
+- **Session-scoped embeddings**: Files automatically embedded in temporary Chroma collection (`session_{uuid}`)
+- **Dual-source retrieval**: Queries search both session files and permanent knowledge base
+- **UI behavior**:
+  - Upload display shows current file only (last uploaded)
+  - Remove button available before sending message
+  - After sending, UI clears but SessionManager retains all uploaded files
+- **Configuration**: Set `ENABLE_SESSION_AUTO_EMBED=False` in `.env` to disable auto-embedding (use old behavior)
+
+**Example workflow**:
+```
+1. Upload report_A.pdf → Send "Question 1"  (SessionManager: {A})
+2. Upload report_B.pdf → Send "Question 2"  (SessionManager: {A, B})
+3. Send "Question 3" (no file)              (Searches: A + B + KB)
+```
 
 **Knowledge Base Upload (Right Panel)**:
 - Files are permanently added with embeddings stored in Chroma
