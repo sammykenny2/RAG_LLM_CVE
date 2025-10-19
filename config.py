@@ -88,6 +88,11 @@ SESSION_MAX_FILES = int(os.getenv('SESSION_MAX_FILES', '5'))
 SESSION_MAX_FILE_SIZE_MB = int(os.getenv('SESSION_MAX_FILE_SIZE_MB', '10'))
 SESSION_TIMEOUT_HOURS = int(os.getenv('SESSION_TIMEOUT_HOURS', '1'))
 
+# Backward compatibility: control whether uploaded files are auto-embedded
+# True: Uploaded files are automatically embedded and searchable in RAG queries (new behavior)
+# False: Uploaded files only used for special commands like summarize/validate (old behavior)
+ENABLE_SESSION_AUTO_EMBED = os.getenv('ENABLE_SESSION_AUTO_EMBED', 'True').lower() == 'true'
+
 # Validate session configuration
 assert SESSION_MAX_FILES > 0 and SESSION_MAX_FILES <= 10, f"SESSION_MAX_FILES must be 1-10, got {SESSION_MAX_FILES}"
 assert SESSION_MAX_FILE_SIZE_MB > 0 and SESSION_MAX_FILE_SIZE_MB <= 50, f"SESSION_MAX_FILE_SIZE_MB must be 1-50, got {SESSION_MAX_FILE_SIZE_MB}"
@@ -231,6 +236,7 @@ def print_config():
     print(f"  SESSION_MAX_FILES: {SESSION_MAX_FILES}")
     print(f"  SESSION_MAX_FILE_SIZE_MB: {SESSION_MAX_FILE_SIZE_MB}")
     print(f"  SESSION_TIMEOUT_HOURS: {SESSION_TIMEOUT_HOURS}")
+    print(f"  ENABLE_SESSION_AUTO_EMBED: {ENABLE_SESSION_AUTO_EMBED}")
 
     print("\nAdvanced:")
     print(f"  VERBOSE_LOGGING: {VERBOSE_LOGGING}")

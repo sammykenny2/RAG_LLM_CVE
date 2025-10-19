@@ -882,6 +882,7 @@ Detailed plan available in `IMPLEMENTATION_PLAN.md` (root directory).
 SESSION_MAX_FILES=5
 SESSION_MAX_FILE_SIZE_MB=10
 SESSION_TIMEOUT_HOURS=1
+ENABLE_SESSION_AUTO_EMBED=True  # Backward compatibility control
 ```
 
 **Constraints**:
@@ -889,6 +890,18 @@ SESSION_TIMEOUT_HOURS=1
 - Max 10 MB per file
 - Session timeout: 1 hour
 - Automatic cleanup on page reload
+
+**Backward Compatibility** (2025-01-19):
+- **Problem**: v2 auto-embeds uploaded files (different from main branch behavior)
+- **Solution**: `ENABLE_SESSION_AUTO_EMBED` configuration flag
+  - `True` (default): New behavior - files auto-embedded and searchable
+  - `False`: Old behavior - files only for special commands (summarize/validate)
+- **Implementation**: Flag check in `web_ui.py` and `web_ui_langchain.py`
+  ```python
+  if session_manager and ENABLE_SESSION_AUTO_EMBED:
+      file_info = session_manager.add_file(str(dest_path))
+  ```
+- **Benefits**: Non-breaking change, gradual migration, easy testing
 
 ### Success Criteria
 
@@ -924,18 +937,20 @@ SESSION_TIMEOUT_HOURS=1
 - ✅ Phase 3: RAG integration (rag/pure_python.py, rag/langchain_impl.py)
 - ✅ Phase 4-5: Web UI integration (web/web_ui.py, web/web_ui_langchain.py)
 - ✅ Phase 6: Documentation update (this file)
+- ✅ Phase 7: Backward compatibility flag (ENABLE_SESSION_AUTO_EMBED)
 
-**Total Commits**: 4
+**Total Commits**: 5
 - `11ebc05`: Phase 1 planning
 - `382b792`: Phase 2 SessionManager core
 - `c2033ad`: Phase 3 RAG dual-source retrieval
 - `9d2f8b4`: Phase 4-5 Web UI integration
+- (pending): Phase 7 Backward compatibility control
 
-**Files Changed**: 10 files, +1,900 lines
+**Files Changed**: 12 files, +1,950 lines
 - Core: config.py, .env.example, core/session_manager.py
 - RAG: rag/pure_python.py, rag/langchain_impl.py
 - Web: web/web_ui.py, web/web_ui_langchain.py
-- Docs: IMPLEMENTATION_PLAN.md, PROGRESS.md
+- Docs: IMPLEMENTATION_PLAN.md, PROGRESS.md (this file)
 
 ## Upcoming Features
 

@@ -31,7 +31,8 @@ from config import (
     DEFAULT_SCHEMA,
     CHUNK_SIZE,
     EMBEDDING_BATCH_SIZE,
-    EMBEDDING_PRECISION
+    EMBEDDING_PRECISION,
+    ENABLE_SESSION_AUTO_EMBED
 )
 
 # =============================================================================
@@ -350,8 +351,8 @@ def handle_chat_file_upload(file):
         # Update global state
         chat_uploaded_file = str(dest_path)
 
-        # Add file to SessionManager for multi-file context
-        if session_manager:
+        # Add file to SessionManager for multi-file context (if enabled)
+        if session_manager and ENABLE_SESSION_AUTO_EMBED:
             try:
                 file_info = session_manager.add_file(str(dest_path))
                 print(f"✅ File added to session: {file_name} ({file_info['chunks']} chunks)")
@@ -361,7 +362,7 @@ def handle_chat_file_upload(file):
         chat_file_uploading = False
 
         # Show success status with file count
-        file_count = len(session_manager.files) if session_manager else 1
+        file_count = len(session_manager.files) if (session_manager and ENABLE_SESSION_AUTO_EMBED) else 1
         success_html = f"""
         <div style='padding: 10px; background-color: #d4edda; border-radius: 5px; border-left: 4px solid #28a745;'>
             <p style='margin: 0;'><b>📄 {file_name}</b></p>

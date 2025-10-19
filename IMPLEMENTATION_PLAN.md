@@ -125,7 +125,36 @@ else:
 - ✅ No score comparison issues
 - ✅ Clear, predictable behavior
 
-#### 3. **File Metadata Schema**
+#### 3. **Backward Compatibility Control**
+
+**Problem**: v2 introduces auto-embedding behavior that differs from main branch:
+- **Main branch**: Uploaded files only used for special commands (summarize/validate)
+- **Feature branch v2**: Uploaded files automatically embedded and searchable in all RAG queries
+
+**Solution**: Configuration flag `ENABLE_SESSION_AUTO_EMBED`
+```python
+# config.py
+ENABLE_SESSION_AUTO_EMBED = os.getenv('ENABLE_SESSION_AUTO_EMBED', 'True').lower() == 'true'
+
+# web_ui.py and web_ui_langchain.py
+if session_manager and ENABLE_SESSION_AUTO_EMBED:
+    file_info = session_manager.add_file(str(dest_path))  # Auto-embed
+else:
+    # Only store file path, no embedding (old behavior)
+    chat_uploaded_file = str(dest_path)
+```
+
+**Configuration**:
+- `ENABLE_SESSION_AUTO_EMBED=True` (default): New behavior - multi-file conversation context
+- `ENABLE_SESSION_AUTO_EMBED=False`: Old behavior - explicit commands only
+
+**Benefits**:
+- ✅ Non-breaking change for users who prefer old behavior
+- ✅ Enables gradual migration
+- ✅ Clear documentation of behavior difference
+- ✅ Easy to toggle for testing
+
+#### 4. **File Metadata Schema**
 
 ```python
 # Stored in Chroma metadata
