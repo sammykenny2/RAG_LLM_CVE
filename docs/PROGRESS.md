@@ -955,33 +955,8 @@ ENABLE_SESSION_AUTO_EMBED=True  # Backward compatibility control
 ## Upcoming Features
 
 ### Planned Optimizations
-- [ ] **Multi-file conversation context** (High Priority)
-  - Allow chat interface to retain multiple uploaded files across conversation
-  - Current limitation: New file upload clears previous file
-  - Use case: User uploads File A, asks questions, then uploads File B but needs to reference File A
-  - Technical challenges:
-    - **File management**: Maintain list of active files in conversation session
-    - **Temporary embeddings**: Generate embeddings for uploaded files without persisting to Chroma
-      - Option 1: In-memory embeddings (fast, memory-intensive)
-      - Option 2: Session-scoped temporary Chroma collection (persistent across chat, deleted on exit)
-    - **RAG workflow refactor**:
-      - Dual-source retrieval: Query both KB (permanent) and session files (temporary)
-      - Merge and rank results from multiple sources
-      - File-aware context: Track which file each retrieved chunk comes from
-    - **LLM prompt engineering**:
-      - Include file provenance in context ("From File A: ...", "From File B: ...")
-      - Manage context window limits with multiple file contents
-      - Smart truncation when files exceed token budget
-    - **UI/UX considerations**:
-      - Display list of active files in conversation
-      - Allow individual file removal
-      - Clear visual indication of which files are in context
-  - Implementation approach:
-    1. Replace single `chat_uploaded_file` with `chat_uploaded_files[]` list
-    2. Create `TemporaryEmbeddingManager` class for session-scoped embeddings
-    3. Refactor `rag_system.query()` to accept `session_sources` parameter
-    4. Update prompt templates to include file provenance metadata
-    5. Add file list UI component with remove buttons
+- [x] **Multi-file conversation context** ✅ **COMPLETED** (v2 implementation on `feature/multi-file-conversation-v2`)
+  - See "[2025-01] Multi-File Conversation Context v2 (Completed)" section above for details
   - Expected impact: More natural multi-turn conversations with multiple documents
 - [ ] Parallel CVE lookups (if memory permits)
 - [ ] Progress bars for long-running operations
