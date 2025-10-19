@@ -764,6 +764,165 @@ RAG_LLM_CVE/
   - ✅ Hybrid search working correctly
   - ✅ Natural language intent detection tested
 
+## [2025-01] Multi-File Conversation Context v2 (In Progress)
+
+### Status: Planning Phase Complete
+
+**Feature Branch**: `feature/multi-file-conversation-v2`
+**Created**: 2025-01-19
+**Estimated Timeline**: 9-15 hours
+
+### Background
+
+This is the second attempt at implementing multi-file conversation context. The first attempt (commits feac1cc to 5acf4fb) was successfully implemented but reverted (commit 097f0f2) due to architectural issues discovered during testing.
+
+**v1 Timeline** (2025-10-18):
+- 12:19 - Planning complete
+- 12:51 - PR 1: SessionManager complete
+- 13:05 - PR 2: RAG integration complete
+- 14:28 - Bug fix 1: Restore special commands
+- 14:36 - Bug fix 2: Fix score priority issue
+- 00:25 (next day) - **Reverted entire feature** (-2,348 lines)
+
+**Lessons Learned from v1**:
+1. ❌ Too aggressive timeline (2 hours for 2 PRs)
+2. ❌ Architecture flaw: Fixed score=1.0 caused KB to always win over session files
+3. ❌ Insufficient UI/UX planning
+4. ❌ Lack of incremental validation
+5. ✅ But: Complete test coverage, detailed documentation, fast iteration
+
+### v2 Improvements
+
+**Key Changes**:
+1. ✅ **Fixed architecture**: Session-first, KB-supplement (eliminates score comparison)
+2. ✅ **Smaller phases**: 6 phases instead of 4 PRs
+3. ✅ **Validation gates**: Each phase must pass tests before next phase
+4. ✅ **Conservative timeline**: 15 hours vs. 2.5 hours in v1
+5. ✅ **UI/UX planning**: Mockups and interaction flow designed upfront
+
+**Architecture Solution**:
+```python
+# v1 approach (BROKEN)
+kb_results = query_kb(top_k=3)        # score=1.0 (fixed)
+session_results = query_session(top_k=2)  # score=0.0-1.0 (real)
+merged.sort(by_score)  # KB always wins ❌
+
+# v2 approach (FIXED)
+session_results = query_session(top_k=5)  # Priority 1
+if len(session_results) >= 5:
+    return session_results  # Session only ✅
+else:
+    kb_results = query_kb(top_k=5-len(session_results))
+    return session_results + kb_results  # Session first ✅
+```
+
+### Implementation Plan
+
+Detailed plan available in `IMPLEMENTATION_PLAN.md` (root directory).
+
+**Phase 1: Planning & Architecture** (1-2 hours) ✅ COMPLETE
+- ✅ Create detailed implementation plan
+- ✅ Design improved architecture
+- ✅ Update PROGRESS.md
+
+**Phase 2: SessionManager Core** (2-3 hours) 🔄 NEXT
+- Step 2.1: Basic SessionManager class
+- Step 2.2: Chroma integration
+- Step 2.3: File removal & config
+- Validation: All unit tests pass
+
+**Phase 3: RAG Integration** (2-3 hours)
+- Step 3.1: Backward-compatible query() modification
+- Step 3.2: Dual-source retrieval logic
+- Step 3.3: Mirror in LangChainRAG
+- Validation: Backward compatibility verified, dual-source correct
+
+**Phase 4: Web UI Basic** (2-3 hours)
+- Step 4.1: UI layout & state management
+- Step 4.2: File upload handler (accumulation)
+- Step 4.3: Chat integration
+- Validation: Multi-file upload works, queries search across files
+
+**Phase 5: Web UI Advanced** (1-2 hours)
+- Step 5.1: Individual file removal
+- Step 5.2: Session cleanup on reload
+- Step 5.3: File status indicators
+- Validation: Removal works, cleanup works, no resource leaks
+
+**Phase 6: Documentation & Testing** (1-2 hours)
+- Step 6.1: Update CLAUDE.md
+- Step 6.2: Update PROGRESS.md
+- Step 6.3: End-to-end testing
+- Step 6.4: Performance testing
+- Validation: All tests pass, ready for merge
+
+### Technical Specifications
+
+**Session-Scoped Chroma Collection**:
+- Collection name: `session_{uuid}`
+- Location: `{CHROMA_DB_PATH}/session_{uuid}/`
+- Lifetime: Until cleanup() or timeout (1 hour)
+
+**File Metadata Schema**:
+```python
+{
+    "source_type": "session",
+    "source_name": "report_A.pdf",
+    "session_id": "abc123",
+    "chunk_index": 42,
+    "added_date": "2025-01-19T10:30:00",
+    "file_size_mb": 2.5,
+    "precision": "float16"
+}
+```
+
+**Configuration** (.env):
+```bash
+SESSION_MAX_FILES=5
+SESSION_MAX_FILE_SIZE_MB=10
+SESSION_TIMEOUT_HOURS=1
+```
+
+**Constraints**:
+- Max 5 files per session
+- Max 10 MB per file
+- Session timeout: 1 hour
+- Automatic cleanup on page reload
+
+### Success Criteria
+
+**Functional**:
+- [ ] Upload up to 5 PDF files per session
+- [ ] Queries search across all uploaded files
+- [ ] Individual file removal
+- [ ] Session cleanup on reload
+- [ ] Backward compatible (no files = KB only)
+
+**Non-Functional**:
+- [ ] Query latency: <2x overhead
+- [ ] Memory: <500 MB per session
+- [ ] Cleanup: <5 seconds
+- [ ] No resource leaks
+
+**Quality**:
+- [ ] All tests pass (unit, integration, E2E)
+- [ ] Code coverage >80%
+- [ ] Documentation complete
+
+### Current Status (2025-01-19)
+
+**Completed**:
+- ✅ Phase 1: Planning complete
+- ✅ IMPLEMENTATION_PLAN.md created (detailed roadmap)
+- ✅ Architecture designed (fixes v1 score issue)
+- ✅ PROGRESS.md updated
+
+**Next Steps**:
+- 🔄 Phase 2, Step 2.1: Create basic SessionManager class
+- Target: Complete Phase 2 within 2-3 hours
+
+**Estimated Completion**: 9-15 hours from start (conservative estimate)
+
 ## Upcoming Features
 
 ### Planned Optimizations
