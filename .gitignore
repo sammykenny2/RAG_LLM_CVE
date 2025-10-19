@@ -53,8 +53,8 @@ MANIFEST
 
 # Project specific
 # Temporary upload directories (web UI)
-temp_uploads/   # Chat file uploads (temporary, no embeddings)
-kb_uploads/     # Knowledge base file uploads (backup, with embeddings)
+temp_uploads/
+kb_uploads/
 # Generated CVE description files (root directory only, not output/)
 /CVEDescription*
 
