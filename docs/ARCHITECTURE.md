@@ -880,6 +880,141 @@ python cli/validate_report.py --speed=fastest
 
 **Trade-off**: Won't catch non-standard CVE mentions (acceptable for official reports).
 
+### Multi-File Conversation Context Architecture
+
+**Feature**: Allows users to upload multiple PDF files in a chat session and query across all files.
+
+#### Core Components
+
+```
+┌─────────────────────────────────────────────────────┐
+│                   Web UI                             │
+│  ┌─────────────┐  ┌──────────────┐  ┌────────────┐ │
+│  │ File Upload │→ │ SessionMgr   │→ │ File List  │ │
+│  └─────────────┘  └──────────────┘  └────────────┘ │
+│         │                                  │         │
+└─────────┼──────────────────────────────────┼─────────┘
+          │                                  │
+          ▼                                  ▼
+  ┌──────────────┐                  ┌──────────────┐
+  │ RAG System   │◄─────────────────│ User Query   │
+  │              │                  └──────────────┘
+  │ query() with │
+  │ session_mgr  │
+  └──────┬───────┘
+         │
+         ├──→ Query Session Files (top_k=5, priority=HIGH)
+         │    └─→ If results >= 5: Use session only
+         │    └─→ Else: Supplement with KB
+         │
+         └──→ Query KB (top_k=remaining, priority=LOW)
+              └─→ Only if session results < 5
+```
+
+#### Session-Scoped Chroma Collection
+
+**Design**:
+```python
+Collection name: f"session_{session_id}"
+Location: {CHROMA_DB_PATH}/session_{session_id}/
+Lifetime: Until cleanup() or timeout (1 hour)
+```
+
+**Pros**:
+- Supports large files (no memory limits)
+- Efficient vector search
+- Consistent with existing architecture
+- Easy cleanup
+
+**Cons**:
+- Disk I/O overhead
+- Requires Chroma instance per session
+
+**Decision**: Use session-scoped collection for consistency and scalability.
+
+#### Priority System: Session First, KB Supplement
+
+**Problem in v1** (reverted):
+```python
+# v1 approach (BROKEN)
+kb_results = query_kb(top_k=3)      # score=1.0 (fixed)
+session_results = query_session(top_k=2)  # score=0.0-1.0 (real)
+merged = kb_results + session_results
+merged.sort(key=lambda x: x['score'], reverse=True)
+# Result: KB always wins due to fixed score=1.0 ❌
+```
+
+**Solution in v2**:
+```python
+# v2 approach (FIXED)
+session_results = query_session(top_k=5)  # Priority 1
+if len(session_results) >= 5:
+    return session_results  # Use session only ✅
+else:
+    remaining = 5 - len(session_results)
+    kb_results = query_kb(top_k=remaining)  # Priority 2
+    return session_results + kb_results  # Session first ✅
+```
+
+**Benefits**:
+- Session files always prioritized
+- KB only used when session insufficient
+- No score comparison issues
+- Clear, predictable behavior
+
+#### Backward Compatibility Control
+
+**Problem**: v2 introduces auto-embedding (different from previous behavior).
+
+**Solution**: `ENABLE_SESSION_AUTO_EMBED` configuration flag
+```python
+# config.py
+ENABLE_SESSION_AUTO_EMBED = os.getenv('ENABLE_SESSION_AUTO_EMBED', 'True').lower() == 'true'
+
+# web_ui.py and web_ui_langchain.py
+if session_manager and ENABLE_SESSION_AUTO_EMBED:
+    file_info = session_manager.add_file(str(dest_path))  # Auto-embed
+else:
+    chat_uploaded_file = str(dest_path)  # Old behavior
+```
+
+**Configuration**:
+- `True` (default): Files auto-embedded and searchable
+- `False`: Files only for special commands (summarize/validate)
+
+#### File Metadata Schema
+
+```python
+# Stored in Chroma metadata
+{
+    "source_type": "session",           # or "permanent" for KB
+    "source_name": "report_A.pdf",      # filename
+    "session_id": "abc123",             # session identifier
+    "chunk_index": 42,                  # chunk number
+    "added_date": "2025-01-19T10:30:00",
+    "file_size_mb": 2.5,                # original file size
+    "precision": "float16"              # embedding precision
+}
+```
+
+#### Session Lifecycle
+
+```
+User opens Web UI
+    ↓
+Generate session_id = uuid.uuid4()
+    ↓
+Initialize SessionManager(session_id)
+    ↓
+User uploads files → add_file() → Store in session collection
+    ↓
+User asks questions → query() → Dual-source retrieval
+    ↓
+User closes browser OR timeout (1 hour)
+    ↓
+cleanup() → Delete collection + temp files
+```
+
 ## Troubleshooting
 
 ### SDPA Warning (fastest)

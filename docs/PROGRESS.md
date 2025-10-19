@@ -819,10 +819,8 @@ else:
 
 ### Implementation Plan
 
-Detailed plan available in `IMPLEMENTATION_PLAN.md` (root directory).
-
 **Phase 1: Planning & Architecture** (1-2 hours) ✅ COMPLETE
-- ✅ Create detailed implementation plan
+- ✅ Create detailed implementation plan (see Decision Log and Architecture section below)
 - ✅ Design improved architecture
 - ✅ Update PROGRESS.md
 
@@ -927,12 +925,11 @@ ENABLE_SESSION_AUTO_EMBED=True  # Backward compatibility control
 
 **Completed**:
 - ✅ Phase 1: Planning complete
-- ✅ IMPLEMENTATION_PLAN.md created (detailed roadmap)
-- ✅ Architecture designed (fixes v1 score issue)
-- ✅ PROGRESS.md updated
+- ✅ Architecture designed (documented in ARCHITECTURE.md and PROGRESS.md)
+- ✅ Documentation updated
 
 **Completed Phases**:
-- ✅ Phase 1: Planning (IMPLEMENTATION_PLAN.md, PROGRESS.md updates)
+- ✅ Phase 1: Planning (Architecture design, PROGRESS.md updates)
 - ✅ Phase 2: SessionManager core (config, core/session_manager.py)
 - ✅ Phase 3: RAG integration (rag/pure_python.py, rag/langchain_impl.py)
 - ✅ Phase 4-5: Web UI integration (web/web_ui.py, web/web_ui_langchain.py)
@@ -950,7 +947,28 @@ ENABLE_SESSION_AUTO_EMBED=True  # Backward compatibility control
 - Core: config.py, .env.example, core/session_manager.py
 - RAG: rag/pure_python.py, rag/langchain_impl.py
 - Web: web/web_ui.py, web/web_ui_langchain.py
-- Docs: IMPLEMENTATION_PLAN.md, PROGRESS.md (this file)
+- Docs: ARCHITECTURE.md, PROGRESS.md (this file), CLAUDE.md
+
+### Decision Log
+
+**Key Decisions**:
+- **Architecture**: Session-first, KB-supplement (fixes v1 score issue)
+- **Timeline**: Conservative 15-hour estimate (vs. 2.5 hours in v1)
+- **Approach**: Incremental with validation gates
+- **File Formats**: PDF only (not expanding scope in v2)
+- **Session Timeout**: Global config only, not per-session
+- **Session Files Display**: Separate from KB panel (temporary vs. permanent)
+
+### Future Enhancements (Not in v2)
+
+Potential improvements for future iterations:
+- Support other file formats (DOCX, TXT, etc.)
+- Per-session timeout configuration
+- Session persistence across browser restarts
+- Session sharing (collaborative mode)
+- File preview before upload
+- Drag-and-drop file upload
+- Batch file upload
 
 ## Upcoming Features
 
