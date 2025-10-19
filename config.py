@@ -81,6 +81,19 @@ GRADIO_SERVER_NAME = os.getenv('GRADIO_SERVER_NAME', '127.0.0.1')
 MAX_FILE_UPLOAD_SIZE_MB = int(os.getenv('MAX_FILE_UPLOAD_SIZE_MB', '50'))
 
 # =============================================================================
+# Session Management Configuration
+# =============================================================================
+
+SESSION_MAX_FILES = int(os.getenv('SESSION_MAX_FILES', '5'))
+SESSION_MAX_FILE_SIZE_MB = int(os.getenv('SESSION_MAX_FILE_SIZE_MB', '10'))
+SESSION_TIMEOUT_HOURS = int(os.getenv('SESSION_TIMEOUT_HOURS', '1'))
+
+# Validate session configuration
+assert SESSION_MAX_FILES > 0 and SESSION_MAX_FILES <= 10, f"SESSION_MAX_FILES must be 1-10, got {SESSION_MAX_FILES}"
+assert SESSION_MAX_FILE_SIZE_MB > 0 and SESSION_MAX_FILE_SIZE_MB <= 50, f"SESSION_MAX_FILE_SIZE_MB must be 1-50, got {SESSION_MAX_FILE_SIZE_MB}"
+assert SESSION_TIMEOUT_HOURS > 0, f"SESSION_TIMEOUT_HOURS must be positive, got {SESSION_TIMEOUT_HOURS}"
+
+# =============================================================================
 # Advanced Configuration
 # =============================================================================
 
@@ -213,6 +226,11 @@ def print_config():
     print(f"  GRADIO_SHARE: {GRADIO_SHARE}")
     print(f"  GRADIO_SERVER_NAME: {GRADIO_SERVER_NAME}")
     print(f"  MAX_FILE_UPLOAD_SIZE_MB: {MAX_FILE_UPLOAD_SIZE_MB}")
+
+    print("\nSession Management:")
+    print(f"  SESSION_MAX_FILES: {SESSION_MAX_FILES}")
+    print(f"  SESSION_MAX_FILE_SIZE_MB: {SESSION_MAX_FILE_SIZE_MB}")
+    print(f"  SESSION_TIMEOUT_HOURS: {SESSION_TIMEOUT_HOURS}")
 
     print("\nAdvanced:")
     print(f"  VERBOSE_LOGGING: {VERBOSE_LOGGING}")
