@@ -19,8 +19,10 @@ from rag.pure_python import PureRAG, ConversationHistory
 from core.chroma_manager import ChromaManager
 from core.embeddings import EmbeddingModel
 from core.pdf_processor import PDFProcessor
+from core.session_manager import SessionManager
 import re
 import numpy as np
+import uuid
 
 # Import configuration
 from config import (
@@ -77,13 +79,15 @@ def split_sentences(text):
 rag_system = None
 chroma_manager = None
 embedding_model = None
+session_manager = None  # SessionManager for multi-file context
+session_id = str(uuid.uuid4())  # Unique session ID
 
 # Track current settings
 current_speed = DEFAULT_SPEED
 current_mode = DEFAULT_MODE
 
 # Track uploaded files
-chat_uploaded_file = None  # Left side: for chat validation
+chat_uploaded_file = None  # Left side: for chat validation (current file display)
 chat_file_uploading = False  # Left side upload status
 kb_uploaded_file = None  # Right side: for knowledge base
 kb_file_uploading = False  # Right side upload status
@@ -98,7 +102,7 @@ KB_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 def initialize_system(speed_level: str = DEFAULT_SPEED, force_reload: bool = False):
     """Initialize RAG system based on speed level."""
-    global rag_system, chroma_manager, embedding_model, current_speed
+    global rag_system, chroma_manager, embedding_model, current_speed, session_manager
 
     if rag_system is not None and not force_reload:
         return f"⚠️ System already initialized with speed={current_speed}"
@@ -115,8 +119,13 @@ def initialize_system(speed_level: str = DEFAULT_SPEED, force_reload: bool = Fal
     use_fp16 = speed_level in ['fast', 'fastest']
     use_sdpa = speed_level == 'fastest'
 
-    # Initialize RAG
-    rag_system = PureRAG()
+    # Initialize SessionManager for multi-file context
+    if session_manager is None:
+        session_manager = SessionManager(session_id=session_id)
+        print(f"✅ SessionManager initialized (session_id={session_id[:8]}...)")
+
+    # Initialize RAG with session_manager
+    rag_system = PureRAG(session_manager=session_manager)
     rag_system.initialize(use_fp16=use_fp16, use_sdpa=use_sdpa)
 
     # Get references for knowledge base management
@@ -362,13 +371,23 @@ def handle_chat_file_upload(file):
 
         # Update global state
         chat_uploaded_file = str(dest_path)
+
+        # Add file to SessionManager for multi-file context
+        if session_manager:
+            try:
+                file_info = session_manager.add_file(str(dest_path))
+                print(f"✅ File added to session: {file_name} ({file_info['chunks']} chunks)")
+            except Exception as e:
+                print(f"⚠️ Failed to add file to session: {e}")
+
         chat_file_uploading = False
 
-        # Show success status
+        # Show success status with file count
+        file_count = len(session_manager.files) if session_manager else 1
         success_html = f"""
         <div style='padding: 10px; background-color: #d4edda; border-radius: 5px; border-left: 4px solid #28a745;'>
             <p style='margin: 0;'><b>📄 {file_name}</b></p>
-            <p style='margin: 5px 0 0 0; color: #155724;'>✅ Ready</p>
+            <p style='margin: 5px 0 0 0; color: #155724;'>✅ Ready (Session: {file_count} file{'s' if file_count != 1 else ''})</p>
         </div>
         """
 

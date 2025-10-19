@@ -16,8 +16,10 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 # Import LangChain RAG
 from rag.langchain_impl import LangChainRAG
+from core.session_manager import SessionManager
 import re
 import numpy as np
+import uuid
 
 # Import configuration
 from config import (
@@ -63,13 +65,15 @@ def split_sentences(text):
 
 # Initialize RAG system (singleton)
 rag_system = None
+session_manager = None  # SessionManager for multi-file context
+session_id = str(uuid.uuid4())  # Unique session ID
 
 # Track current settings
 current_speed = DEFAULT_SPEED
 current_mode = DEFAULT_MODE
 
 # Track uploaded files
-chat_uploaded_file = None  # Left side: for chat validation
+chat_uploaded_file = None  # Left side: for chat validation (current file display)
 chat_file_uploading = False  # Left side upload status
 
 # Upload directories
@@ -82,7 +86,7 @@ KB_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 def initialize_system(speed_level: str = DEFAULT_SPEED, force_reload: bool = False):
     """Initialize LangChain RAG system based on speed level."""
-    global rag_system, current_speed
+    global rag_system, current_speed, session_manager
 
     if rag_system is not None and not force_reload:
         return f"⚠️ System already initialized with speed={current_speed}"
@@ -99,8 +103,13 @@ def initialize_system(speed_level: str = DEFAULT_SPEED, force_reload: bool = Fal
     use_fp16 = speed_level in ['fast', 'fastest']
     use_sdpa = speed_level == 'fastest'
 
-    # Initialize LangChain RAG
-    rag_system = LangChainRAG()
+    # Initialize SessionManager for multi-file context
+    if session_manager is None:
+        session_manager = SessionManager(session_id=session_id)
+        print(f"✅ SessionManager initialized (session_id={session_id[:8]}...)")
+
+    # Initialize LangChain RAG with session_manager
+    rag_system = LangChainRAG(session_manager=session_manager)
     rag_system.initialize(use_fp16=use_fp16, use_sdpa=use_sdpa)
 
     # Update current speed
@@ -340,13 +349,23 @@ def handle_chat_file_upload(file):
 
         # Update global state
         chat_uploaded_file = str(dest_path)
+
+        # Add file to SessionManager for multi-file context
+        if session_manager:
+            try:
+                file_info = session_manager.add_file(str(dest_path))
+                print(f"✅ File added to session: {file_name} ({file_info['chunks']} chunks)")
+            except Exception as e:
+                print(f"⚠️ Failed to add file to session: {e}")
+
         chat_file_uploading = False
 
-        # Show success status
+        # Show success status with file count
+        file_count = len(session_manager.files) if session_manager else 1
         success_html = f"""
         <div style='padding: 10px; background-color: #d4edda; border-radius: 5px; border-left: 4px solid #28a745;'>
             <p style='margin: 0;'><b>📄 {file_name}</b></p>
-            <p style='margin: 5px 0 0 0; color: #155724;'>✅ Ready</p>
+            <p style='margin: 5px 0 0 0; color: #155724;'>✅ Ready (Session: {file_count} file{'s' if file_count != 1 else ''})</p>
         </div>
         """
 
