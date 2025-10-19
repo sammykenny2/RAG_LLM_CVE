@@ -103,6 +103,40 @@ LLM_TEMPERATURE = float(os.getenv('LLM_TEMPERATURE', '0.3'))
 LLM_TOP_P = float(os.getenv('LLM_TOP_P', '0.9'))
 
 # =============================================================================
+# Summary Configuration
+# =============================================================================
+
+SUMMARY_CHUNK_TOKENS = int(os.getenv('SUMMARY_CHUNK_TOKENS', '1500'))
+SUMMARY_CHUNK_OVERLAP_TOKENS = int(os.getenv('SUMMARY_CHUNK_OVERLAP_TOKENS', '200'))
+SUMMARY_TOKENS_PER_CHUNK = int(os.getenv('SUMMARY_TOKENS_PER_CHUNK', '150'))
+SUMMARY_FINAL_TOKENS = int(os.getenv('SUMMARY_FINAL_TOKENS', '300'))
+SUMMARY_CHUNK_THRESHOLD_CHARS = int(os.getenv('SUMMARY_CHUNK_THRESHOLD_CHARS', '3000'))
+SUMMARY_ENABLE_SECOND_STAGE = os.getenv('SUMMARY_ENABLE_SECOND_STAGE', 'True').lower() == 'true'
+
+# =============================================================================
+# Validation Configuration
+# =============================================================================
+
+VALIDATION_CHUNK_TOKENS = int(os.getenv('VALIDATION_CHUNK_TOKENS', '1500'))
+VALIDATION_CHUNK_OVERLAP_TOKENS = int(os.getenv('VALIDATION_CHUNK_OVERLAP_TOKENS', '200'))
+VALIDATION_TOKENS_PER_CHUNK = int(os.getenv('VALIDATION_TOKENS_PER_CHUNK', '300'))
+VALIDATION_CHUNK_THRESHOLD_CHARS = int(os.getenv('VALIDATION_CHUNK_THRESHOLD_CHARS', '3000'))
+VALIDATION_ENABLE_CVE_FILTERING = os.getenv('VALIDATION_ENABLE_CVE_FILTERING', 'True').lower() == 'true'
+VALIDATION_FINAL_TOKENS = int(os.getenv('VALIDATION_FINAL_TOKENS', '500'))
+VALIDATION_ENABLE_SECOND_STAGE = os.getenv('VALIDATION_ENABLE_SECOND_STAGE', 'True').lower() == 'true'
+
+# =============================================================================
+# Q&A Configuration
+# =============================================================================
+
+QA_CHUNK_TOKENS = int(os.getenv('QA_CHUNK_TOKENS', '1500'))
+QA_CHUNK_OVERLAP_TOKENS = int(os.getenv('QA_CHUNK_OVERLAP_TOKENS', '200'))
+QA_TOKENS_PER_CHUNK = int(os.getenv('QA_TOKENS_PER_CHUNK', '200'))
+QA_CHUNK_THRESHOLD_CHARS = int(os.getenv('QA_CHUNK_THRESHOLD_CHARS', '3000'))
+QA_FINAL_TOKENS = int(os.getenv('QA_FINAL_TOKENS', '400'))
+QA_ENABLE_SECOND_STAGE = os.getenv('QA_ENABLE_SECOND_STAGE', 'True').lower() == 'true'
+
+# =============================================================================
 # Path Validation
 # =============================================================================
 
@@ -186,6 +220,31 @@ def print_config():
     print(f"  MAX_EMBEDDING_ROWS: {MAX_EMBEDDING_ROWS or '(all)'}")
     print(f"  LLM_TEMPERATURE: {LLM_TEMPERATURE}")
     print(f"  LLM_TOP_P: {LLM_TOP_P}")
+
+    print("\nSummary:")
+    print(f"  SUMMARY_CHUNK_TOKENS: {SUMMARY_CHUNK_TOKENS}")
+    print(f"  SUMMARY_CHUNK_OVERLAP_TOKENS: {SUMMARY_CHUNK_OVERLAP_TOKENS}")
+    print(f"  SUMMARY_TOKENS_PER_CHUNK: {SUMMARY_TOKENS_PER_CHUNK}")
+    print(f"  SUMMARY_FINAL_TOKENS: {SUMMARY_FINAL_TOKENS}")
+    print(f"  SUMMARY_CHUNK_THRESHOLD_CHARS: {SUMMARY_CHUNK_THRESHOLD_CHARS}")
+    print(f"  SUMMARY_ENABLE_SECOND_STAGE: {SUMMARY_ENABLE_SECOND_STAGE}")
+
+    print("\nValidation:")
+    print(f"  VALIDATION_CHUNK_TOKENS: {VALIDATION_CHUNK_TOKENS}")
+    print(f"  VALIDATION_CHUNK_OVERLAP_TOKENS: {VALIDATION_CHUNK_OVERLAP_TOKENS}")
+    print(f"  VALIDATION_TOKENS_PER_CHUNK: {VALIDATION_TOKENS_PER_CHUNK}")
+    print(f"  VALIDATION_CHUNK_THRESHOLD_CHARS: {VALIDATION_CHUNK_THRESHOLD_CHARS}")
+    print(f"  VALIDATION_ENABLE_CVE_FILTERING: {VALIDATION_ENABLE_CVE_FILTERING}")
+    print(f"  VALIDATION_FINAL_TOKENS: {VALIDATION_FINAL_TOKENS}")
+    print(f"  VALIDATION_ENABLE_SECOND_STAGE: {VALIDATION_ENABLE_SECOND_STAGE}")
+
+    print("\nQ&A:")
+    print(f"  QA_CHUNK_TOKENS: {QA_CHUNK_TOKENS}")
+    print(f"  QA_CHUNK_OVERLAP_TOKENS: {QA_CHUNK_OVERLAP_TOKENS}")
+    print(f"  QA_TOKENS_PER_CHUNK: {QA_TOKENS_PER_CHUNK}")
+    print(f"  QA_CHUNK_THRESHOLD_CHARS: {QA_CHUNK_THRESHOLD_CHARS}")
+    print(f"  QA_FINAL_TOKENS: {QA_FINAL_TOKENS}")
+    print(f"  QA_ENABLE_SECOND_STAGE: {QA_ENABLE_SECOND_STAGE}")
     print("=" * 60)
 
 if __name__ == "__main__":

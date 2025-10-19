@@ -608,29 +608,161 @@ RAG_LLM_CVE/
 - Docstrings updated to reference unified approach
 - No syntax errors
 
+✅ **Production validation** (2025-01-19):
+- Both Phase 1 and Phase 2 web UIs tested with real queries
+- Response quality confirmed comparable across implementations
+- Hybrid search working correctly for CVE ID queries
+- No regressions observed in normal RAG queries
+
 ### Impact
 - **Phase 1 (pure_python.py)**: No changes (already working correctly)
 - **Phase 2 (langchain_impl.py)**: Now behaves consistently with Phase 1
 - **ConversationalRetrievalChain**: No longer used in query() method
   - Still initialized for backward compatibility
   - May be used in future for other features
-- **Expected improvements**:
-  - More accurate responses with proper context
-  - Consistent conversation history across all query types
-  - No more "I don't know" for valid KB content
-  - Reduced hangs from simplified execution path
+- **Confirmed improvements**:
+  - ✅ More accurate responses with proper context
+  - ✅ Consistent conversation history across all query types
+  - ✅ No more "I don't know" for valid KB content
+  - ✅ Reduced hangs from simplified execution path
 
-### Next Steps
-- [ ] Real-world testing with web_ui_langchain.py
-- [ ] A/B comparison: Phase 1 vs Phase 2 response quality
-- [ ] Monitor for any regressions or edge cases
+## [2025-01] Q&A Feature Implementation and CLI/Web UI Unification
+
+### Added (Configuration)
+- **Q&A Configuration** in `.env`, `.env.example`, and `config.py`:
+  - `QA_CHUNK_TOKENS=1500` - Chunk size for long documents
+  - `QA_CHUNK_OVERLAP_TOKENS=200` - Overlap between chunks
+  - `QA_TOKENS_PER_CHUNK=200` - Tokens per chunk answer (Stage 1)
+  - `QA_CHUNK_THRESHOLD_CHARS=3000` - Threshold to trigger chunking
+  - `QA_FINAL_TOKENS=400` - Tokens for final consolidated answer (Stage 2)
+  - `QA_ENABLE_SECOND_STAGE=True` - Enable answer consolidation
+- Imported in RAG classes: `rag/pure_python.py` and `rag/langchain_impl.py`
+- Imported in CLI: `cli/validate_report.py`
+
+### Enhanced (RAG Classes)
+- **rag/pure_python.py**:
+  - `answer_question_about_report()` refactored with two-stage approach:
+    - Short documents (≤3000 chars): Single-pass Q&A
+    - Long documents (>3000 chars): Chunked processing with consolidation
+  - `_answer_question_single_pass()`: Direct Q&A for short texts
+  - `_answer_question_chunked()`: Two-stage Q&A for long texts
+    - Stage 1: Answer question for each chunk (200 tokens/chunk)
+    - Stage 2: Consolidate all answers into coherent response (400 tokens)
+- **rag/langchain_impl.py**:
+  - Mirrored implementation using HuggingFacePipeline
+  - Same two-stage approach as Phase 1
+  - Uses tokenizer.apply_chat_template() for prompts
+
+### Enhanced (Web UI)
+- **web/web_ui.py** (Phase 1 - Pure Python):
+  - `process_uploaded_report()` added 'qa' action:
+    - Extracts PDF text
+    - Calls `rag_system.answer_question_about_report()`
+    - Returns formatted answer with 💬 emoji
+  - `chat_respond()` updated with **Plan A approach**:
+    - When file attached + user question detected
+    - If 'summarize' intent → summarize action
+    - If 'validate' intent → validate action
+    - **Otherwise → Q&A on file content (default behavior)**
+  - No special keywords needed for Q&A
+- **web/web_ui_langchain.py** (Phase 2 - LangChain):
+  - Same changes as Phase 1
+  - Both web UIs now support Q&A on attached files
+
+### Enhanced (CLI)
+- **cli/validate_report.py**:
+  - **Option 1 (Summarize)** refactored:
+    - Now uses `rag_system.summarize_report()`
+    - Controlled by `.env` SUMMARY_* configuration
+    - Legacy implementation preserved as `menu_option_1_legacy()`
+  - **Option 2 (Validate CVE)**: Already refactored (previous session)
+  - **Option 3 (Q&A)** refactored:
+    - Now uses `rag_system.answer_question_about_report()`
+    - Controlled by `.env` QA_* configuration
+    - Legacy implementation preserved as `menu_option_3_legacy()`
+  - All three options now show progress messages:
+    - "📝 Generating summary..." / "📝 Validating CVE usage..." / "💬 Answering question..."
+    - Indicates if using two-stage processing
+  - Imported SUMMARY_ENABLE_SECOND_STAGE and QA_ENABLE_SECOND_STAGE
+
+### Impact: CLI and Web UI Unification
+
+**Before (Inconsistent)**:
+- CLI Option 1/3 used custom `generate_chunked_responses()` logic
+- Web UI used RAG class methods
+- Different chunking approaches (custom vs token-based)
+- Different output formats
+- Difficult to maintain and debug
+
+**After (Unified)**:
+| Feature | CLI | Web UI (Phase 1) | Web UI (Phase 2) |
+|---------|-----|------------------|------------------|
+| Summarize | ✅ `rag_system.summarize_report()` | ✅ Same | ✅ Same |
+| Validate CVE | ✅ `rag_system.validate_cve_usage()` | ✅ Same | ✅ Same |
+| Q&A | ✅ `rag_system.answer_question_about_report()` | ✅ Same | ✅ Same |
+| Two-stage processing | ✅ Yes | ✅ Yes | ✅ Yes |
+| .env configuration | ✅ Full | ✅ Full | ✅ Full |
+| Token-based chunking | ✅ Yes | ✅ Yes | ✅ Yes |
+
+### Benefits
+- ✅ **Single source of truth**: All implementations use same RAG class methods
+- ✅ **Unified configuration**: All controlled by `.env` parameters
+- ✅ **Consistent behavior**: CLI and Web UI produce same results
+- ✅ **Easier maintenance**: Bug fixes apply to all interfaces
+- ✅ **Better optimization**: Two-stage processing prevents fragmented output
+
+### Plan A Approach (Web UI Q&A)
+**User workflow**:
+1. Upload a PDF file in chat interface
+2. Ask any question (e.g., "What are the key findings?", "這個檔案內容在講什麼？")
+3. System automatically:
+   - Detects if 'summarize' or 'validate' keyword → uses those actions
+   - Otherwise → **defaults to Q&A on file content** (no special keywords needed)
+   - Chunks long documents using token-based approach
+   - Consolidates answers from all chunks
+   - Uses .env QA_* configuration
+
+**Design rationale**:
+- Natural user experience (no need to remember keywords)
+- File-first approach (attached file takes priority)
+- Future enhancement: Hybrid mode (KB + file) to be implemented later
+
+### Testing
+✅ **Configuration verified** (2025-01-19):
+- .env and .env.example updated with QA_* parameters
+- config.py loads all 6 Q&A parameters
+- print_config() displays Q&A section
+
+✅ **RAG class methods** (2025-01-19):
+- Both pure_python.py and langchain_impl.py implement two-stage Q&A
+- Chunking logic consistent with summary/validate
+- Consolidation prompt prevents redundant/fragmented answers
+
+✅ **Web UI integration** (2025-01-19):
+- process_uploaded_report() handles 'qa' action
+- chat_respond() defaults to Q&A when file attached
+- Works in both Phase 1 and Phase 2 web UIs
+- Natural language intent detection working correctly
+
+✅ **CLI refactoring** (2025-01-19):
+- Option 1 and Option 3 use RAG class methods
+- Progress messages show two-stage status
+- Legacy functions preserved for reference
+
+✅ **Production validation** (2025-01-19):
+- All three features (Summary/Validate/Q&A) tested end-to-end
+- Two-stage processing prevents fragmented output on long documents
+- Natural language intent detection working in Chinese and English
+- CLI and Web UI produce consistent results
 
 ## Known Issues
 
 ### Phase 2: LangChain Web UI (web_ui_langchain.py)
-- **No known critical issues** (as of 2025-01-18)
-  - Previous LLM response quality issues have been fixed (see above)
-  - Further testing needed to confirm complete resolution
+- **No known issues** (as of 2025-01-19)
+  - ✅ Previous LLM response quality issues resolved
+  - ✅ Q&A feature implemented and production-validated
+  - ✅ Hybrid search working correctly
+  - ✅ Natural language intent detection tested
 
 ## Upcoming Features
 

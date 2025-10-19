@@ -179,6 +179,56 @@ def get_current_status() -> str:
 # Chat interface handlers
 # =============================================================================
 
+def detect_user_intent(message: str, has_file: bool) -> str:
+    """
+    Detect user intent from natural language message.
+
+    Supports Chinese and English phrases for:
+    - summarize: 總結, 摘要, 概括, 整理, 內容, 講什麼, summary, summarize
+    - validate: 驗證, 檢查, 核實, validate, verify, check
+
+    Args:
+        message: User message
+        has_file: Whether user has uploaded a file
+
+    Returns:
+        str: Intent ('summarize', 'validate', or None)
+    """
+    if not has_file:
+        return None
+
+    message_lower = message.lower()
+
+    # Summarize intent keywords (Chinese + English)
+    summarize_keywords = [
+        # Chinese
+        '總結', '摘要', '概括', '概要', '整理', '內容', '講什麼', '说什么',
+        '主要內容', '主要内容', '重點', '重点', '大意',
+        # English
+        'summarize', 'summary', 'summarise', 'what is this', 'what does',
+        'content', 'about', 'main point', 'key point', 'overview'
+    ]
+
+    # Validate intent keywords (Chinese + English)
+    validate_keywords = [
+        # Chinese
+        '驗證', '验证', '檢查', '检查', '核實', '核实', '確認', '确认',
+        # English
+        'validate', 'verify', 'check', 'correct', 'accuracy'
+    ]
+
+    # Check for summarize intent
+    for keyword in summarize_keywords:
+        if keyword in message_lower:
+            return 'summarize'
+
+    # Check for validate intent
+    for keyword in validate_keywords:
+        if keyword in message_lower:
+            return 'validate'
+
+    return None
+
 def chat_respond(message: str, history: list):
     """
     Handle chat messages with RAG context retrieval.
@@ -217,17 +267,22 @@ def chat_respond(message: str, history: list):
     yield "", history, "", gr.update()
 
     try:
-        message_lower = message.strip().lower()
         import os
 
-        # Check if user is requesting to summarize or validate uploaded file
-        if chat_uploaded_file and message_lower in ['summarize', 'validate']:
-            if message_lower == 'summarize':
+        # Detect user intent using natural language processing
+        intent = detect_user_intent(message, has_file=bool(chat_uploaded_file))
+
+        # Handle file-specific actions based on detected intent
+        if chat_uploaded_file:
+            if intent == 'summarize':
                 response = process_uploaded_report(chat_uploaded_file, action='summarize', mode=current_mode)
-            elif message_lower == 'validate':
+            elif intent == 'validate':
                 response = process_uploaded_report(chat_uploaded_file, action='validate', schema=DEFAULT_SCHEMA, mode=current_mode)
+            else:
+                # Default to Q&A on file content (Plan A approach)
+                response = process_uploaded_report(chat_uploaded_file, action='qa', question=message, mode=current_mode)
         else:
-            # Normal RAG query
+            # Normal RAG query (no file attached)
             response = rag_system.query(
                 question=message,
                 include_history=True,
@@ -364,16 +419,18 @@ def process_uploaded_report(
     file,
     action: str,
     schema: str = DEFAULT_SCHEMA,
-    mode: str = None
+    mode: str = None,
+    question: str = None
 ) -> str:
     """
     Process uploaded report based on user action.
 
     Args:
-        file: Gradio File object
-        action: 'summarize', 'validate', or 'add'
+        file: Gradio File object or file path string
+        action: 'summarize', 'validate', 'add', or 'qa'
         schema: CVE schema to use
         mode: Processing mode (demo/full), uses global current_mode if None
+        question: User question (required for 'qa' action)
 
     Returns:
         str: Processing result
@@ -384,26 +441,30 @@ def process_uploaded_report(
     # Use global mode if not specified
     mode = mode or current_mode
 
-    # Mode-specific settings
+    # Mode-specific settings (for PDF extraction and validation only)
+    # Note: Summary token limits are now controlled by .env (SUMMARY_* parameters)
     if mode == 'demo':
-        max_tokens = 256
         max_pages = 10
         top_k = 3
+        validation_tokens = 256
     else:  # full mode
-        max_tokens = 700
         max_pages = None
         top_k = 5
+        validation_tokens = 700
 
     try:
-        file_path = Path(file.name)
+        # Handle both string paths and Gradio File objects
+        if isinstance(file, str):
+            file_path = Path(file)
+        else:
+            file_path = Path(file.name)
 
         if action == 'summarize':
-            # Extract text and summarize
+            # Extract text and summarize (uses .env SUMMARY_* configuration)
             pdf_processor = PDFProcessor()
             text = pdf_processor.extract_text(file_path, max_pages=max_pages)
-            summary = rag_system.summarize_report(text, max_tokens=max_tokens)
-            mode_info = f" (mode={mode}, max_tokens={max_tokens})"
-            return f"📝 Summary{mode_info}:\n\n{summary}"
+            summary = rag_system.summarize_report(text)  # Let RAG class use .env config
+            return f"📝 Summary:\n\n{summary}"
 
         elif action == 'validate':
             # Process report and validate CVE usage
@@ -415,10 +476,19 @@ def process_uploaded_report(
             validation = rag_system.validate_cve_usage(
                 report_text,
                 cve_descriptions,
-                max_tokens=max_tokens
+                max_tokens=validation_tokens
             )
-            mode_info = f" (mode={mode}, max_tokens={max_tokens})"
-            return f"✅ Validation Result{mode_info}:\n\n{validation}\n\n📋 Found CVEs: {', '.join(cves)}"
+            return f"✅ Validation Result:\n\n{validation}\n\n📋 Found CVEs: {', '.join(cves)}"
+
+        elif action == 'qa':
+            # Answer question about report (uses .env QA_* configuration)
+            if not question:
+                return "⚠️ No question provided for Q&A"
+
+            pdf_processor = PDFProcessor()
+            text = pdf_processor.extract_text(file_path, max_pages=max_pages)
+            answer = rag_system.answer_question_about_report(text, question)  # Let RAG class use .env config
+            return f"💬 Answer:\n\n{answer}"
 
         elif action == 'add':
             # Add to knowledge base

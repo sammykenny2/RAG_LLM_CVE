@@ -55,6 +55,10 @@ from sentence_transformers import util, SentenceTransformer
 # Configuration
 # ============================================================================
 
+# Import RAG classes
+from rag.pure_python import PureRAG
+from core.models import LlamaModel
+
 # Import configuration
 from config import (
     DEFAULT_SPEED,
@@ -65,7 +69,10 @@ from config import (
     LLAMA_MODEL_NAME,
     EMBEDDING_PATH,
     CVE_V5_PATH,
-    CVE_V4_PATH
+    CVE_V4_PATH,
+    SUMMARY_ENABLE_SECOND_STAGE,
+    VALIDATION_ENABLE_SECOND_STAGE,
+    QA_ENABLE_SECOND_STAGE
 )
 
 # Parse command-line arguments
@@ -298,6 +305,22 @@ def cleanup_model(model):
     gc.collect()
 
 tokenizer, model = initialize_model()
+
+# Initialize RAG system for unified validation logic
+llama_model = LlamaModel(
+    model_name=LLAMA_MODEL_NAME,
+    use_fp16=USE_FP16,
+    use_sdpa=USE_SDPA
+)
+# Inject already-loaded tokenizer and model into LlamaModel wrapper
+llama_model.tokenizer = tokenizer
+llama_model.model = model
+llama_model._initialized = True
+
+rag_system = PureRAG(llama_model=llama_model)
+rag_system._initialized = True  # Mark as initialized since we provided pre-loaded model
+
+print("✅ RAG system initialized for unified validation")
 
 # ============================================================================
 # PDF processing
@@ -680,7 +703,32 @@ for cve in cves:
 # ============================================================================
 
 def menu_option_1(all_text, tokenizer, model):
-    """Summarize the report."""
+    """
+    Summarize the report using unified RAG class logic.
+
+    Uses the same implementation as Web UI for consistency:
+    - Token-based chunking
+    - Optional second-stage consolidation
+    - Controlled by .env SUMMARY_* configuration
+    """
+    print("\n📝 Generating summary...")
+
+    if SUMMARY_ENABLE_SECOND_STAGE:
+        print("   └─ Using two-stage summarization (chunk-level + final consolidation)")
+    else:
+        print("   └─ Using chunk-level summarization only")
+
+    # Use RAG class method (unified logic with Web UI)
+    summary = rag_system.summarize_report(all_text)
+
+    print("\n" + "="*80)
+    print("SUMMARY")
+    print("="*80)
+    print(summary)
+    print("="*80)
+
+def menu_option_1_legacy(all_text, tokenizer, model):
+    """Legacy summarization (kept for reference)."""
     if DEMO_MODE:
         # Demo mode: truncate text
         limited_text = all_text[:2000] if len(all_text) > 2000 else all_text
@@ -717,8 +765,39 @@ def menu_option_1(all_text, tokenizer, model):
         )
         print(summary)
 
-def menu_option_2(all_text, cve_description, tokenizer, model):
-    """Validate CVE usage."""
+def menu_option_2(all_text, cve_description):
+    """
+    Validate CVE usage using unified RAG class logic.
+
+    Uses the same implementation as Web UI for consistency:
+    - Token-based chunking
+    - Chunk-aware CVE filtering
+    - Optional second-stage consolidation
+    """
+    print("\n📝 Validating CVE usage...")
+
+    if VALIDATION_ENABLE_SECOND_STAGE:
+        print("   └─ Using two-stage validation (chunk-level + final consolidation)")
+    else:
+        print("   └─ Using chunk-level validation only")
+
+    # Use RAG class method (unified logic with Web UI)
+    validation_result = rag_system.validate_cve_usage(
+        report_text=all_text,
+        cve_descriptions=cve_description
+    )
+
+    print("\n" + "="*80)
+    print("VALIDATION RESULT")
+    print("="*80)
+    print(validation_result)
+    print("="*80)
+
+def menu_option_2_legacy(all_text, cve_description, tokenizer, model):
+    """
+    LEGACY: Old validation implementation (kept for reference).
+    Use menu_option_2() instead for unified logic with Web UI.
+    """
     if DEMO_MODE:
         # Demo mode: truncate text
         limited_text = all_text[:2000] if len(all_text) > 2000 else all_text
@@ -841,7 +920,35 @@ def menu_option_2(all_text, cve_description, tokenizer, model):
         print(llamaSug)
 
 def menu_option_3(all_text, user_question, tokenizer, model):
-    """Answer questions about the report."""
+    """
+    Answer questions about the report using unified RAG class logic.
+
+    Uses the same implementation as Web UI for consistency:
+    - Token-based chunking
+    - Optional second-stage consolidation
+    - Controlled by .env QA_* configuration
+    """
+    print(f"\n💬 Answering question: {user_question}")
+
+    if QA_ENABLE_SECOND_STAGE:
+        print("   └─ Using two-stage Q&A (chunk-level + final consolidation)")
+    else:
+        print("   └─ Using chunk-level Q&A only")
+
+    # Use RAG class method (unified logic with Web UI)
+    answer = rag_system.answer_question_about_report(
+        report_text=all_text,
+        question=user_question
+    )
+
+    print("\n" + "="*80)
+    print("ANSWER")
+    print("="*80)
+    print(answer)
+    print("="*80)
+
+def menu_option_3_legacy(all_text, user_question, tokenizer, model):
+    """Legacy Q&A (kept for reference)."""
     if DEMO_MODE:
         # Demo mode: truncate text
         limited_text = all_text[:2000] if len(all_text) > 2000 else all_text
@@ -891,7 +998,7 @@ while user_continue == "1":
     if menu_option_number == "1":
         menu_option_1(all_text, tokenizer, model)
     elif menu_option_number == "2":
-        menu_option_2(all_text, cve_description, tokenizer, model)
+        menu_option_2(all_text, cve_description)  # Now uses unified RAG class logic
     elif menu_option_number == "3":
         user_question = input("Please enter the question you have about the report: ")
         menu_option_3(all_text, user_question, tokenizer, model)

@@ -300,22 +300,29 @@ python web/web_ui_langchain.py
 
 #### Usage Examples
 
-**Ask questions about CVEs**:
+**Ask questions about CVEs** (Hybrid Search):
 ```
 User: "What is CVE-2024-1234?"
-AI: [Retrieves from knowledge base and responds with context]
+AI: [Uses exact metadata match for CVE ID, falls back to semantic search if not found]
 ```
+- CVE ID queries use precise metadata filtering
+- Automatic fallback to embedding-based semantic search
+- Works in both Phase 1 and Phase 2 implementations
 
-**Validate uploaded reports**:
-1. Click upload button → Select PDF report
-2. Type "validate" in chat to validate CVE usage
-3. Or type "summarize" for executive summary
-4. Or type "add to kb" to add to knowledge base
+**Work with uploaded reports** (Natural Language Intent Detection):
+1. Upload PDF file in chat interface
+2. Ask questions in Chinese or English:
+   - **Summarize**: "總結這個檔案", "summarize", "這個報告在講什麼"
+   - **Validate CVEs**: "驗證CVE使用", "validate", "check CVE correctness"
+   - **Q&A (default)**: Any other question triggers Q&A on file content
+3. System automatically detects intent and processes accordingly
+4. No need to remember specific keywords - just ask naturally
 
 **Manage knowledge base**:
-- Use right panel "Add Files" to expand knowledge base
-- View all sources with chunk counts
-- Click refresh to update statistics
+- **Add sources**: Use right panel "Add Files" to expand knowledge base permanently
+- **View sources**: See all sources with chunk counts
+- **Delete sources**: Select source from dropdown → Click delete button
+- **Refresh**: Click refresh to update statistics after operations
 
 #### Recent Updates
 
@@ -383,6 +390,32 @@ python cli/add_to_embeddings.py --pdf=report.pdf --speed=fast --extension=chroma
 
 **Note**: The target embedding database must already exist (created by `cli/build_embeddings.py`). This tool only adds incremental updates.
 
+### Step 8: Remove Sources from Knowledge Base
+
+Use `cli/remove_from_embeddings.py` to delete specific sources from the knowledge base:
+
+```bash
+# Interactive mode (lists all sources)
+python cli/remove_from_embeddings.py
+
+# Direct deletion
+python cli/remove_from_embeddings.py --source="CVEpdf2024.pdf"
+
+# List sources only (no deletion)
+python cli/remove_from_embeddings.py --list
+```
+
+**Features**:
+- Delete PDF files or CVE data from knowledge base
+- Shows confirmation prompt before deletion
+- Displays number of chunks removed
+- Works with all embedding formats (pkl, parquet, chroma)
+
+**Web UI Alternative**:
+- Select source from dropdown in Knowledge Base panel
+- Click "🗑️ Delete Selected Source" button
+- Automatic refresh after deletion
+
 ## Configuration System
 
 ### Environment Variables (.env)
@@ -418,7 +451,39 @@ CHUNK_SIZE=10
 EMBEDDING_BATCH_SIZE=64
 EMBEDDING_PRECISION=float16
 VERBOSE_LOGGING=False
+
+# Two-Stage Processing Configuration
+# Summary
+SUMMARY_CHUNK_TOKENS=1500
+SUMMARY_CHUNK_OVERLAP_TOKENS=200
+SUMMARY_TOKENS_PER_CHUNK=200
+SUMMARY_CHUNK_THRESHOLD_CHARS=3000
+SUMMARY_FINAL_TOKENS=400
+SUMMARY_ENABLE_SECOND_STAGE=True
+
+# Validation
+VALIDATION_CHUNK_TOKENS=1500
+VALIDATION_CHUNK_OVERLAP_TOKENS=200
+VALIDATION_TOKENS_PER_CHUNK=300
+VALIDATION_CHUNK_THRESHOLD_CHARS=3000
+VALIDATION_FINAL_TOKENS=500
+VALIDATION_ENABLE_SECOND_STAGE=True
+VALIDATION_ENABLE_CVE_FILTERING=True
+
+# Q&A
+QA_CHUNK_TOKENS=1500
+QA_CHUNK_OVERLAP_TOKENS=200
+QA_TOKENS_PER_CHUNK=200
+QA_CHUNK_THRESHOLD_CHARS=3000
+QA_FINAL_TOKENS=400
+QA_ENABLE_SECOND_STAGE=True
 ```
+
+**Two-Stage Processing Explained**:
+- **Stage 1**: Process long documents in chunks (prevents context overflow)
+- **Stage 2**: Consolidate chunk results into unified response (prevents fragmented output)
+- Controlled by `*_ENABLE_SECOND_STAGE` flags (True/False)
+- Short documents (< threshold) skip chunking and use single-pass processing
 
 ### Configuration Loading (config.py)
 
