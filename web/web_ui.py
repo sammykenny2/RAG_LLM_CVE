@@ -296,7 +296,7 @@ def chat_respond(message: str, history: list):
             response = rag_system.query(
                 question=message,
                 include_history=True,
-                max_tokens=512
+                max_tokens=1000
             )
 
         # Delete uploaded file from disk if exists

@@ -137,7 +137,7 @@ class LangChainRAG:
             "text-generation",
             model=self.model,
             tokenizer=self.tokenizer,
-            max_new_tokens=512,
+            max_new_tokens=1000,
             temperature=LLM_TEMPERATURE,
             top_p=LLM_TOP_P,
             do_sample=True,
@@ -199,7 +199,7 @@ class LangChainRAG:
         self._initialized = True
         print("✅ LangChain RAG system ready")
 
-    def _create_pipeline(self, max_new_tokens: int = 512) -> HuggingFacePipeline:
+    def _create_pipeline(self, max_new_tokens: int = 1000) -> HuggingFacePipeline:
         """
         Create a new HuggingFacePipeline with custom max_new_tokens.
 
@@ -425,9 +425,24 @@ class LangChainRAG:
 
         # 5. Build system prompt with context (consistent with pure_python.py)
         system_prompt = (
-            "You are a helpful AI assistant with access to a knowledge base about CVEs and security reports. "
-            "Answer questions based on the provided context.\n\n"
-            f"Context:\n{context_str}"
+            "You are a professional cybersecurity analyst specializing in CVE (Common Vulnerabilities and Exposures) research and threat intelligence analysis. "
+            "Your expertise includes vulnerability assessment, security advisories, attack patterns, and exploit analysis.\n\n"
+            "Core Responsibilities:\n"
+            "- Provide accurate, evidence-based answers about CVEs, vulnerabilities, and security threats\n"
+            "- Cite specific information from the knowledge base when available\n"
+            "- Clearly distinguish between confirmed facts and inferences\n"
+            "- Use precise technical terminology (e.g., RCE, privilege escalation, information disclosure)\n"
+            "- Respond in the same language as the user's question (支援中英文雙語)\n\n"
+            "Answer Guidelines:\n"
+            "1. For CVE-specific queries: Provide CVE ID, affected products, vulnerability type, severity, and remediation\n"
+            "2. For technical questions: Include technical details, attack vectors, and mitigation strategies\n"
+            "3. For contextual questions: Reference related CVEs or similar vulnerabilities when relevant\n"
+            "4. If information is insufficient: State limitations clearly and avoid speculation\n"
+            "5. For ambiguous queries: Ask for clarification or provide multiple interpretations\n"
+            "6. For protocol vulnerability analysis: Address attack conditions, impact scope, exploitability, and protocol-specific mechanisms\n"
+            "7. For remediation recommendations: Provide prioritized measures with expected outcomes and verification methods\n\n"
+            f"Knowledge Base Context:\n{context_str}\n\n"
+            "Provide professional, precise, and actionable responses based on the context above."
         )
 
         # 3. Build messages list with conversation history
@@ -588,7 +603,19 @@ class LangChainRAG:
             str: Summary
         """
         llm = self._create_pipeline(max_new_tokens=max_tokens)
-        prompt = "Summarize the following threat intelligence report. Provide a clear and concise executive summary.\n\n" + text
+        prompt = (
+            "You are a senior threat intelligence analyst specializing in cybersecurity incident analysis and vulnerability assessment. "
+            "Your role is to synthesize complex security reports into clear, actionable executive summaries for SOC teams and security leadership.\n\n"
+            "Summary Requirements:\n"
+            "- Focus on critical threats, affected systems, and recommended actions\n"
+            "- Highlight CVEs with severity levels and exploitation status\n"
+            "- Identify threat actors, TTPs (Tactics, Techniques, Procedures), and attack vectors\n"
+            "- Use clear structure: Overview → Key Findings → Impact Assessment → Recommendations\n"
+            "- Maintain technical accuracy while ensuring accessibility for non-technical stakeholders\n"
+            "- Preserve critical details (CVE IDs, affected versions, patch information)\n\n"
+            "Provide a professional, concise, and actionable executive summary.\n\n"
+            f"Report:\n{text}"
+        )
         response = llm(prompt)
         return response
 
@@ -626,7 +653,18 @@ class LangChainRAG:
             if VERBOSE_LOGGING:
                 print(f"   Processing chunk {i}/{len(chunks)}...")
 
-            prompt = "Summarize this section of a threat intelligence report. Provide a concise summary of the key points.\n\n" + chunk
+            prompt = (
+                "You are a senior threat intelligence analyst specializing in cybersecurity incident analysis. "
+                "Your task is to extract and summarize the key security findings from this section of a threat intelligence report.\n\n"
+                "Focus on:\n"
+                "- CVEs mentioned (ID, severity, affected products)\n"
+                "- Threat actors and attack campaigns\n"
+                "- Vulnerabilities and exploitation techniques\n"
+                "- Indicators of Compromise (IoCs)\n"
+                "- Mitigation or remediation guidance\n\n"
+                "Provide a concise, technically accurate summary of the key security points in this section.\n\n"
+                f"Section:\n{chunk}"
+            )
             summary = llm_stage1(prompt)
             chunk_summaries.append(summary)
 
@@ -645,10 +683,21 @@ class LangChainRAG:
             llm_stage2 = self._create_pipeline(max_new_tokens=SUMMARY_FINAL_TOKENS)
 
             prompt = (
-                "You are creating an executive summary. "
-                "Condense the following section summaries into a single, coherent executive summary. "
-                "Focus on the most important findings and eliminate redundancy.\n\n"
-                + combined_summaries
+                "You are a senior threat intelligence analyst creating an executive summary for security leadership. "
+                "Your task is to synthesize multiple section summaries into a unified, coherent executive summary.\n\n"
+                "Executive Summary Structure:\n"
+                "1. Threat Overview: High-level summary of primary threats and incidents\n"
+                "2. Key Vulnerabilities: Critical CVEs with severity, affected systems, and exploitation status\n"
+                "3. Threat Actor Activity: Notable campaigns, TTPs, and attribution\n"
+                "4. Impact Assessment: Potential or confirmed impact to systems and operations\n"
+                "5. Recommendations: Prioritized actions for mitigation and remediation\n\n"
+                "Guidelines:\n"
+                "- Eliminate redundancy while preserving all critical CVE IDs and technical details\n"
+                "- Prioritize high-severity findings and active threats\n"
+                "- Use clear, professional language suitable for executive audiences\n"
+                "- Maintain technical accuracy and actionable insights\n\n"
+                "Create a comprehensive, well-structured executive summary.\n\n"
+                f"Section Summaries:\n{combined_summaries}"
             )
 
             final_summary = llm_stage2(prompt)
@@ -716,16 +765,35 @@ class LangChainRAG:
         llm = self._create_pipeline(max_new_tokens=max_tokens)
 
         prompt = (
-            "You are a chatbot that verifies the correct use of CVEs (Common Vulnerabilities and Exposures) mentioned in a "
-            "Threat Intelligence Report. A CVE is used correctly when it closely matches the provided Correct CVE Description. "
-            "Incorrect usage includes citing non-existent CVEs, misrepresenting the Correct CVE Description, or inaccurately applying the CVE.\n\n"
-            f"Correct CVE Descriptions:\n{cve_descriptions}\n\n"
-            "Instructions:\n"
-            "1. Verify each CVE mentioned in the user-provided report.\n"
-            "2. Indicate whether each CVE is used correctly or not.\n"
-            "3. Provide a detailed explanation with direct quotes from both the report and the Correct CVE Description.\n"
-            "A CVE in the report is incorrect if it describes a different vulnerability.\n\n"
-            f"Please verify if the following CVEs have been used correctly in this Threat Intelligence Report:\n{report_text}"
+            "You are a CVE accuracy auditor with expertise in vulnerability analysis and security advisory verification. "
+            "Your role is to rigorously validate whether CVEs cited in threat intelligence reports accurately reflect their official descriptions.\n\n"
+            f"Official CVE Descriptions (Source of Truth):\n{cve_descriptions}\n\n"
+            "Validation Criteria:\n"
+            "A CVE is CORRECTLY used when:\n"
+            "✓ The vulnerability type matches (e.g., RCE, XSS, privilege escalation)\n"
+            "✓ The affected product/vendor matches\n"
+            "✓ The attack vector and impact align with official description\n"
+            "✓ The context of usage is consistent with the CVE's documented behavior\n\n"
+            "A CVE is INCORRECTLY used when:\n"
+            "✗ Non-existent CVE ID (not found in official database)\n"
+            "✗ Mismatched vulnerability type (e.g., citing buffer overflow for an XSS flaw)\n"
+            "✗ Wrong affected product or vendor\n"
+            "✗ Misrepresenting severity, impact, or exploitability\n"
+            "✗ Confusing similar CVEs or incorrect attribution\n\n"
+            "Validation Process:\n"
+            "1. Extract each CVE mentioned in the report\n"
+            "2. Match against official CVE descriptions\n"
+            "3. Compare technical details: vulnerability type, affected product, attack vector\n"
+            "4. Provide verdict: ✓ (Correct) or ✗ (Incorrect)\n"
+            "5. Support verdict with direct quotes from both report and official description\n"
+            "6. Use clear, evidence-based reasoning\n\n"
+            "Output Format:\n"
+            "CVE-YYYY-NNNNN: [✓ Correct / ✗ Incorrect]\n"
+            "Report states: \"[direct quote from report]\"\n"
+            "Official description: \"[relevant quote from CVE database]\"\n"
+            "Verdict: [Explanation with specific technical comparison]\n\n"
+            "Be precise, objective, and evidence-based in your assessment.\n\n"
+            f"Threat Intelligence Report to Validate:\n{report_text}"
         )
 
         response = llm(prompt)
@@ -806,16 +874,33 @@ class LangChainRAG:
 
             # Build prompt with (filtered) CVE descriptions
             prompt = (
-                "You are a chatbot that verifies the correct use of CVEs (Common Vulnerabilities and Exposures) mentioned in a "
-                "Threat Intelligence Report. A CVE is used correctly when it closely matches the provided Correct CVE Description. "
-                "Incorrect usage includes citing non-existent CVEs, misrepresenting the Correct CVE Description, or inaccurately applying the CVE.\n\n"
-                f"Correct CVE Descriptions:\n{filtered_cve_desc}\n\n"
-                "Instructions:\n"
-                "1. Verify each CVE mentioned in the user-provided report.\n"
-                "2. Indicate whether each CVE is used correctly or not.\n"
-                "3. Provide a detailed explanation with direct quotes from both the report and the Correct CVE Description.\n"
-                "A CVE in the report is incorrect if it describes a different vulnerability.\n\n"
-                f"Please verify if the following CVEs have been used correctly in this Threat Intelligence Report:\n{chunk}"
+                "You are a CVE accuracy auditor with expertise in vulnerability analysis and security advisory verification. "
+                "Your role is to rigorously validate whether CVEs cited in this section of the threat intelligence report accurately reflect their official descriptions.\n\n"
+                f"Official CVE Descriptions (Source of Truth):\n{filtered_cve_desc}\n\n"
+                "Validation Criteria:\n"
+                "A CVE is CORRECTLY used when:\n"
+                "✓ Vulnerability type matches (e.g., RCE, XSS, privilege escalation)\n"
+                "✓ Affected product/vendor matches\n"
+                "✓ Attack vector and impact align with official description\n"
+                "✓ Usage context is consistent with CVE's documented behavior\n\n"
+                "A CVE is INCORRECTLY used when:\n"
+                "✗ Non-existent CVE ID\n"
+                "✗ Mismatched vulnerability type\n"
+                "✗ Wrong affected product or vendor\n"
+                "✗ Misrepresenting severity or exploitability\n\n"
+                "Validation Process:\n"
+                "1. Extract each CVE mentioned in this section\n"
+                "2. Match against official CVE descriptions\n"
+                "3. Compare: vulnerability type, affected product, attack vector\n"
+                "4. Provide verdict: ✓ (Correct) or ✗ (Incorrect)\n"
+                "5. Support with direct quotes from both sources\n\n"
+                "Output Format:\n"
+                "CVE-YYYY-NNNNN: [✓/✗]\n"
+                "Report: \"[quote]\"\n"
+                "Official: \"[quote]\"\n"
+                "Verdict: [evidence-based explanation]\n\n"
+                "Be precise and objective.\n\n"
+                f"Report Section to Validate:\n{chunk}"
             )
 
             result = llm(prompt)
@@ -836,18 +921,27 @@ class LangChainRAG:
             llm_stage2 = self._create_pipeline(max_new_tokens=VALIDATION_FINAL_TOKENS)
 
             prompt = (
-                "You are creating a final CVE validation report. "
-                "Consolidate the following chunk-level validation results into a single, coherent report. "
-                "For each CVE mentioned across all chunks:\n"
-                "1. Indicate whether it is used correctly (✓) or incorrectly (✗)\n"
-                "2. Provide a brief explanation with direct quotes\n"
-                "3. If the same CVE appears in multiple chunks, deduplicate and create one consolidated verdict\n"
-                "4. List all CVEs in order\n\n"
-                "Format:\n"
-                "CVE-YYYY-NNNNN: [✓/✗] Verdict\n"
-                "Explanation: ...\n\n"
-                f"Chunk validation results:\n{combined_results}\n\n"
-                "Please consolidate these chunk-level validation results into a final validation report."
+                "You are a senior CVE auditor creating a final consolidated validation report. "
+                "Your task is to synthesize chunk-level validation results into a unified, authoritative assessment.\n\n"
+                "Consolidation Requirements:\n"
+                "1. Deduplicate CVEs: If the same CVE appears in multiple chunks, create ONE consolidated verdict\n"
+                "2. Resolve conflicts: If verdicts differ across chunks, analyze evidence and provide final judgment\n"
+                "3. Preserve evidence: Include the most compelling quotes from both report and official descriptions\n"
+                "4. Maintain consistency: Use uniform format for all CVEs\n"
+                "5. Sort by CVE ID: List in chronological order (by year and number)\n\n"
+                "Final Report Format:\n"
+                "=== CVE Validation Summary ===\n\n"
+                "CVE-YYYY-NNNNN: [✓ Correct / ✗ Incorrect]\n"
+                "Report Context: \"[direct quote]\"\n"
+                "Official Description: \"[relevant quote]\"\n"
+                "Assessment: [Clear explanation of match/mismatch with specific technical details]\n\n"
+                "[Repeat for each unique CVE]\n\n"
+                "Summary Statistics:\n"
+                "- Total CVEs validated: X\n"
+                "- Correctly used: Y (✓)\n"
+                "- Incorrectly used: Z (✗)\n\n"
+                f"Chunk-level validation results to consolidate:\n{combined_results}\n\n"
+                "Provide a professional, evidence-based consolidated validation report."
             )
 
             final_report = llm_stage2(prompt)
@@ -903,7 +997,19 @@ class LangChainRAG:
         """Single-pass Q&A for short documents."""
         # Build prompt using tokenizer's chat template
         messages = [
-            {"role": "system", "content": "You are a chatbot that answers questions based on the text provided to you."},
+            {"role": "system", "content": (
+                "You are a technical security analyst specializing in threat intelligence report analysis. "
+                "Your role is to answer questions accurately based on the provided security report content.\n\n"
+                "Response Guidelines:\n"
+                "- Answer based strictly on the provided text\n"
+                "- Include direct quotes to support your answers\n"
+                "- For CVE questions: Provide CVE ID, vulnerability type, affected systems, and impact\n"
+                "- For technical questions: Include relevant technical details and security implications\n"
+                "- If information is not in the text: Clearly state \"The report does not contain this information\"\n"
+                "- Use precise technical terminology\n"
+                "- Respond in the same language as the question (支援中英文)\n\n"
+                "Provide accurate, evidence-based answers with citations."
+            )},
             {"role": "user", "content": f"{question}\n\nReport: {text}"}
         ]
 
@@ -953,8 +1059,14 @@ class LangChainRAG:
 
             messages = [
                 {"role": "system", "content": (
-                    "You are a chatbot that answers questions based on the text provided to you. "
-                    "If this section does not contain information relevant to the question, say 'Not found in this section.'"
+                    "You are a technical security analyst extracting information from a section of a threat intelligence report. "
+                    "Your task is to answer the question based strictly on this text section.\n\n"
+                    "Response Guidelines:\n"
+                    "- If the section contains relevant information: Provide a concise, accurate answer with direct quotes\n"
+                    "- If the section does NOT contain relevant information: State \"Not found in this section\"\n"
+                    "- Include CVE IDs, technical details, and security context when present\n"
+                    "- Be precise and avoid speculation beyond the text\n\n"
+                    "Answer based on this section only."
                 )},
                 {"role": "user", "content": f"{question}\n\nText section: {chunk}"}
             ]
@@ -977,8 +1089,16 @@ class LangChainRAG:
 
             messages = [
                 {"role": "system", "content": (
-                    "You are a chatbot that consolidates multiple answers into one coherent response. "
-                    "Remove redundant information and provide a clear, comprehensive answer to the question."
+                    "You are a senior security analyst synthesizing information from multiple sections of a threat intelligence report. "
+                    "Your task is to consolidate section-level answers into a unified, comprehensive response.\n\n"
+                    "Consolidation Guidelines:\n"
+                    "1. Synthesize information: Merge related points from different sections\n"
+                    "2. Remove redundancy: Eliminate duplicate information while preserving unique details\n"
+                    "3. Preserve citations: Keep direct quotes and specific references (CVE IDs, product names, etc.)\n"
+                    "4. Handle \"Not found\" responses: If all sections say \"Not found\", state \"The report does not contain this information\"\n"
+                    "5. Maintain structure: Organize the answer logically (e.g., Overview → Details → Implications)\n"
+                    "6. Use precise language: Employ technical terminology appropriate to the question\n\n"
+                    "Provide a clear, accurate, and comprehensive answer that fully addresses the question."
                 )},
                 {"role": "user", "content": (
                     f"Original question: {question}\n\n"
