@@ -664,7 +664,7 @@ def format_kb_display() -> str:
         """
 
         for source_name, info in sources.items():
-            icon = "📄" if info['type'] == 'pdf' else "[TAG]"
+            icon = "📄" if info['type'] == 'pdf' else "🔖"
             date = info['added_date'][:10]
             html += f"<li>{icon} <b>{source_name}</b> ({info['count']} chunks, added {date})</li>"
 
