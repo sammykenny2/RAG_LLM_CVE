@@ -833,7 +833,7 @@ else:
 SESSION_MAX_FILES=5
 SESSION_MAX_FILE_SIZE_MB=10
 SESSION_TIMEOUT_HOURS=1
-ENABLE_SESSION_AUTO_EMBED=True  # Backward compatibility control
+ENABLE_SESSION_AUTO_EMBED=False  # Backward compatibility control (default: False for resource efficiency)
 ```
 
 **Constraints**:
@@ -845,14 +845,19 @@ ENABLE_SESSION_AUTO_EMBED=True  # Backward compatibility control
 **Backward Compatibility** (2025-01-19):
 - **Problem**: v2 auto-embeds uploaded files (different from main branch behavior)
 - **Solution**: `ENABLE_SESSION_AUTO_EMBED` configuration flag
-  - `True` (default): New behavior - files auto-embedded and searchable
-  - `False`: Old behavior - files only for special commands (summarize/validate)
-- **Implementation**: Flag check in `web_ui.py` and `web_ui_langchain.py`
+  - `False` (default): Resource-efficient - no session database, files only for special commands (summarize/validate)
+  - `True`: Multi-file context - files auto-embedded and searchable, requires temp_uploads/ directory creation
+- **Implementation**: Conditional SessionManager initialization in `web_ui.py` and `web_ui_langchain.py`
   ```python
+  # Only create SessionManager if enabled (avoids unnecessary temp_uploads/ directory)
+  if session_manager is None and ENABLE_SESSION_AUTO_EMBED:
+      session_manager = SessionManager(session_id=session_id)
+
+  # Only auto-embed if enabled
   if session_manager and ENABLE_SESSION_AUTO_EMBED:
       file_info = session_manager.add_file(str(dest_path))
   ```
-- **Benefits**: Non-breaking change, gradual migration, easy testing
+- **Benefits**: Resource efficiency (no temp_uploads/ creation when disabled), non-breaking change, easy testing
 
 ### Success Criteria
 

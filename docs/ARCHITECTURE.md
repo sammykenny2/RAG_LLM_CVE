@@ -964,14 +964,19 @@ else:
 
 #### Backward Compatibility Control
 
-**Problem**: v2 introduces auto-embedding (different from previous behavior).
+**Problem**: v2 introduces auto-embedding (different from previous behavior). SessionManager creates temp_uploads/ directory and vector database even when not needed.
 
-**Solution**: `ENABLE_SESSION_AUTO_EMBED` configuration flag
+**Solution**: `ENABLE_SESSION_AUTO_EMBED` configuration flag with conditional initialization
 ```python
 # config.py
-ENABLE_SESSION_AUTO_EMBED = os.getenv('ENABLE_SESSION_AUTO_EMBED', 'True').lower() == 'true'
+ENABLE_SESSION_AUTO_EMBED = os.getenv('ENABLE_SESSION_AUTO_EMBED', 'False').lower() == 'true'
 
 # web_ui.py and web_ui_langchain.py
+# Only create SessionManager if enabled (avoids unnecessary temp_uploads/ directory)
+if session_manager is None and ENABLE_SESSION_AUTO_EMBED:
+    session_manager = SessionManager(session_id=session_id)
+
+# Only auto-embed if enabled
 if session_manager and ENABLE_SESSION_AUTO_EMBED:
     file_info = session_manager.add_file(str(dest_path))  # Auto-embed
 else:
@@ -979,8 +984,8 @@ else:
 ```
 
 **Configuration**:
-- `True` (default): Files auto-embedded and searchable
-- `False`: Files only for special commands (summarize/validate)
+- `False` (default): Resource-efficient - no temp_uploads/ directory creation, files only for special commands (summarize/validate)
+- `True`: Multi-file context - files auto-embedded and searchable, creates temp_uploads/ directory and session database
 
 #### File Metadata Schema
 

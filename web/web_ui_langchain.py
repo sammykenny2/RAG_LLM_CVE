@@ -105,10 +105,12 @@ def initialize_system(speed_level: str = DEFAULT_SPEED, force_reload: bool = Fal
     use_fp16 = speed_level in ['fast', 'fastest']
     use_sdpa = speed_level == 'fastest'
 
-    # Initialize SessionManager for multi-file context
-    if session_manager is None:
+    # Initialize SessionManager for multi-file context (only if enabled)
+    if session_manager is None and ENABLE_SESSION_AUTO_EMBED:
         session_manager = SessionManager(session_id=session_id)
         print(f"[OK] SessionManager initialized (session_id={session_id[:8]}...)")
+    elif not ENABLE_SESSION_AUTO_EMBED:
+        print("[INFO] SessionManager disabled (ENABLE_SESSION_AUTO_EMBED=False)")
 
     # Initialize LangChain RAG with session_manager
     rag_system = LangChainRAG(session_manager=session_manager)
