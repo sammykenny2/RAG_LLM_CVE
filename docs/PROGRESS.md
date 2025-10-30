@@ -57,7 +57,7 @@ This file tracks completed changes and upcoming features for the project.
   - Automatic metadata tagging
   - Progress bars and error handling
 - **web/web_ui.py**: Gradio web interface (Phase 1)
-  - Claude Projects-style layout (left chat + right settings/KB)
+  - Two-column layout (left chat + right settings/KB)
   - Conversational AI with 10-round history
   - Upload PDF for validation (summarize/validate/add to KB)
   - Knowledge base management (add/view/refresh)
@@ -69,14 +69,13 @@ This file tracks completed changes and upcoming features for the project.
 - **.gitignore**: Added `.env` and `temp_uploads/` exclusions
 - **requirements.txt**: Added `python-dotenv` and `gradio`
 - Repository structure: Added `core/`, `rag/`, `web/` directories
-- See CLAUDE.md for complete directory structure
 
 ### Phase 1 Goals Achieved
 ✅ Core modules created and tested (all imports successful)
 ✅ Configuration system with .env support
 ✅ Incremental knowledge base updates (PDFs and CVE data)
 ✅ Conversation-aware RAG implementation
-✅ Gradio web UI with Claude Projects-style layout
+✅ Gradio web UI with two-column layout
 ✅ Knowledge base management (add/view sources)
 ✅ Real-time statistics and refresh
 
@@ -128,7 +127,7 @@ This file tracks completed changes and upcoming features for the project.
 
 ### Added (LangChain Web UI)
 - **web/web_ui_langchain.py**: Gradio interface using LangChain
-  - Same Claude Projects-style layout as Phase 1
+  - Same two-column layout as Phase 1
   - Uses LangChainRAG for backend
   - Automatic memory management (no manual history tracking)
   - Port 7861 (Phase 1 uses 7860) - both can run simultaneously
@@ -370,9 +369,9 @@ python web/web_ui_langchain.py
 - CUDA migration guide: Documented upgrade path from 12.1 → 12.4
 
 ### Changed
-- Updated CLAUDE.md with CUDA 12.4 as recommended version
 - Renamed CUDA 12.1 references to CUDA 11.8 for GTX 1660 Ti compatibility
 - Corrected GPU references (GTX 1650 → GTX 1660 Ti in documentation)
+- Updated documentation with CUDA 12.4 as recommended version
 
 ### Performance
 - RTX 4060: 20-40x faster than CPU
@@ -468,7 +467,6 @@ python web/web_ui_langchain.py
 - CVE JSON feed support (V4 schema)
 - PyMuPDF text extraction
 - CPU and CUDA support
-- See CLAUDE.md for complete directory structure
 
 ## [2025-01-18] Phase 2 LangChain Query Fix
 
@@ -767,9 +765,8 @@ else:
 - Validation: Removal works, cleanup works, no resource leaks
 
 **Phase 6: Documentation & Testing** (1-2 hours)
-- Step 6.1: Update CLAUDE.md
-- Step 6.2: Update PROGRESS.md
-- Step 6.3: End-to-end testing
+- Step 6.1: Update PROGRESS.md
+- Step 6.2: End-to-end testing
 - Step 6.4: Performance testing
 - Validation: All tests pass, ready for merge
 
@@ -865,7 +862,7 @@ ENABLE_SESSION_AUTO_EMBED=True  # Backward compatibility control
 - Core: config.py, .env.example, core/session_manager.py
 - RAG: rag/pure_python.py, rag/langchain_impl.py
 - Web: web/web_ui.py, web/web_ui_langchain.py
-- Docs: ARCHITECTURE.md, PROGRESS.md (this file), CLAUDE.md
+- Docs: ARCHITECTURE.md, PROGRESS.md (this file)
 
 ### Decision Log
 

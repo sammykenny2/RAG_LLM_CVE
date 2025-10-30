@@ -279,7 +279,7 @@ metadata = {
 - Built-in file upload, markdown rendering
 - Easy deployment: `--share` flag generates public URL (valid 72 hours)
 
-**Layout**: Claude Projects-inspired two-column design
+**Layout**: Two-column design
 - **Left Column (7/12)**: Chat interface with conversation history
 - **Right Column (5/12)**:
   - Top: Analysis Settings (speed/mode/schema dropdowns)

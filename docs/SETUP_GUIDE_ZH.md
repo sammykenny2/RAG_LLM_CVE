@@ -60,7 +60,7 @@ git --version
 
 ### 1. 解壓縮主專案
 
-你應該已經收到 `RAG_LLM_CVE.zip` 壓縮檔，將它解壓縮到合適的工作目錄。
+你應該已經收到 `RAG_LLM_CVE-main.zip` 壓縮檔，將它解壓縮到合適的工作目錄。
 
 **使用 PowerShell 解壓縮：**
 
@@ -69,18 +69,19 @@ git --version
 cd C:\Users\你的用戶名\Downloads
 
 # 解壓縮到指定目錄
-Expand-Archive -Path RAG_LLM_CVE.zip -DestinationPath C:\Users\你的用戶名\Source
+Expand-Archive -Path RAG_LLM_CVE-main.zip -DestinationPath C:\Users\你的用戶名\Source
 
-# 進入專案目錄
-cd C:\Users\你的用戶名\Source\RAG_LLM_CVE
+# 進入專案目錄（注意解壓縮後的資料夾名稱會是 RAG_LLM_CVE-main）
+cd C:\Users\你的用戶名\Source\RAG_LLM_CVE-main
 ```
 
 **或手動解壓縮：**
 
-1. 在檔案總管中找到 `RAG_LLM_CVE.zip`
+1. 在檔案總管中找到 `RAG_LLM_CVE-main.zip`
 2. 右鍵點擊 → **"解壓縮全部"**
 3. 選擇解壓縮位置（例如 `C:\Users\你的用戶名\Source`）
-4. 完成後，進入 `RAG_LLM_CVE` 資料夾
+4. 完成後，你會看到一個名為 `RAG_LLM_CVE-main` 的資料夾
+5. 進入 `RAG_LLM_CVE-main` 資料夾
 
 ### 2. Clone CVE 資料專案
 
@@ -108,7 +109,7 @@ git clone https://github.com/CVEProject/cvelist.git
 完成後，你的目錄結構應該如下：
 ```
 C:\Users\你的用戶名\Source\
-├── RAG_LLM_CVE\         ← 主專案
+├── RAG_LLM_CVE-main\    ← 主專案
 ├── cvelistV5\           ← CVE V5 資料
 └── cvelist\             ← CVE V4 資料
 ```
@@ -139,7 +140,7 @@ ls ..\cvelist\2025\
 
 **CPU 模式（無需 GPU）：**
 ```powershell
-cd C:\Users\你的用戶名\Source\RAG_LLM_CVE
+cd C:\Users\你的用戶名\Source\RAG_LLM_CVE-main
 .\scripts\windows\Setup-CPU.ps1
 ```
 
@@ -195,7 +196,7 @@ nvidia-smi
 
 成功啟動後，你會看到提示符前面出現環境名稱，例如：
 ```
-(.venv-cuda118) PS C:\Users\你的用戶名\Source\RAG_LLM_CVE>
+(.venv-cuda118) PS C:\Users\你的用戶名\Source\RAG_LLM_CVE-main>
 ```
 
 ### 手動安裝（進階）
@@ -647,12 +648,12 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 # 更新 V5 資料
 cd ..\cvelistV5
 git pull
-cd ..\RAG_LLM_CVE
+cd ..\RAG_LLM_CVE-main
 
 # 更新 V4 資料
 cd ..\cvelist
 git pull
-cd ..\RAG_LLM_CVE
+cd ..\RAG_LLM_CVE-main
 
 # 重新建立 embeddings
 python .\cli\build_embeddings.py
@@ -682,12 +683,9 @@ python .\cli\add_to_embeddings.py
 
 現在你已經成功建立了開發環境並啟動了 Web 介面，可以：
 
-1. **探索更多功能：** 閱讀 [CLAUDE.md](../CLAUDE.md) 了解完整功能
-2. **了解系統架構：** 閱讀 [docs/ARCHITECTURE.md](./ARCHITECTURE.md) 了解技術細節
-3. **查看更新紀錄：** 閱讀 [docs/PROGRESS.md](./PROGRESS.md) 了解最新功能
-4. **自訂配置：** 調整 `.env` 檔案以最佳化系統效能
-
-**需要協助？** 請在 [GitHub Issues](https://github.com/你的用戶名/RAG_LLM_CVE/issues) 提出問題。
+1. **了解系統架構：** 閱讀 [docs/ARCHITECTURE.md](./ARCHITECTURE.md) 了解技術細節
+2. **查看更新紀錄：** 閱讀 [docs/PROGRESS.md](./PROGRESS.md) 了解最新功能
+3. **自訂配置：** 調整 `.env` 檔案以最佳化系統效能
 
 ---
 

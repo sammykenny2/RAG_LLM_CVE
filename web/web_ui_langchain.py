@@ -1,6 +1,6 @@
 """
 Gradio Web UI (Phase 2: LangChain)
-Claude Projects-style interface using LangChain chains and memory.
+Two-column interface using LangChain chains and memory.
 
 Layout:
 - Left: Chat interface with upload button for validation
@@ -757,7 +757,7 @@ def create_interface():
                     elem_id="msg_input"
                 )
 
-                # Action buttons row (Claude Projects style)
+                # Action buttons row
                 with gr.Row():
                     upload_file_btn = gr.UploadButton(
                         "[ADD] Add File",

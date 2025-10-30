@@ -1,6 +1,6 @@
 """
 Gradio Web UI (Phase 1: Pure Python)
-Claude Projects-style interface for RAG CVE validation system.
+Two-column interface for RAG CVE validation system.
 
 Layout:
 - Left: Chat interface with upload button for validation
@@ -976,7 +976,7 @@ def create_interface():
                     elem_id="msg_input"
                 )
 
-                # Action buttons row (Claude Projects style)
+                # Action buttons row
                 with gr.Row():
                     upload_file_btn = gr.UploadButton(
                         "[ADD] Add File",
