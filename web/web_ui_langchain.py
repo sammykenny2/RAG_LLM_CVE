@@ -90,7 +90,7 @@ def initialize_system(speed_level: str = DEFAULT_SPEED, force_reload: bool = Fal
     global rag_system, current_speed, session_manager
 
     if rag_system is not None and not force_reload:
-        return f"⚠️ System already initialized with speed={current_speed}"
+        return f"[WARNING] System already initialized with speed={current_speed}"
 
     # Clean up existing model if reloading
     if force_reload and rag_system is not None:
@@ -107,7 +107,7 @@ def initialize_system(speed_level: str = DEFAULT_SPEED, force_reload: bool = Fal
     # Initialize SessionManager for multi-file context
     if session_manager is None:
         session_manager = SessionManager(session_id=session_id)
-        print(f"✅ SessionManager initialized (session_id={session_id[:8]}...)")
+        print(f"[OK] SessionManager initialized (session_id={session_id[:8]}...)")
 
     # Initialize LangChain RAG with session_manager
     rag_system = LangChainRAG(session_manager=session_manager)
@@ -116,8 +116,8 @@ def initialize_system(speed_level: str = DEFAULT_SPEED, force_reload: bool = Fal
     # Update current speed
     current_speed = speed_level
 
-    print(f"✅ LangChain RAG system ready (speed={current_speed})")
-    return f"✅ System initialized with speed={current_speed}"
+    print(f"[OK] LangChain RAG system ready (speed={current_speed})")
+    return f"[OK] System initialized with speed={current_speed}"
 
 def reload_model(new_speed: str) -> str:
     """
@@ -133,7 +133,7 @@ def reload_model(new_speed: str) -> str:
         result = initialize_system(speed_level=new_speed, force_reload=True)
         return result
     except Exception as e:
-        return f"❌ Reload failed: {str(e)}"
+        return f"[ERROR] Reload failed: {str(e)}"
 
 def update_mode(new_mode: str) -> str:
     """
@@ -147,7 +147,7 @@ def update_mode(new_mode: str) -> str:
     """
     global current_mode
     current_mode = new_mode
-    return f"✅ Mode updated to: {current_mode}"
+    return f"[OK] Mode updated to: {current_mode}"
 
 def get_current_status() -> str:
     """Get current system status as formatted string."""
@@ -159,7 +159,7 @@ def get_current_status() -> str:
 
     status = f"""
     <div style='padding: 10px; background-color: #f0f0f0; border-radius: 5px;'>
-        <h4>📊 Current Settings</h4>
+        <h4>[STATS] Current Settings</h4>
         <p><b>Speed:</b> {current_speed}</p>
         <p><b>Mode:</b> {current_mode}</p>
         <p><b>Model:</b> {model_name}</p>
@@ -176,8 +176,8 @@ def detect_user_intent(message: str, has_file: bool) -> str:
     Detect user intent from natural language message.
 
     Supports Chinese and English phrases for:
-    - summarize: 總結, 摘要, 概括, 整理, 內容, 講什麼, summary, summarize
-    - validate: 驗證, 檢查, 核實, validate, verify, check
+    - summarize: Chinese keywords for summary, summary, summarize
+    - validate: Chinese keywords for validate, validate, verify, check
 
     Args:
         message: User message
@@ -194,8 +194,8 @@ def detect_user_intent(message: str, has_file: bool) -> str:
     # Summarize intent keywords (Chinese + English)
     summarize_keywords = [
         # Chinese
-        '總結', '摘要', '概括', '概要', '整理', '內容', '講什麼', '说什么',
-        '主要內容', '主要内容', '重點', '重点', '大意',
+        'summary_zh', 'summary_zh', 'summary_zh', 'summary_zh', 'summary_zh', 'content_zh', 'whatisit_zh', 'whatisit_zh',
+        'maincontent_zh', 'maincontent_zh', 'keypoint_zh', 'keypoint_zh', 'gist_zh',
         # English
         'summarize', 'summary', 'summarise', 'what is this', 'what does',
         'content', 'about', 'main point', 'key point', 'overview'
@@ -204,7 +204,7 @@ def detect_user_intent(message: str, has_file: bool) -> str:
     # Validate intent keywords (Chinese + English)
     validate_keywords = [
         # Chinese
-        '驗證', '验证', '檢查', '检查', '核實', '核实', '確認', '确认',
+        'validate_zh', 'validate_zh', 'check_zh', 'check_zh', 'verify_zh', 'verify_zh', 'confirm_zh', 'confirm_zh',
         # English
         'validate', 'verify', 'check', 'correct', 'accuracy'
     ]
@@ -251,11 +251,11 @@ def chat_respond(message: str, history: list):
     user_content = message
     if chat_uploaded_file:
         file_name = Path(chat_uploaded_file).name
-        user_content = f"{message}\n\n📎 **Attached:** {file_name}"
+        user_content = f"{message}\n\n[ATTACH] **Attached:** {file_name}"
 
     # Immediately show user message with "Thinking..." placeholder
     history.append({"role": "user", "content": user_content})
-    history.append({"role": "assistant", "content": "💭 Thinking..."})
+    history.append({"role": "assistant", "content": "[THINKING] Thinking..."})
     yield "", history, "", gr.update()
 
     try:
@@ -292,7 +292,7 @@ def chat_respond(message: str, history: list):
         yield "", history, "", gr.update(interactive=False)
 
     except Exception as e:
-        error_msg = f"❌ Error: {str(e)}"
+        error_msg = f"[ERROR] Error: {str(e)}"
         history[-1]["content"] = error_msg
 
         # Delete uploaded file from disk if exists (even on error)
@@ -336,8 +336,8 @@ def handle_chat_file_upload(file):
         # Show uploading status
         uploading_html = f"""
         <div style='padding: 10px; background-color: #fff3cd; border-radius: 5px; border-left: 4px solid #ffc107;'>
-            <p style='margin: 0;'><b>📄 {file_name}</b></p>
-            <p style='margin: 5px 0 0 0; color: #856404;'>🔄 Uploading...</p>
+            <p style='margin: 0;'><b>[FILE] {file_name}</b></p>
+            <p style='margin: 5px 0 0 0; color: #856404;'>[RELOAD] Uploading...</p>
         </div>
         """
 
@@ -355,9 +355,9 @@ def handle_chat_file_upload(file):
         if session_manager and ENABLE_SESSION_AUTO_EMBED:
             try:
                 file_info = session_manager.add_file(str(dest_path))
-                print(f"✅ File added to session: {file_name} ({file_info['chunks']} chunks)")
+                print(f"[OK] File added to session: {file_name} ({file_info['chunks']} chunks)")
             except Exception as e:
-                print(f"⚠️ Failed to add file to session: {e}")
+                print(f"[WARNING] Failed to add file to session: {e}")
 
         chat_file_uploading = False
 
@@ -365,8 +365,8 @@ def handle_chat_file_upload(file):
         file_count = len(session_manager.files) if (session_manager and ENABLE_SESSION_AUTO_EMBED) else 1
         success_html = f"""
         <div style='padding: 10px; background-color: #d4edda; border-radius: 5px; border-left: 4px solid #28a745;'>
-            <p style='margin: 0;'><b>📄 {file_name}</b></p>
-            <p style='margin: 5px 0 0 0; color: #155724;'>✅ Ready (Session: {file_count} file{'s' if file_count != 1 else ''})</p>
+            <p style='margin: 0;'><b>[FILE] {file_name}</b></p>
+            <p style='margin: 5px 0 0 0; color: #155724;'>[OK] Ready (Session: {file_count} file{'s' if file_count != 1 else ''})</p>
         </div>
         """
 
@@ -383,8 +383,8 @@ def handle_chat_file_upload(file):
 
         error_html = f"""
         <div style='padding: 10px; background-color: #f8d7da; border-radius: 5px; border-left: 4px solid #dc3545;'>
-            <p style='margin: 0;'><b>📄 {display_name}</b></p>
-            <p style='margin: 5px 0 0 0; color: #721c24;'>❌ Upload Error</p>
+            <p style='margin: 0;'><b>[FILE] {display_name}</b></p>
+            <p style='margin: 5px 0 0 0; color: #721c24;'>[ERROR] Upload Error</p>
         </div>
         """
         return error_html, gr.update(interactive=False)
@@ -434,7 +434,7 @@ def process_uploaded_report(
         str: Processing result
     """
     if file is None:
-        return "⚠️ No file uploaded"
+        return "[WARNING] No file uploaded"
 
     # Use global mode if not specified
     mode = mode or current_mode
@@ -463,7 +463,7 @@ def process_uploaded_report(
             pdf_processor = PDFProcessor()
             text = pdf_processor.extract_text(file_path, max_pages=max_pages)
             summary = rag_system.summarize_report(text)  # Let RAG class use .env config
-            return f"📝 Summary:\n\n{summary}"
+            return f"[INFO] Summary:\n\n{summary}"
 
         elif action == 'validate':
             # Process report and validate CVE usage
@@ -473,18 +473,18 @@ def process_uploaded_report(
                 max_pages=max_pages
             )
             validation = rag_system.validate_cve_usage(report_text, cve_descriptions, max_tokens=validation_tokens)
-            return f"✅ Validation Result:\n\n{validation}\n\n📋 Found CVEs: {', '.join(cves)}"
+            return f"[OK] Validation Result:\n\n{validation}\n\n[CLIPBOARD] Found CVEs: {', '.join(cves)}"
 
         elif action == 'qa':
             # Answer question about report (uses .env QA_* configuration)
             if not question:
-                return "⚠️ No question provided for Q&A"
+                return "[WARNING] No question provided for Q&A"
 
             from core.pdf_processor import PDFProcessor
             pdf_processor = PDFProcessor()
             text = pdf_processor.extract_text(file_path, max_pages=max_pages)
             answer = rag_system.answer_question_about_report(text, question)  # Let RAG class use .env config
-            return f"💬 Answer:\n\n{answer}"
+            return f"[CHAT] Answer:\n\n{answer}"
 
         elif action == 'add':
             # Add to knowledge base
@@ -492,10 +492,10 @@ def process_uploaded_report(
             return result
 
         else:
-            return f"⚠️ Unknown action: {action}"
+            return f"[WARNING] Unknown action: {action}"
 
     except Exception as e:
-        return f"❌ Processing error: {str(e)}"
+        return f"[ERROR] Processing error: {str(e)}"
 
 # =============================================================================
 # Knowledge base management
@@ -559,13 +559,13 @@ def handle_kb_file_upload(file):
         # Add to knowledge base (LangChain handles embedding generation)
         rag_system.add_document_to_kb(texts=chunks, metadatas=metadatas)
 
-        print(f"✅ Added {len(chunks)} chunks from {file_name} to knowledge base")
+        print(f"[OK] Added {len(chunks)} chunks from {file_name} to knowledge base")
 
         # Return empty status (hide immediately), updated KB display, dropdown, and clear file input
         return "", format_kb_display(), gr.update(choices=get_source_names()), None
 
     except Exception as e:
-        print(f"❌ Error adding {file.name if file else 'file'} to knowledge base: {str(e)}")
+        print(f"[ERROR] Error adding {file.name if file else 'file'} to knowledge base: {str(e)}")
 
         # Return empty status even on error (hide immediately), and clear file input
         return "", format_kb_display(), gr.update(choices=get_source_names()), None
@@ -582,7 +582,7 @@ def add_pdf_to_kb(file, source_name: str = None) -> str:
         str: Result message
     """
     if file is None:
-        return "⚠️ No file selected"
+        return "[WARNING] No file selected"
 
     try:
         from core.pdf_processor import PDFProcessor
@@ -626,10 +626,10 @@ def add_pdf_to_kb(file, source_name: str = None) -> str:
         # Add to knowledge base (LangChain handles embedding generation)
         rag_system.add_document_to_kb(texts=chunks, metadatas=metadatas)
 
-        return f"✅ Added {len(chunks)} chunks from '{source_name}' to knowledge base"
+        return f"[OK] Added {len(chunks)} chunks from '{source_name}' to knowledge base"
 
     except Exception as e:
-        return f"❌ Error adding to KB: {str(e)}"
+        return f"[ERROR] Error adding to KB: {str(e)}"
 
 def format_kb_display() -> str:
     """
@@ -642,26 +642,26 @@ def format_kb_display() -> str:
         stats = rag_system.get_kb_stats()
 
         if not stats:
-            return "<p>⚠️ No statistics available</p>"
+            return "<p>[WARNING] No statistics available</p>"
 
         sources = stats.get('sources', {})
 
         # Build HTML with collapsible sources list
         html = f"""
         <div style='padding: 10px; background-color: #f0f0f0; border-radius: 5px;'>
-            <h4>📊 Statistics</h4>
+            <h4>[STATS] Statistics</h4>
             <p><b>Total documents:</b> {stats.get('total_docs', 0)}</p>
             <p><b>By type:</b> {dict(stats.get('by_source_type', {}))}</p>
             <br>
             <details>
                 <summary style='cursor: pointer; font-weight: bold; font-size: 1.1em;'>
-                    📚 Sources ({len(sources)})
+                    [KB] Sources ({len(sources)})
                 </summary>
                 <ul style='list-style: none; padding-left: 0; margin-top: 10px;'>
         """
 
         for source_name, info in sources.items():
-            icon = "📄" if info['type'] == 'pdf' else "🔖"
+            icon = "[FILE]" if info['type'] == 'pdf' else "[TAG]"
             date = info['added_date'][:10]
             html += f"<li>{icon} <b>{source_name}</b> ({info['count']} chunks, added {date})</li>"
 
@@ -674,7 +674,7 @@ def format_kb_display() -> str:
         return html
 
     except Exception as e:
-        return f"<p>❌ Error loading sources: {str(e)}</p>"
+        return f"<p>[ERROR] Error loading sources: {str(e)}</p>"
 
 def get_source_names() -> list:
     """
@@ -704,16 +704,16 @@ def delete_source(source_name: str) -> tuple:
         tuple: (status_message, updated_kb_display, updated_dropdown_choices)
     """
     if not source_name:
-        return "⚠️ No source selected", format_kb_display(), get_source_names()
+        return "[WARNING] No source selected", format_kb_display(), get_source_names()
 
     try:
         # Delete the source using chroma_manager
         n_deleted = rag_system.chroma_manager.delete_by_source(source_name)
 
         if n_deleted > 0:
-            status = f"✅ Deleted {n_deleted} chunks from '{source_name}'"
+            status = f"[OK] Deleted {n_deleted} chunks from '{source_name}'"
         else:
-            status = f"⚠️ Source '{source_name}' not found"
+            status = f"[WARNING] Source '{source_name}' not found"
 
         # Get updated displays
         updated_display = format_kb_display()
@@ -722,7 +722,7 @@ def delete_source(source_name: str) -> tuple:
         return status, updated_display, updated_choices
 
     except Exception as e:
-        return f"❌ Error deleting source: {str(e)}", format_kb_display(), get_source_names()
+        return f"[ERROR] Error deleting source: {str(e)}", format_kb_display(), get_source_names()
 
 # =============================================================================
 # Gradio interface
@@ -733,13 +733,13 @@ def create_interface():
 
     with gr.Blocks(title="RAG CVE Validation System (LangChain)", theme=gr.themes.Soft()) as demo:
         # Title
-        gr.Markdown("# 🛡️ RAG CVE Validation System (LangChain)")
+        gr.Markdown("# [SHIELD] RAG CVE Validation System (LangChain)")
         gr.Markdown("Conversational AI with LangChain automatic memory management")
 
         with gr.Row():
             # Left column: Chat interface (7/12 width)
             with gr.Column(scale=7):
-                gr.Markdown("### 💬 Conversation")
+                gr.Markdown("### [CHAT] Conversation")
 
                 chatbot = gr.Chatbot(
                     label="Chat History",
@@ -759,13 +759,13 @@ def create_interface():
                 # Action buttons row (Claude Projects style)
                 with gr.Row():
                     upload_file_btn = gr.UploadButton(
-                        "➕ Add File",
+                        "[ADD] Add File",
                         file_types=[".pdf"],
                         file_count="single",
                         size="sm",
                         scale=1
                     )
-                    remove_file_btn = gr.Button("🗑️", size="sm", scale=0, min_width=40, interactive=False)
+                    remove_file_btn = gr.Button("[DELETE]", size="sm", scale=0, min_width=40, interactive=False)
                     send_btn = gr.Button("Send →", size="sm", scale=1, variant="primary", elem_id="send_btn")
                     with gr.Column(scale=8):
                         pass  # Spacer
@@ -776,7 +776,7 @@ def create_interface():
             # Right column: Settings and Knowledge Base (5/12 width)
             with gr.Column(scale=5):
                 # Current Status Display
-                gr.Markdown("### ⚙️ Analysis Settings")
+                gr.Markdown("### [SETTINGS] Analysis Settings")
                 with gr.Group():
                     status_display = gr.HTML(
                         value=get_current_status(),
@@ -787,7 +787,7 @@ def create_interface():
                         choices=['normal', 'fast', 'fastest'],
                         value=DEFAULT_SPEED,
                         label="Speed",
-                        info="⚠️ Changing speed will reload the model (takes 1-2 min)"
+                        info="[WARNING] Changing speed will reload the model (takes 1-2 min)"
                     )
                     mode_dropdown = gr.Dropdown(
                         choices=['demo', 'full'],
@@ -799,7 +799,7 @@ def create_interface():
                 gr.Markdown("---")
 
                 # Knowledge Base panel
-                gr.Markdown("### 📚 Knowledge Base")
+                gr.Markdown("### [KB] Knowledge Base")
                 with gr.Group():
                     kb_display = gr.HTML(
                         value=format_kb_display(),
@@ -807,7 +807,7 @@ def create_interface():
                     )
 
                     with gr.Row():
-                        refresh_kb_btn = gr.Button("🔄 Refresh", size="sm", scale=1)
+                        refresh_kb_btn = gr.Button("[RELOAD] Refresh", size="sm", scale=1)
 
                     # Delete section
                     source_dropdown = gr.Dropdown(
@@ -815,7 +815,7 @@ def create_interface():
                         label="Remove",
                         interactive=True
                     )
-                    delete_btn = gr.Button("🗑️ Delete Selected Source", size="sm", variant="stop")
+                    delete_btn = gr.Button("[DELETE] Delete Selected Source", size="sm", variant="stop")
 
                     # Add section
                     add_file = gr.File(
@@ -825,7 +825,7 @@ def create_interface():
                         type="filepath"
                     )
                     kb_upload_btn = gr.UploadButton(
-                        "➕ Add File To Knowledge Base",
+                        "[ADD] Add File To Knowledge Base",
                         file_types=[".pdf"],
                         file_count="single",
                         size="sm"
@@ -981,7 +981,7 @@ def main():
         for name, info in list(stats.get('sources', {}).items())[:5]:
             print(f"    - {name}: {info['count']} chunks")
     except Exception as e:
-        print(f"  ⚠️ Error loading stats: {e}")
+        print(f"  [WARNING] Error loading stats: {e}")
 
     demo.launch(
         server_name=GRADIO_SERVER_NAME,

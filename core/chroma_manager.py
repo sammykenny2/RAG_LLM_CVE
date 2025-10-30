@@ -69,7 +69,7 @@ class ChromaManager:
         """
         if self._initialized:
             if VERBOSE_LOGGING:
-                print("⚠️ Chroma manager already initialized, skipping...")
+                print("[WARNING] Chroma manager already initialized, skipping...")
             return
 
         if VERBOSE_LOGGING:
@@ -82,7 +82,7 @@ class ChromaManager:
         try:
             self.collection = self.client.get_collection(self.collection_name)
             if VERBOSE_LOGGING:
-                print(f"✅ Loaded existing collection: {self.collection_name}")
+                print(f"[OK] Loaded existing collection: {self.collection_name}")
         except Exception:
             if create_if_not_exists:
                 self.collection = self.client.create_collection(
@@ -90,7 +90,7 @@ class ChromaManager:
                     metadata={"description": "CVE and PDF embeddings for RAG system"}
                 )
                 if VERBOSE_LOGGING:
-                    print(f"✅ Created new collection: {self.collection_name}")
+                    print(f"[OK] Created new collection: {self.collection_name}")
             else:
                 raise RuntimeError(f"Collection '{self.collection_name}' not found")
 
@@ -169,7 +169,7 @@ class ChromaManager:
             )
 
         if VERBOSE_LOGGING:
-            print(f"✅ Added {n_docs} documents to collection")
+            print(f"[OK] Added {n_docs} documents to collection")
 
         return n_docs
 
@@ -257,11 +257,11 @@ class ChromaManager:
         if ids_to_delete:
             self.collection.delete(ids=ids_to_delete)
             if VERBOSE_LOGGING:
-                print(f"✅ Deleted {len(ids_to_delete)} documents from source: {source_name}")
+                print(f"[OK] Deleted {len(ids_to_delete)} documents from source: {source_name}")
             return len(ids_to_delete)
         else:
             if VERBOSE_LOGGING:
-                print(f"⚠️ No documents found for source: {source_name}")
+                print(f"[WARNING] No documents found for source: {source_name}")
             return 0
 
     def delete_by_year(self, year: int, schema: str = None) -> int:
@@ -301,13 +301,13 @@ class ChromaManager:
 
             if ids_to_delete:
                 self.collection.delete(ids=ids_to_delete)
-                print(f"  ✅ Deleted {len(ids_to_delete)} documents from {source_name}")
+                print(f"  [OK] Deleted {len(ids_to_delete)} documents from {source_name}")
                 total_deleted += len(ids_to_delete)
 
         if total_deleted > 0:
-            print(f"✅ Total deleted for year {year}: {total_deleted} documents")
+            print(f"[OK] Total deleted for year {year}: {total_deleted} documents")
         else:
-            print(f"⚠️ No documents found for year {year}")
+            print(f"[WARNING] No documents found for year {year}")
 
         return total_deleted
 
@@ -398,7 +398,7 @@ class ChromaManager:
         )
 
         if VERBOSE_LOGGING:
-            print(f"⚠️ Collection '{self.collection_name}' has been reset")
+            print(f"[WARNING] Collection '{self.collection_name}' has been reset")
 
 
 # =============================================================================

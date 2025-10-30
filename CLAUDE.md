@@ -311,9 +311,9 @@ AI: [Uses exact metadata match for CVE ID, falls back to semantic search if not 
 
 **Work with uploaded reports** (Natural Language Intent Detection):
 1. Upload PDF file in chat interface
-2. Ask questions in Chinese or English:
-   - **Summarize**: "總結這個檔案", "summarize", "這個報告在講什麼"
-   - **Validate CVEs**: "驗證CVE使用", "validate", "check CVE correctness"
+2. Ask questions in natural language:
+   - **Summarize**: "summarize this file", "what is this report about", "give me a summary"
+   - **Validate CVEs**: "validate CVE usage", "check CVE correctness", "verify CVEs"
    - **Q&A (default)**: Any other question triggers Q&A on file content
 3. System automatically detects intent and processes accordingly
 4. No need to remember specific keywords - just ask naturally

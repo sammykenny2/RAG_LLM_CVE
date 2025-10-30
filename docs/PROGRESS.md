@@ -714,7 +714,7 @@ RAG_LLM_CVE/
 ### Plan A Approach (Web UI Q&A)
 **User workflow**:
 1. Upload a PDF file in chat interface
-2. Ask any question (e.g., "What are the key findings?", "這個檔案內容在講什麼？")
+2. Ask any question (e.g., "What are the key findings?", "What is this document about?")
 3. System automatically:
    - Detects if 'summarize' or 'validate' keyword → uses those actions
    - Otherwise → **defaults to Q&A on file content** (no special keywords needed)

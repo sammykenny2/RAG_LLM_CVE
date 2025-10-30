@@ -78,14 +78,14 @@ class SessionManager:
         try:
             self.collection = self.client.get_collection(self.collection_name)
             if VERBOSE_LOGGING:
-                print(f"✅ Loaded existing session collection: {self.collection_name}")
+                print(f"[OK] Loaded existing session collection: {self.collection_name}")
         except Exception:
             self.collection = self.client.create_collection(
                 name=self.collection_name,
                 metadata={"description": f"Session {session_id} temporary files"}
             )
             if VERBOSE_LOGGING:
-                print(f"✅ Created new session collection: {self.collection_name}")
+                print(f"[OK] Created new session collection: {self.collection_name}")
 
         # Initialize embedding model (shared across files)
         self.embedder = EmbeddingModel()
@@ -222,7 +222,7 @@ class SessionManager:
             file_info["chunks"] = len(chunks)
 
             if VERBOSE_LOGGING:
-                print(f"✅ File added successfully: {filename} ({len(chunks)} chunks)")
+                print(f"[OK] File added successfully: {filename} ({len(chunks)} chunks)")
 
             return file_info
 
@@ -232,7 +232,7 @@ class SessionManager:
             file_info["error"] = str(e)
 
             if VERBOSE_LOGGING:
-                print(f"❌ Error processing file: {filename}")
+                print(f"[ERROR] Error processing file: {filename}")
                 print(f"  └─ {e}")
 
             return file_info
@@ -249,7 +249,7 @@ class SessionManager:
         """
         if filename not in self.files:
             if VERBOSE_LOGGING:
-                print(f"⚠️ File not found in session: {filename}")
+                print(f"[WARNING] File not found in session: {filename}")
             return False
 
         try:
@@ -263,7 +263,7 @@ class SessionManager:
             if ids_to_delete:
                 self.collection.delete(ids=ids_to_delete)
                 if VERBOSE_LOGGING:
-                    print(f"✅ Deleted {len(ids_to_delete)} chunks from: {filename}")
+                    print(f"[OK] Deleted {len(ids_to_delete)} chunks from: {filename}")
 
             # Remove from tracking
             del self.files[filename]
@@ -272,7 +272,7 @@ class SessionManager:
 
         except Exception as e:
             if VERBOSE_LOGGING:
-                print(f"❌ Error removing file: {filename}")
+                print(f"[ERROR] Error removing file: {filename}")
                 print(f"  └─ {e}")
             return False
 
@@ -346,30 +346,30 @@ class SessionManager:
             # Delete Chroma collection
             self.client.delete_collection(self.collection_name)
             if VERBOSE_LOGGING:
-                print(f"✅ Deleted collection: {self.collection_name}")
+                print(f"[OK] Deleted collection: {self.collection_name}")
         except Exception as e:
             if VERBOSE_LOGGING:
-                print(f"⚠️ Error deleting collection: {e}")
+                print(f"[WARNING] Error deleting collection: {e}")
 
         try:
             # Delete session directory
             if self.session_dir.exists():
                 shutil.rmtree(self.session_dir)
                 if VERBOSE_LOGGING:
-                    print(f"✅ Deleted session directory: {self.session_dir}")
+                    print(f"[OK] Deleted session directory: {self.session_dir}")
         except Exception as e:
             if VERBOSE_LOGGING:
-                print(f"⚠️ Error deleting session directory: {e}")
+                print(f"[WARNING] Error deleting session directory: {e}")
 
         # Clean up embedding model
         try:
             self.embedder.cleanup()
         except Exception as e:
             if VERBOSE_LOGGING:
-                print(f"⚠️ Error cleaning up embedder: {e}")
+                print(f"[WARNING] Error cleaning up embedder: {e}")
 
         if VERBOSE_LOGGING:
-            print(f"✅ Session cleaned up: {self.session_id}")
+            print(f"[OK] Session cleaned up: {self.session_id}")
 
     def _split_text_with_overlap(self, text: str) -> List[str]:
         """

@@ -58,10 +58,10 @@ foreach ($CachePath in $CachePaths) {
                 Path = $Dir.FullName
                 Size = $Size
             }
-            Write-Host "  ✓ Removed: $($Dir.Name)" -ForegroundColor Green
+            Write-Host "  [OK] Removed: $($Dir.Name)" -ForegroundColor Green
         }
         catch {
-            Write-Host "  ✗ Failed to remove: $($Dir.Name) - $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "  [FAIL] Failed to remove: $($Dir.Name) - $($_.Exception.Message)" -ForegroundColor Red
         }
     }
 }

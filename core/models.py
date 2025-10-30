@@ -83,7 +83,7 @@ class LlamaModel:
         for indicator in large_model_indicators:
             if indicator in model_name_lower:
                 if VERBOSE_LOGGING:
-                    print(f"🔍 Detected large model ({indicator.upper()}), enabling 4-bit quantization")
+                    print(f"[SEARCH] Detected large model ({indicator.upper()}), enabling 4-bit quantization")
                 return True
 
         return False
@@ -92,7 +92,7 @@ class LlamaModel:
         """Load tokenizer and model with specified optimizations."""
         if self._initialized:
             if VERBOSE_LOGGING:
-                print("⚠️ Model already initialized, skipping...")
+                print("[WARNING] Model already initialized, skipping...")
             return self.tokenizer, self.model
 
         if VERBOSE_LOGGING:
@@ -157,7 +157,7 @@ class LlamaModel:
 
         if VERBOSE_LOGGING:
             device = next(self.model.parameters()).device
-            print(f"✅ Model loaded on device: {device}")
+            print(f"[OK] Model loaded on device: {device}")
 
         return self.tokenizer, self.model
 
@@ -188,7 +188,7 @@ class LlamaModel:
         self._initialized = False
 
         if VERBOSE_LOGGING:
-            print("✅ Model cleaned up from memory")
+            print("[OK] Model cleaned up from memory")
 
     def generate(
         self,

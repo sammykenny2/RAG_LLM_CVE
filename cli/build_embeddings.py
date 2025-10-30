@@ -155,7 +155,7 @@ def process_cve_file(cve_file_path, keyword_filter=None):
     file_ext = Path(cve_file_path).suffix.lower()
 
     if not Path(cve_file_path).exists():
-        print(f"❌ File not found: {cve_file_path}")
+        print(f"[ERROR] File not found: {cve_file_path}")
         return []
 
     if file_ext == '.jsonl':
@@ -183,7 +183,7 @@ def process_cve_file(cve_file_path, keyword_filter=None):
                         "cve_id": record['cve_id']
                     })
                 except (json.JSONDecodeError, KeyError) as e:
-                    print(f"⚠️ Skipping line {line_num}: {e}")
+                    print(f"[WARNING] Skipping line {line_num}: {e}")
                     continue
 
     elif file_ext == '.txt':
@@ -229,15 +229,15 @@ def process_cve_file(cve_file_path, keyword_filter=None):
                 })
 
             except Exception as e:
-                print(f"⚠️ Error parsing entry: {e}")
+                print(f"[WARNING] Error parsing entry: {e}")
                 continue
 
     else:
-        print(f"❌ Unsupported file format: {file_ext}. Use .txt or .jsonl")
+        print(f"[ERROR] Unsupported file format: {file_ext}. Use .txt or .jsonl")
         return []
 
     if keyword_filter:
-        print(f"\n✅ Extracted {len(cve_data)} CVE descriptions (filtered by '{keyword_filter}')")
+        print(f"\n[OK] Extracted {len(cve_data)} CVE descriptions (filtered by '{keyword_filter}')")
     else:
         print(f"\nExtracted {len(cve_data)} CVE descriptions")
     return cve_data
@@ -284,7 +284,7 @@ def process_cve_data(years, schema, batch_size, precision, keyword_filter=None):
                 paths_to_check.append(('v4', v4_year_path))
 
         if not paths_to_check:
-            print(f"⚠️ No CVE data found for year {year} with schema {schema}")
+            print(f"[WARNING] No CVE data found for year {year} with schema {schema}")
             continue
 
         year_cve_count = 0
@@ -329,7 +329,7 @@ def process_cve_data(years, schema, batch_size, precision, keyword_filter=None):
 
     if keyword_filter:
         print(f"\n{'='*60}")
-        print(f"✅ Total: Extracted {len(all_cve_data)} CVE descriptions (filtered by '{keyword_filter}')")
+        print(f"[OK] Total: Extracted {len(all_cve_data)} CVE descriptions (filtered by '{keyword_filter}')")
         print(f"{'='*60}")
     else:
         print(f"\n{'='*60}")
@@ -463,8 +463,8 @@ def process_pdf(pdf_path, sentence_size, output_path, batch_size, precision, ext
 
         print(f"  └─ Stored {len(dic_chunks)} embeddings in Chroma database")
 
-    print(f"✅ Generated: {output_path}")
-    print(f"💡 To use this with theRag.py, run:")
+    print(f"[OK] Generated: {output_path}")
+    print(f"[INFO] To use this with theRag.py, run:")
     print(f"   python theRag.py --extension={extension}")
 
 
@@ -569,7 +569,7 @@ Examples:
             v4_years = get_available_years(str(CVE_V4_PATH)) if schema in ['v4', 'all'] else []
             years = sorted(set(v5_years + v4_years))
             if not years:
-                print(f"❌ No year directories found in CVE feeds for schema '{schema}'")
+                print(f"[ERROR] No year directories found in CVE feeds for schema '{schema}'")
                 sys.exit(1)
             print(f"Processing all available years: {years}")
         elif '-' in year_input:
@@ -579,12 +579,12 @@ Examples:
                 start_year = int(start_year.strip())
                 end_year = int(end_year.strip())
                 if start_year > end_year:
-                    print(f"❌ Invalid range: start year {start_year} > end year {end_year}")
+                    print(f"[ERROR] Invalid range: start year {start_year} > end year {end_year}")
                     sys.exit(1)
                 years = list(range(start_year, end_year + 1))
                 print(f"Processing years {start_year}-{end_year}: {years}")
             except ValueError:
-                print(f"❌ Invalid year range format: {year_input}. Use format: 2023-2025")
+                print(f"[ERROR] Invalid year range format: {year_input}. Use format: 2023-2025")
                 sys.exit(1)
         elif ',' in year_input:
             # Comma-separated format: 2023,2024,2025
@@ -592,14 +592,14 @@ Examples:
                 years = [int(y.strip()) for y in year_input.split(',')]
                 print(f"Processing years: {years}")
             except ValueError:
-                print(f"❌ Invalid year format: {year_input}. Use single year (2025), range (2023-2025), comma-separated (2023,2024,2025), or 'all'")
+                print(f"[ERROR] Invalid year format: {year_input}. Use single year (2025), range (2023-2025), comma-separated (2023,2024,2025), or 'all'")
                 sys.exit(1)
         else:
             # Single year
             try:
                 years = [int(year_input)]
             except ValueError:
-                print(f"❌ Invalid year format: {year_input}. Use single year (2025), range (2023-2025), comma-separated (2023,2024,2025), or 'all'")
+                print(f"[ERROR] Invalid year format: {year_input}. Use single year (2025), range (2023-2025), comma-separated (2023,2024,2025), or 'all'")
                 sys.exit(1)
 
         # Ask for filter keyword
@@ -617,7 +617,7 @@ Examples:
         cve_file = input("\nEnter CVE file path (.txt or .jsonl): ").strip()
 
     else:
-        print(f"❌ Invalid choice: {choice}")
+        print(f"[ERROR] Invalid choice: {choice}")
         sys.exit(1)
 
     # Display configuration
@@ -653,7 +653,7 @@ Examples:
         dic_chunks = process_cve_file(cve_file, keyword_filter=args.filter)
 
         if not dic_chunks:
-            print("❌ No CVE data found to process")
+            print("[ERROR] No CVE data found to process")
             sys.exit(1)
 
         # Initialize SentenceTransformer
@@ -724,8 +724,8 @@ Examples:
                 )
             print(f"  └─ Stored {len(dic_chunks)} embeddings in Chroma database")
 
-        print(f"✅ Generated: {output_path}")
-        print(f"\n💡 To use this with validate_report.py, run:")
+        print(f"[OK] Generated: {output_path}")
+        print(f"\n[INFO] To use this with validate_report.py, run:")
         print(f"   python validate_report.py --extension={args.extension}")
 
     else:  # CVE JSON mode
@@ -733,7 +733,7 @@ Examples:
         dic_chunks = process_cve_data(years, schema, BATCH_SIZE, PRECISION, keyword_filter=args.filter)
 
         if not dic_chunks:
-            print("❌ No CVE data found to process")
+            print("[ERROR] No CVE data found to process")
             sys.exit(1)
 
         # Initialize SentenceTransformer
@@ -804,6 +804,6 @@ Examples:
                 )
             print(f"  └─ Stored {len(dic_chunks)} embeddings in Chroma database")
 
-        print(f"✅ Generated: {output_path}")
-        print(f"\n💡 To use this with validate_report.py, run:")
+        print(f"[OK] Generated: {output_path}")
+        print(f"\n[INFO] To use this with validate_report.py, run:")
         print(f"   python validate_report.py --extension={args.extension}")

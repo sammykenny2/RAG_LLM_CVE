@@ -23,7 +23,7 @@ def list_sources(manager: ChromaManager):
     sources = stats['sources']
 
     if not sources:
-        print("⚠️ Knowledge base is empty")
+        print("[WARNING] Knowledge base is empty")
         return []
 
     print(f"\n{'='*60}")
@@ -53,20 +53,20 @@ def remove_source(manager: ChromaManager, source_name: str) -> bool:
     print(f"{'='*60}\n")
 
     # Confirm deletion
-    confirm = input(f"⚠️ This will permanently delete all chunks from '{source_name}'. Continue? (yes/no): ").strip().lower()
+    confirm = input(f"[WARNING] This will permanently delete all chunks from '{source_name}'. Continue? (yes/no): ").strip().lower()
 
     if confirm not in ['yes', 'y']:
-        print("❌ Cancelled")
+        print("[ERROR] Cancelled")
         return False
 
     # Delete
     count = manager.delete_by_source(source_name)
 
     if count > 0:
-        print(f"✅ Removed {count} chunks from '{source_name}'")
+        print(f"[OK] Removed {count} chunks from '{source_name}'")
         return True
     else:
-        print(f"⚠️ Source '{source_name}' not found")
+        print(f"[WARNING] Source '{source_name}' not found")
         return False
 
 def main():
@@ -125,10 +125,10 @@ Examples:
             if 0 <= index < len(source_list):
                 source_name = source_list[index]
             else:
-                print(f"❌ Invalid number: {choice}")
+                print(f"[ERROR] Invalid number: {choice}")
                 return
         except ValueError:
-            print(f"❌ Invalid input: {choice}")
+            print(f"[ERROR] Invalid input: {choice}")
             return
 
     # Remove source

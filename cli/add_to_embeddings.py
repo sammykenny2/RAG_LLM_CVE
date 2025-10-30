@@ -139,7 +139,7 @@ def process_cve_file(
     file_ext = cve_file_path.suffix.lower()
 
     if not cve_file_path.exists():
-        print(f"❌ File not found: {cve_file_path}")
+        print(f"[ERROR] File not found: {cve_file_path}")
         return 0
 
     cve_texts = []
@@ -173,7 +173,7 @@ def process_cve_file(
                         'precision': precision
                     })
                 except (json.JSONDecodeError, KeyError) as e:
-                    print(f"⚠️ Skipping line {line_num}: {e}")
+                    print(f"[WARNING] Skipping line {line_num}: {e}")
                     continue
 
     elif file_ext == '.txt':
@@ -222,15 +222,15 @@ def process_cve_file(
                 })
 
             except Exception as e:
-                print(f"⚠️ Error parsing entry: {e}")
+                print(f"[WARNING] Error parsing entry: {e}")
                 continue
 
     else:
-        print(f"❌ Unsupported file format: {file_ext}. Use .txt or .jsonl")
+        print(f"[ERROR] Unsupported file format: {file_ext}. Use .txt or .jsonl")
         return 0
 
     if not cve_texts:
-        print(f"⚠️ No CVE descriptions extracted")
+        print(f"[WARNING] No CVE descriptions extracted")
         return 0
 
     print(f"\nExtracted {len(cve_texts)} CVE descriptions")
@@ -256,7 +256,7 @@ def process_cve_file(
         metadata=cve_metadata
     )
 
-    print(f"✅ Added {n_added} CVE descriptions")
+    print(f"[OK] Added {n_added} CVE descriptions")
     return n_added
 
 def process_pdf_files(
@@ -286,7 +286,7 @@ def process_pdf_files(
     for pdf_path in pdf_files:
         pdf_path = Path(pdf_path)
         if not pdf_path.exists():
-            print(f"⚠️ File not found: {pdf_path}, skipping...")
+            print(f"[WARNING] File not found: {pdf_path}, skipping...")
             continue
 
         print(f"\n{'='*60}")
@@ -353,7 +353,7 @@ def process_pdf_files(
         )
 
         total_added += n_added
-        print(f"✅ Added {n_added} chunks from {pdf_path.name}")
+        print(f"[OK] Added {n_added} chunks from {pdf_path.name}")
 
     return total_added
 
@@ -393,7 +393,7 @@ def process_cve_data(
             paths_to_check.append(('v4', v4_year_path))
 
     if not paths_to_check:
-        print(f"❌ No CVE data found for year {year} with schema {schema}")
+        print(f"[ERROR] No CVE data found for year {year} with schema {schema}")
         return 0
 
     # Collect all CVE text descriptions
@@ -458,11 +458,11 @@ def process_cve_data(
 
                 except Exception as e:
                     if '--verbose' in sys.argv:
-                        print(f"⚠️ Error processing {json_file.name}: {e}")
+                        print(f"[WARNING] Error processing {json_file.name}: {e}")
                     continue
 
     if not cve_texts:
-        print(f"⚠️ No CVE descriptions extracted")
+        print(f"[WARNING] No CVE descriptions extracted")
         return 0
 
     print(f"\nExtracted {len(cve_texts)} CVE descriptions")
@@ -488,7 +488,7 @@ def process_cve_data(
         metadata=cve_metadata
     )
 
-    print(f"✅ Added {n_added} CVE descriptions")
+    print(f"[OK] Added {n_added} CVE descriptions")
     return n_added
 
 def main():
@@ -522,7 +522,7 @@ def main():
         try:
             year = int(year_input)
         except ValueError:
-            print(f"❌ Invalid year: {year_input}")
+            print(f"[ERROR] Invalid year: {year_input}")
             sys.exit(1)
 
         # Ask for schema
@@ -555,7 +555,7 @@ def main():
         filter_keyword = None  # File should be pre-filtered by extract_cve.py
         replace_existing = False  # Not applicable for CVE file import
     else:
-        print(f"❌ Invalid choice: {choice}")
+        print(f"[ERROR] Invalid choice: {choice}")
         sys.exit(1)
 
     # Use default settings
@@ -608,11 +608,11 @@ def main():
             # If replace mode, delete existing year data first
             if replace_existing:
                 print(f"\n{'='*60}")
-                print(f"🗑️  Deleting existing data for year {year}")
+                print(f"[DELETE]  Deleting existing data for year {year}")
                 print(f"{'='*60}")
                 deleted_count = chroma_manager.delete_by_year(year, schema)
                 if deleted_count > 0:
-                    print(f"✅ Cleared {deleted_count} existing documents")
+                    print(f"[OK] Cleared {deleted_count} existing documents")
                 print()
 
             # Now add new data
@@ -648,14 +648,14 @@ def main():
         print(f"By source type:       {stats['by_source_type']}")
         print(f"{'='*60}")
 
-        print(f"\n✅ Operation completed successfully!")
-        print(f"\n💡 Knowledge base updated at: {EMBEDDING_PATH}")
+        print(f"\n[OK] Operation completed successfully!")
+        print(f"\n[INFO] Knowledge base updated at: {EMBEDDING_PATH}")
 
     except KeyboardInterrupt:
-        print(f"\n⚠️ Operation interrupted by user")
+        print(f"\n[WARNING] Operation interrupted by user")
         sys.exit(1)
     except Exception as e:
-        print(f"\n❌ Error: {e}")
+        print(f"\n[ERROR] Error: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)

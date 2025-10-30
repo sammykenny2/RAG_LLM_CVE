@@ -177,8 +177,8 @@ llamaSug = ""
 EMBEDDING_FILE = f"{EMBEDDING_PATH}.{EMBEDDING_EXTENSION}"
 
 if not os.path.exists(EMBEDDING_FILE):
-    print(f"❌ Error: {EMBEDDING_FILE} not found!")
-    print(f"💡 Generate it first with:")
+    print(f"[ERROR] Error: {EMBEDDING_FILE} not found!")
+    print(f"[INFO] Generate it first with:")
     print(f"   python localEmbedding.py --extension={EMBEDDING_EXTENSION}")
     sys.exit(1)
 
@@ -320,7 +320,7 @@ llama_model._initialized = True
 rag_system = PureRAG(llama_model=llama_model)
 rag_system._initialized = True  # Mark as initialized since we provided pre-loaded model
 
-print("✅ RAG system initialized for unified validation")
+print("[OK] RAG system initialized for unified validation")
 
 # ============================================================================
 # PDF processing
@@ -711,7 +711,7 @@ def menu_option_1(all_text, tokenizer, model):
     - Optional second-stage consolidation
     - Controlled by .env SUMMARY_* configuration
     """
-    print("\n📝 Generating summary...")
+    print("\n[INFO] Generating summary...")
 
     if SUMMARY_ENABLE_SECOND_STAGE:
         print("   └─ Using two-stage summarization (chunk-level + final consolidation)")
@@ -774,7 +774,7 @@ def menu_option_2(all_text, cve_description):
     - Chunk-aware CVE filtering
     - Optional second-stage consolidation
     """
-    print("\n📝 Validating CVE usage...")
+    print("\n[INFO] Validating CVE usage...")
 
     if VALIDATION_ENABLE_SECOND_STAGE:
         print("   └─ Using two-stage validation (chunk-level + final consolidation)")
@@ -928,7 +928,7 @@ def menu_option_3(all_text, user_question, tokenizer, model):
     - Optional second-stage consolidation
     - Controlled by .env QA_* configuration
     """
-    print(f"\n💬 Answering question: {user_question}")
+    print(f"\n[CHAT] Answering question: {user_question}")
 
     if QA_ENABLE_SECOND_STAGE:
         print("   └─ Using two-stage Q&A (chunk-level + final consolidation)")

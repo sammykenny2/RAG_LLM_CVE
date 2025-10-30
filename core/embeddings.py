@@ -57,7 +57,7 @@ class EmbeddingModel:
         """Load embedding model."""
         if self._initialized:
             if VERBOSE_LOGGING:
-                print("⚠️ Embedding model already initialized, skipping...")
+                print("[WARNING] Embedding model already initialized, skipping...")
             return self.model
 
         if VERBOSE_LOGGING:
@@ -73,7 +73,7 @@ class EmbeddingModel:
         self._initialized = True
 
         if VERBOSE_LOGGING:
-            print(f"✅ Embedding model loaded on {self.device}")
+            print(f"[OK] Embedding model loaded on {self.device}")
 
         return self.model
 
@@ -183,7 +183,7 @@ class EmbeddingModel:
         self._initialized = False
 
         if VERBOSE_LOGGING:
-            print("✅ Embedding model cleaned up from memory")
+            print("[OK] Embedding model cleaned up from memory")
 
 
 # =============================================================================

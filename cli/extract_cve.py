@@ -296,10 +296,10 @@ Examples:
     print(f"Output:      {output_file}")
     print(f"{'='*60}")
 
-    print(f"\n✅ Extraction completed successfully!")
-    print(f"\n💡 File created at: {output_file}")
+    print(f"\n[OK] Extraction completed successfully!")
+    print(f"\n[INFO] File created at: {output_file}")
     if args.extension == 'jsonl':
-        print(f"\n💡 JSONL format preserves all metadata (schema, year, etc.)")
+        print(f"\n[INFO] JSONL format preserves all metadata (schema, year, etc.)")
         print(f"   Use with build_embeddings.py option 3 for lossless processing")
 
 

@@ -171,7 +171,7 @@ def lookup_cve(cve: str, schema: str = None) -> Optional[Dict[str, str]]:
         first_set, second_set = extract_cve_numbers(cve)
     except ValueError as e:
         if VERBOSE_LOGGING:
-            print(f"⚠️ Invalid CVE format: {cve} - {e}")
+            print(f"[WARNING] Invalid CVE format: {cve} - {e}")
         return None
 
     data = load_cve_record(cve, first_set, second_set, schema)

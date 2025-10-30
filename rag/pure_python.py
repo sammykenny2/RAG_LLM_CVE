@@ -130,7 +130,7 @@ class PureRAG:
         """
         if self._initialized:
             if VERBOSE_LOGGING:
-                print("⚠️ RAG system already initialized")
+                print("[WARNING] RAG system already initialized")
             return
 
         print("Initializing RAG system...")
@@ -149,7 +149,7 @@ class PureRAG:
         self._initialized = True
 
         if VERBOSE_LOGGING:
-            print("✅ RAG system initialized")
+            print("[OK] RAG system initialized")
 
     def _hybrid_search(self, query: str, top_k: int = RETRIEVAL_TOP_K) -> List[str]:
         """
@@ -335,7 +335,7 @@ class PureRAG:
             "- Cite specific information from the knowledge base when available\n"
             "- Clearly distinguish between confirmed facts and inferences\n"
             "- Use precise technical terminology (e.g., RCE, privilege escalation, information disclosure)\n"
-            "- Respond in the same language as the user's question (支援中英文雙語)\n\n"
+            "- Respond in the same language as the user's question\n\n"
             "Answer Guidelines:\n"
             "1. For CVE-specific queries: Provide CVE ID, affected products, vulnerability type, severity, and remediation\n"
             "2. For technical questions: Include technical details, attack vectors, and mitigation strategies\n"
@@ -510,12 +510,12 @@ class PureRAG:
             return "Error: Could not chunk text for summarization."
 
         if VERBOSE_LOGGING:
-            print(f"📝 Summarizing {len(chunks)} chunks (Stage 1)...")
+            print(f"[INFO] Summarizing {len(chunks)} chunks (Stage 1)...")
 
         chunk_summaries = []
         for i, chunk in enumerate(chunks, 1):
             if VERBOSE_LOGGING:
-                print(f"   Processing chunk {i}/{len(chunks)}...")
+                print(f"[INFO] Processing chunk {i}/{len(chunks)}...")
 
             system_prompt = (
                 "You are a senior threat intelligence analyst specializing in cybersecurity incident analysis. "
@@ -544,7 +544,7 @@ class PureRAG:
         # Stage 2: Optional final condensing
         if SUMMARY_ENABLE_SECOND_STAGE:
             if VERBOSE_LOGGING:
-                print(f"📝 Condensing summaries into executive summary (Stage 2)...")
+                print(f"[INFO] Condensing summaries into executive summary (Stage 2)...")
 
             # Combine all chunk summaries
             combined_summaries = "\n\n".join([
@@ -646,25 +646,25 @@ class PureRAG:
             f"Official CVE Descriptions (Source of Truth):\n{cve_descriptions}\n\n"
             "Validation Criteria:\n"
             "A CVE is CORRECTLY used when:\n"
-            "✓ The vulnerability type matches (e.g., RCE, XSS, privilege escalation)\n"
-            "✓ The affected product/vendor matches\n"
-            "✓ The attack vector and impact align with official description\n"
-            "✓ The context of usage is consistent with the CVE's documented behavior\n\n"
+            "[OK] The vulnerability type matches (e.g., RCE, XSS, privilege escalation)\n"
+            "[OK] The affected product/vendor matches\n"
+            "[OK] The attack vector and impact align with official description\n"
+            "[OK] The context of usage is consistent with the CVE's documented behavior\n\n"
             "A CVE is INCORRECTLY used when:\n"
-            "✗ Non-existent CVE ID (not found in official database)\n"
-            "✗ Mismatched vulnerability type (e.g., citing buffer overflow for an XSS flaw)\n"
-            "✗ Wrong affected product or vendor\n"
-            "✗ Misrepresenting severity, impact, or exploitability\n"
-            "✗ Confusing similar CVEs or incorrect attribution\n\n"
+            "[FAIL] Non-existent CVE ID (not found in official database)\n"
+            "[FAIL] Mismatched vulnerability type (e.g., citing buffer overflow for an XSS flaw)\n"
+            "[FAIL] Wrong affected product or vendor\n"
+            "[FAIL] Misrepresenting severity, impact, or exploitability\n"
+            "[FAIL] Confusing similar CVEs or incorrect attribution\n\n"
             "Validation Process:\n"
             "1. Extract each CVE mentioned in the report\n"
             "2. Match against official CVE descriptions\n"
             "3. Compare technical details: vulnerability type, affected product, attack vector\n"
-            "4. Provide verdict: ✓ (Correct) or ✗ (Incorrect)\n"
+            "4. Provide verdict: [OK] (Correct) or [FAIL] (Incorrect)\n"
             "5. Support verdict with direct quotes from both report and official description\n"
             "6. Use clear, evidence-based reasoning\n\n"
             "Output Format:\n"
-            "CVE-YYYY-NNNNN: [✓ Correct / ✗ Incorrect]\n"
+            "CVE-YYYY-NNNNN: [[OK] Correct / [FAIL] Incorrect]\n"
             "Report states: \"[direct quote from report]\"\n"
             "Official description: \"[relevant quote from CVE database]\"\n"
             "Verdict: [Explanation with specific technical comparison]\n\n"
@@ -727,13 +727,13 @@ class PureRAG:
             return "Error: Could not chunk report for validation."
 
         if VERBOSE_LOGGING:
-            print(f"🔍 Validating {len(chunks)} chunks...")
+            print(f"[SEARCH] Validating {len(chunks)} chunks...")
 
         # Validate each chunk
         chunk_results = []
         for i, chunk in enumerate(chunks, 1):
             if VERBOSE_LOGGING:
-                print(f"   Processing chunk {i}/{len(chunks)}...")
+                print(f"[SEARCH] Processing chunk {i}/{len(chunks)}...")
 
             # Extract CVEs mentioned in this chunk
             chunk_cves = extract_cves_regex(chunk)
@@ -760,23 +760,23 @@ class PureRAG:
                 f"Official CVE Descriptions (Source of Truth):\n{filtered_cve_desc}\n\n"
                 "Validation Criteria:\n"
                 "A CVE is CORRECTLY used when:\n"
-                "✓ Vulnerability type matches (e.g., RCE, XSS, privilege escalation)\n"
-                "✓ Affected product/vendor matches\n"
-                "✓ Attack vector and impact align with official description\n"
-                "✓ Usage context is consistent with CVE's documented behavior\n\n"
+                "[OK] Vulnerability type matches (e.g., RCE, XSS, privilege escalation)\n"
+                "[OK] Affected product/vendor matches\n"
+                "[OK] Attack vector and impact align with official description\n"
+                "[OK] Usage context is consistent with CVE's documented behavior\n\n"
                 "A CVE is INCORRECTLY used when:\n"
-                "✗ Non-existent CVE ID\n"
-                "✗ Mismatched vulnerability type\n"
-                "✗ Wrong affected product or vendor\n"
-                "✗ Misrepresenting severity or exploitability\n\n"
+                "[FAIL] Non-existent CVE ID\n"
+                "[FAIL] Mismatched vulnerability type\n"
+                "[FAIL] Wrong affected product or vendor\n"
+                "[FAIL] Misrepresenting severity or exploitability\n\n"
                 "Validation Process:\n"
                 "1. Extract each CVE mentioned in this section\n"
                 "2. Match against official CVE descriptions\n"
                 "3. Compare: vulnerability type, affected product, attack vector\n"
-                "4. Provide verdict: ✓ (Correct) or ✗ (Incorrect)\n"
+                "4. Provide verdict: [OK] (Correct) or [FAIL] (Incorrect)\n"
                 "5. Support with direct quotes from both sources\n\n"
                 "Output Format:\n"
-                "CVE-YYYY-NNNNN: [✓/✗]\n"
+                "CVE-YYYY-NNNNN: [[OK]/[FAIL]]\n"
                 "Report: \"[quote]\"\n"
                 "Official: \"[quote]\"\n"
                 "Verdict: [evidence-based explanation]\n\n"
@@ -798,7 +798,7 @@ class PureRAG:
         # Stage 2: Optional final consolidation
         if VALIDATION_ENABLE_SECOND_STAGE:
             if VERBOSE_LOGGING:
-                print(f"🔍 Consolidating validation results into final report (Stage 2)...")
+                print(f"[SEARCH] Consolidating validation results into final report (Stage 2)...")
 
             # Combine all chunk results for consolidation
             combined_results = "\n\n".join([
@@ -817,15 +817,15 @@ class PureRAG:
                 "5. Sort by CVE ID: List in chronological order (by year and number)\n\n"
                 "Final Report Format:\n"
                 "=== CVE Validation Summary ===\n\n"
-                "CVE-YYYY-NNNNN: [✓ Correct / ✗ Incorrect]\n"
+                "CVE-YYYY-NNNNN: [[OK] Correct / [FAIL] Incorrect]\n"
                 "Report Context: \"[direct quote]\"\n"
                 "Official Description: \"[relevant quote]\"\n"
                 "Assessment: [Clear explanation of match/mismatch with specific technical details]\n\n"
                 "[Repeat for each unique CVE]\n\n"
                 "Summary Statistics:\n"
                 "- Total CVEs validated: X\n"
-                "- Correctly used: Y (✓)\n"
-                "- Incorrectly used: Z (✗)\n\n"
+                "- Correctly used: Y ([OK])\n"
+                "- Incorrectly used: Z ([FAIL])\n\n"
                 "Chunk-level validation results to consolidate:\n"
                 f"{combined_results}\n\n"
                 "Provide a professional, evidence-based consolidated validation report."
@@ -879,13 +879,13 @@ class PureRAG:
         # Short document: use single-pass
         if len(report_text) <= QA_CHUNK_THRESHOLD_CHARS:
             if VERBOSE_LOGGING:
-                print(f"📝 Q&A on short document ({len(report_text)} chars, single-pass)...")
+                print(f"[INFO] Q&A on short document ({len(report_text)} chars, single-pass)...")
 
             return self._answer_question_single_pass(report_text, question, max_tokens)
 
         # Long document: use two-stage chunked approach
         if VERBOSE_LOGGING:
-            print(f"📝 Q&A on long document ({len(report_text)} chars, two-stage chunking)...")
+            print(f"[INFO] Q&A on long document ({len(report_text)} chars, two-stage chunking)...")
 
         return self._answer_question_chunked(report_text, question, max_tokens)
 
@@ -901,7 +901,7 @@ class PureRAG:
             "- For technical questions: Include relevant technical details and security implications\n"
             "- If information is not in the text: Clearly state \"The report does not contain this information\"\n"
             "- Use precise technical terminology\n"
-            "- Respond in the same language as the question (支援中英文)\n\n"
+            "- Respond in the same language as the question\n\n"
             "Provide accurate, evidence-based answers with citations."
         )
 
@@ -943,12 +943,12 @@ class PureRAG:
             return "Error: Could not chunk text for Q&A."
 
         if VERBOSE_LOGGING:
-            print(f"📝 Answering question on {len(chunks)} chunks (Stage 1)...")
+            print(f"[INFO] Answering question on {len(chunks)} chunks (Stage 1)...")
 
         chunk_answers = []
         for i, chunk in enumerate(chunks, 1):
             if VERBOSE_LOGGING:
-                print(f"   Processing chunk {i}/{len(chunks)}...")
+                print(f"[INFO] Processing chunk {i}/{len(chunks)}...")
 
             system_prompt = (
                 "You are a technical security analyst extracting information from a section of a threat intelligence report. "
@@ -976,7 +976,7 @@ class PureRAG:
         # Stage 2: Optional consolidation
         if QA_ENABLE_SECOND_STAGE:
             if VERBOSE_LOGGING:
-                print(f"📝 Consolidating {len(chunk_answers)} answers (Stage 2)...")
+                print(f"[INFO] Consolidating {len(chunk_answers)} answers (Stage 2)...")
 
             all_answers = "\n\n".join(chunk_answers)
 
@@ -1054,7 +1054,7 @@ class PureRAG:
 
         # Handle missing CVEs (optional: could query LLM for suggestions)
         if missing_cves and VERBOSE_LOGGING:
-            print(f"⚠️ Could not find {len(missing_cves)} CVEs: {', '.join(missing_cves)}")
+            print(f"[WARNING] Could not find {len(missing_cves)} CVEs: {', '.join(missing_cves)}")
 
         return report_text, cves, cve_descriptions_text
 
@@ -1068,7 +1068,7 @@ class PureRAG:
         self._initialized = False
 
         if VERBOSE_LOGGING:
-            print("✅ RAG system cleaned up")
+            print("[OK] RAG system cleaned up")
 
 
 # =============================================================================

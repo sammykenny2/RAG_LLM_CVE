@@ -278,8 +278,8 @@ if __name__ == "__main__":
     # Validate paths
     errors = validate_paths(check_cve_feeds=True, check_embeddings=True)
     if errors:
-        print("\n⚠️ Configuration Errors:")
+        print("\n[WARNING] Configuration Errors:")
         for error in errors:
             print(f"  - {error}")
     else:
-        print("\n✅ All paths validated successfully!")
+        print("\n[OK] All paths validated successfully!")
