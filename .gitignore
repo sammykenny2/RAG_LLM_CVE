@@ -61,12 +61,13 @@ kb_uploads/
 # Temporary files directory (test reports and demo data)
 temp/
 
-# Embedding files (auto-generated, large files)
+# Embedding files and output directory (auto-generated, large files)
 # Note: Existing files on GitHub will remain, but future changes won't be tracked
-cve_embeddings.csv
-cve_embeddings.pkl
-cve_embeddings.parquet
-cve_embeddings.chroma/
+embeddings/
+output/
+
+# Project documentation (local copy only)
+CLAUDE.md
 
 # Model cache
 .cache/
