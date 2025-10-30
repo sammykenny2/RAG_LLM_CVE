@@ -9,11 +9,11 @@ sentence-transformers
 huggingface_hub
 
 # LangChain (Phase 2 - V2 only)
-langchain
-langchain_community
-langchain-huggingface
-langchain-chroma
-langchain_qdrant
+langchain>=0.3.0
+langchain-core>=0.3.0
+langchain-community>=0.3.0
+langchain-huggingface>=0.1.0
+langchain-chroma>=0.1.0
 
 # Vector databases
 chromadb

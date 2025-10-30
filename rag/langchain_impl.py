@@ -9,9 +9,9 @@ from pathlib import Path
 import re
 
 # LangChain imports
-from langchain.chains import ConversationalRetrievalChain
-from langchain.memory import ConversationBufferWindowMemory
-from langchain.prompts import PromptTemplate
+from langchain_core.prompts import PromptTemplate
+from langchain_core.chat_history import InMemoryChatMessageHistory
+from langchain_core.messages import HumanMessage, AIMessage
 from langchain_huggingface import HuggingFacePipeline, HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 
@@ -58,8 +58,8 @@ class LangChainRAG:
     """
     LangChain-based RAG system with automatic conversation management.
 
-    Uses ConversationalRetrievalChain for RAG workflow and
-    ConversationBufferWindowMemory for history management.
+    Uses InMemoryChatMessageHistory for conversation history management
+    and manual RAG workflow implementation.
     """
 
     def __init__(self, session_manager=None):
@@ -74,8 +74,8 @@ class LangChainRAG:
         self.model = None
         self.embeddings = None
         self.vectorstore = None
-        self.memory = None
-        self.qa_chain = None
+        self.chat_history = None  # InMemoryChatMessageHistory
+        self.max_history_messages = None
         self.chroma_manager = None
         self.session_manager = session_manager  # Optional: for multi-file conversations
         self._initialized = False
@@ -172,29 +172,11 @@ class LangChainRAG:
         if VERBOSE_LOGGING:
             print("[OK] Chroma connected")
 
-        # 4. Initialize memory
-        self.memory = ConversationBufferWindowMemory(
-            k=memory_k,
-            memory_key="chat_history",
-            return_messages=True,
-            output_key="answer"
-        )
+        # 4. Initialize chat history
+        self.chat_history = InMemoryChatMessageHistory()
+        self.max_history_messages = memory_k * 2  # k conversations = k*2 messages (user+assistant)
         if VERBOSE_LOGGING:
-            print(f"[OK] Memory initialized (k={memory_k})")
-
-        # 5. Create ConversationalRetrievalChain
-        self.qa_chain = ConversationalRetrievalChain.from_llm(
-            llm=self.llm,
-            retriever=self.vectorstore.as_retriever(
-                search_type="similarity",
-                search_kwargs={"k": RETRIEVAL_TOP_K}
-            ),
-            memory=self.memory,
-            return_source_documents=True,
-            verbose=VERBOSE_LOGGING
-        )
-        if VERBOSE_LOGGING:
-            print("[OK] ConversationalRetrievalChain created")
+            print(f"[OK] Chat history initialized (max_messages={self.max_history_messages})")
 
         self._initialized = True
         print("[OK] LangChain RAG system ready")
@@ -271,7 +253,7 @@ class LangChainRAG:
             search_type="similarity",
             search_kwargs={"k": top_k}
         )
-        docs = retriever.get_relevant_documents(query)
+        docs = retriever.invoke(query)
 
         # Extract page_content from Document objects
         return [doc.page_content for doc in docs]
@@ -448,16 +430,13 @@ class LangChainRAG:
         # 3. Build messages list with conversation history
         messages = [{"role": "system", "content": system_prompt}]
 
-        # Add conversation history from memory
-        if self.memory and self.memory.chat_memory:
-            for msg in self.memory.chat_memory.messages:
-                if hasattr(msg, 'type'):
-                    # LangChain message format
-                    role = "user" if msg.type == "human" else "assistant"
-                    messages.append({"role": role, "content": msg.content})
-                elif isinstance(msg, dict):
-                    # Dict format
-                    messages.append(msg)
+        # Add conversation history
+        if self.chat_history:
+            for msg in self.chat_history.messages:
+                if isinstance(msg, HumanMessage):
+                    messages.append({"role": "user", "content": msg.content})
+                elif isinstance(msg, AIMessage):
+                    messages.append({"role": "assistant", "content": msg.content})
 
         # Add current question
         messages.append({"role": "user", "content": question})
@@ -469,17 +448,22 @@ class LangChainRAG:
         formatted_prompt = self._format_messages_for_llama(messages)
 
         # Use the default pipeline for generation
-        response = self.llm(formatted_prompt)
+        response = self.llm.invoke(formatted_prompt)
 
         if VERBOSE_LOGGING:
             print(f"[Query] Generated response length: {len(response)} chars")
 
-        # 5. Update memory with new interaction
-        from langchain.schema import HumanMessage, AIMessage
-        self.memory.chat_memory.add_message(HumanMessage(content=question))
-        self.memory.chat_memory.add_message(AIMessage(content=response))
+        # 5. Update chat history with new interaction
+        self.chat_history.add_message(HumanMessage(content=question))
+        self.chat_history.add_message(AIMessage(content=response))
 
-        # 6. Return response (with sources if requested)
+        # 6. Trim history to max_history_messages if needed
+        if len(self.chat_history.messages) > self.max_history_messages:
+            # Keep only the most recent messages
+            messages_to_remove = len(self.chat_history.messages) - self.max_history_messages
+            self.chat_history.messages = self.chat_history.messages[messages_to_remove:]
+
+        # 7. Return response (with sources if requested)
         if return_sources:
             from langchain.docstore.document import Document
             # Convert top_results (dicts) to Document objects with metadata
@@ -499,8 +483,8 @@ class LangChainRAG:
 
     def clear_history(self):
         """Clear conversation history."""
-        if self.memory:
-            self.memory.clear()
+        if self.chat_history:
+            self.chat_history.clear()
             if VERBOSE_LOGGING:
                 print("[OK] Conversation history cleared")
 
@@ -509,10 +493,10 @@ class LangChainRAG:
         Get conversation history.
 
         Returns:
-            list: List of message dicts
+            list: List of message objects (HumanMessage/AIMessage)
         """
-        if self.memory:
-            return self.memory.chat_memory.messages
+        if self.chat_history:
+            return self.chat_history.messages
         return []
 
     def _chunk_text_by_tokens(
@@ -616,7 +600,7 @@ class LangChainRAG:
             "Provide a professional, concise, and actionable executive summary.\n\n"
             f"Report:\n{text}"
         )
-        response = llm(prompt)
+        response = llm.invoke(prompt)
         return response
 
     def _generate_two_stage_summary(self, text: str) -> str:
@@ -665,7 +649,7 @@ class LangChainRAG:
                 "Provide a concise, technically accurate summary of the key security points in this section.\n\n"
                 f"Section:\n{chunk}"
             )
-            summary = llm_stage1(prompt)
+            summary = llm_stage1.invoke(prompt)
             chunk_summaries.append(summary)
 
         # Stage 2: Optional final condensing
@@ -700,7 +684,7 @@ class LangChainRAG:
                 f"Section Summaries:\n{combined_summaries}"
             )
 
-            final_summary = llm_stage2(prompt)
+            final_summary = llm_stage2.invoke(prompt)
             return final_summary
         else:
             # Return all chunk summaries without condensing
@@ -796,7 +780,7 @@ class LangChainRAG:
             f"Threat Intelligence Report to Validate:\n{report_text}"
         )
 
-        response = llm(prompt)
+        response = llm.invoke(prompt)
         return response
 
     def _validate_chunked(
@@ -903,7 +887,7 @@ class LangChainRAG:
                 f"Report Section to Validate:\n{chunk}"
             )
 
-            result = llm(prompt)
+            result = llm.invoke(prompt)
             chunk_results.append(result)
 
         # Stage 2: Optional final consolidation
@@ -944,7 +928,7 @@ class LangChainRAG:
                 "Provide a professional, evidence-based consolidated validation report."
             )
 
-            final_report = llm_stage2(prompt)
+            final_report = llm_stage2.invoke(prompt)
             return final_report
         else:
             # Return all chunk results without consolidation
@@ -1019,8 +1003,8 @@ class LangChainRAG:
             add_generation_prompt=True
         )
 
-        # Generate using HuggingFacePipeline
-        response = self.llm(prompt, max_new_tokens=max_tokens)
+        # Generate using HuggingFacePipeline (max_new_tokens already set in pipeline)
+        response = self.llm.invoke(prompt)
 
         return response
 
@@ -1077,7 +1061,7 @@ class LangChainRAG:
                 add_generation_prompt=True
             )
 
-            answer = self.llm(prompt, max_new_tokens=QA_TOKENS_PER_CHUNK)
+            answer = self.llm.invoke(prompt)
             chunk_answers.append(f"Section {i}: {answer}")
 
         # Stage 2: Optional consolidation
@@ -1114,7 +1098,7 @@ class LangChainRAG:
                 add_generation_prompt=True
             )
 
-            final_answer = self.llm(prompt, max_new_tokens=max_tokens)
+            final_answer = self.llm.invoke(prompt)
             return final_answer
         else:
             # Return all chunk answers concatenated
@@ -1224,9 +1208,9 @@ class LangChainRAG:
             del self.tokenizer
             self.tokenizer = None
 
-        if self.memory:
-            self.memory.clear()
-            self.memory = None
+        if self.chat_history:
+            self.chat_history.clear()
+            self.chat_history = None
 
         # Clear CUDA cache if available
         if torch.cuda.is_available():
