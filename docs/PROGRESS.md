@@ -2,6 +2,44 @@
 
 This file tracks completed changes and upcoming features for the project.
 
+## [2025-10-31] LangChain 1.0+ Migration and UI Improvements
+
+### Changed
+- **rag/langchain_impl.py**: Migrated to LangChain 1.0+ API
+  - Replaced deprecated `ConversationBufferWindowMemory` with `InMemoryChatMessageHistory`
+  - Removed `ConversationalRetrievalChain` (manual implementation)
+  - Updated all imports to `langchain_core` and `langchain_classic`
+  - Fixed API calls: `llm()` → `llm.invoke()`, `retriever.get_relevant_documents()` → `retriever.invoke()`
+  - Added automatic history trimming to maintain conversation window
+  - Eliminated deprecation warnings
+
+- **requirements.txt**: Updated LangChain dependencies
+  - Added `langchain-core>=0.3.0` (required for new API)
+  - Added version constraints for all LangChain packages
+  - Ensures compatibility with LangChain 1.0+
+
+- **web/web_ui.py & web/web_ui_langchain.py**: Restored user-visible emojis
+  - UI labels: 🛡️ 💬 ⚙️ 📚 (titles and headers)
+  - Buttons: ➕ 🗑️ 🔄 (actions)
+  - Status messages: ✅ ❌ ⚠️ (feedback)
+  - File indicators: 📄 🔖 📎 (file types and attachments)
+  - Process states: 💭 🔄 (thinking, uploading)
+  - Information: 📊 📝 📋 💬 (stats, summaries, results)
+  - Note: Backend logging emojis remain removed
+
+### Fixed
+- LangChain compatibility with version 1.0+ (eliminated all deprecation warnings)
+- Web UI user experience with restored visual indicators
+
+### Performance Notes
+- LangChain version runs slower than Pure Python due to additional abstraction layers:
+  - `transformers.pipeline()` wrapper
+  - `HuggingFacePipeline` wrapper
+  - `Runnable` abstraction with config/callback/tracing
+  - Trade-off: Slower but more maintainable with LangChain ecosystem
+
+---
+
 ## [2025-10] Phase 1: Web UI and Knowledge Base Enhancement
 
 ### Added (Core Modules)
