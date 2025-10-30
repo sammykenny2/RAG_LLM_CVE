@@ -536,12 +536,83 @@ Running on local URL:  http://127.0.0.1:7861
 
 **問題：** Windows 預設禁止執行未簽署的腳本。
 
-**解決方法：**
+**完整錯誤訊息範例：**
+```
+.\scripts\windows\Setup-CPU.ps1: File C:\...\Setup-CPU.ps1 cannot be loaded.
+The file is not digitally signed. You cannot run this script on the current system.
+```
+
+**解決方法（依推薦順序）：**
+
+**方法 1：為當前 PowerShell 進程設置執行策略（推薦，已驗證）**
+
+在**非管理員** PowerShell 中執行：
 ```powershell
-# 以管理員身分開啟 PowerShell，執行：
+# 設置當前進程的執行策略（僅影響當前視窗）
+Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process
+
+# 然後執行腳本
+.\scripts\windows\Setup-CPU.ps1
+```
+
+這個方法：
+- ✅ 不需要管理員權限
+- ✅ 只影響當前 PowerShell 視窗
+- ✅ 關閉視窗後設定自動失效，安全性高
+
+**方法 2：解除檔案的「網際網路下載」封鎖標記**
+
+```powershell
+# 解除腳本的封鎖
+Unblock-File -Path .\scripts\windows\Setup-CPU.ps1
+
+# 然後正常執行
+.\scripts\windows\Setup-CPU.ps1
+```
+
+這個方法：
+- ✅ 只需要執行一次
+- ✅ 腳本會被視為本地建立的檔案
+
+**方法 3：使用 Bypass 參數直接執行**
+
+```powershell
+# 一次性使用 Bypass 策略執行
+powershell -ExecutionPolicy Bypass -File .\scripts\windows\Setup-CPU.ps1
+```
+
+這個方法：
+- ✅ 不修改任何設定
+- ✅ 每次執行都需要使用完整命令
+
+**方法 4：永久設置用戶層級執行策略**
+
+以**管理員身分**開啟 PowerShell：
+```powershell
+# 設置當前用戶的執行策略
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 # 選擇 "Y" 確認
+```
+
+然後在**非管理員** PowerShell 中執行腳本：
+```powershell
+.\scripts\windows\Setup-CPU.ps1
+```
+
+如果仍然失敗，可能需要再執行方法 2 解除檔案封鎖。
+
+**為什麼會出現這個問題？**
+
+當你從 ZIP 解壓縮或從網路下載檔案時，Windows 會標記這些檔案為「從網際網路下載」。PowerShell 的 `RemoteSigned` 策略會要求這些檔案必須有數位簽章才能執行，但我們的腳本沒有簽章。
+
+**快速驗證：哪個方法適合我？**
+
+```powershell
+# 檢查當前執行策略設定
+Get-ExecutionPolicy -List
+
+# 如果所有 Scope 都是 Undefined 或 Restricted，建議使用方法 1 或方法 2
 ```
 
 ### Q2: Hugging Face 下載模型失敗或速度很慢
