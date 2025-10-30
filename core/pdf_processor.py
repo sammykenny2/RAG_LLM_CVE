@@ -156,7 +156,7 @@ def extract_cve_context(source_text: str, cve: str, window_chars: int = 1500) ->
 
     Args:
         source_text: Full text to search
-        cve: CVE identifier (e.g., "CVE-2024-12345")
+        cve: CVE identifier (e.g., "CVE-2025-12345")
         window_chars: Size of context window (characters before + after)
 
     Returns:

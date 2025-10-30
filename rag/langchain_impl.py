@@ -826,7 +826,7 @@ class LangChainRAG:
                 block = block.strip()
                 if not block:
                     continue
-                # Extract CVE ID from block (format: "-CVE Number: CVE-2024-1234")
+                # Extract CVE ID from block (format: "-CVE Number: CVE-2025-1234")
                 cve_match = re.search(r'CVE-\d{4}-\d{4,7}', block)
                 if cve_match:
                     cve_id = cve_match.group(0)

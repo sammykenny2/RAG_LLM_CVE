@@ -213,7 +213,7 @@ class ChromaManager:
         Useful for exact CVE ID lookup.
 
         Args:
-            where: Metadata filter dict (e.g., {"cve_id": "CVE-2024-1234"})
+            where: Metadata filter dict (e.g., {"cve_id": "CVE-2025-1234"})
             limit: Maximum number of results (default: all matches)
 
         Returns:

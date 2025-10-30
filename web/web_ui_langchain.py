@@ -32,7 +32,8 @@ from config import (
     CHUNK_SIZE,
     EMBEDDING_BATCH_SIZE,
     EMBEDDING_PRECISION,
-    ENABLE_SESSION_AUTO_EMBED
+    ENABLE_SESSION_AUTO_EMBED,
+    RETRIEVAL_TOP_K
 )
 
 # =============================================================================
@@ -443,11 +444,11 @@ def process_uploaded_report(
     # Note: Summary token limits are now controlled by .env (SUMMARY_* parameters)
     if mode == 'demo':
         max_pages = 10
-        top_k = 3
+        top_k = 3  # Demo mode uses fewer results for speed
         validation_tokens = 256
     else:  # full mode
         max_pages = None
-        top_k = 5
+        top_k = RETRIEVAL_TOP_K  # Use config value
         validation_tokens = 700
 
     try:

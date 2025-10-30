@@ -119,12 +119,12 @@ C:\Users\你的用戶名\Source\
 
 ```powershell
 # 檢查 V5 資料
-ls ..\cvelistV5\cves\2024\
+ls ..\cvelistV5\cves\2025\
 
 # 應該會看到多個目錄，如：0xxx, 1xxx, 2xxx, ...
 
 # 檢查 V4 資料
-ls ..\cvelist\2024\
+ls ..\cvelist\2025\
 
 # 同樣應該看到多個目錄
 ```
@@ -284,8 +284,8 @@ DEFAULT_SPEED=fast
 # 預設處理模式（full 為完整功能）
 DEFAULT_MODE=full
 
-# 預設 CVE 資料來源（all 為 V5→V4 自動備援）
-DEFAULT_SCHEMA=all
+# 預設 CVE 資料來源（v5 為 CVE 5.0 格式，速度最快）
+DEFAULT_SCHEMA=v5
 
 # 預設 embedding 格式（chroma 為向量資料庫，效能最佳）
 DEFAULT_EMBEDDING_FORMAT=chroma

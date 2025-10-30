@@ -107,7 +107,7 @@ def split(input_list, chunk_size):
 
 **Why CVE Data Doesn't Need Overlap**:
 - CVE descriptions are already atomic (complete descriptions in single entries)
-- Format: `"CVE Number: CVE-2024-1234, Vendor: Microsoft, Product: Windows, Description: ..."`
+- Format: `"CVE Number: CVE-2025-1234, Vendor: Microsoft, Product: Windows, Description: ..."`
 - No cross-boundary issues since each CVE is independent
 
 **Why PDF Reports Need Overlap**:
@@ -239,7 +239,7 @@ Both phases use consistent metadata structure for vector database:
 ```python
 metadata = {
     "source_type": "pdf",           # "pdf" or "cve"
-    "source_name": "CVEpdf2024.pdf", # Filename or "CVE List 2024"
+    "source_name": "CVEpdf2024.pdf", # Filename or "CVE List 2025"
     "added_date": "2025-01-14",     # ISO format (YYYY-MM-DD)
     "chunk_index": 1234,            # Sequential index
     "page_number": 5,               # PDF page (if applicable)
@@ -339,7 +339,7 @@ metadata = {
 **Phase 1: Initialization** (one-time, at startup)
 1. Parse command-line arguments:
    - `--mode=demo` or `--mode=full` (default)
-   - `--schema=v5|v4|all` (default: all)
+   - `--schema=v5|v4|all` (default: v5)
 2. Load **Llama-3.2-1B-Instruct** model (~2.5GB)
    - Device: Auto-detect CUDA/CPU via `device_map="auto"`
    - Precision: FP16 (demo) or auto (full)
@@ -362,9 +362,9 @@ metadata = {
 1. Parse CVE format: `CVE-<year>-<id>` → extract year and ID
 2. Format path prefix: `<id>` → `Nxxx` (e.g., `1234` → `1xxx`, `12345` → `12xxx`)
 3. **Load CVE record based on schema parameter**:
-   - `--schema=v5`: Only try `../cvelistV5/cves/<year>/<prefix>/CVE-<year>-<id>.json`
+   - `--schema=v5` (default): Only try `../cvelistV5/cves/<year>/<prefix>/CVE-<year>-<id>.json`
    - `--schema=v4`: Only try `../cvelist/<year>/<prefix>/CVE-<year>-<id>.json`
-   - `--schema=all` (default): Try v5 first, fallback to v4
+   - `--schema=all`: Try v5 first, fallback to v4
 4. Extract fields (schema-aware):
    - `cveId`, `vendor`, `product`, `description`
 5. Build concatenated string of all found CVE descriptions

@@ -24,7 +24,8 @@ from config import (
     CHUNK_SIZE,
     CHUNK_OVERLAP_RATIO,
     EMBEDDING_PRECISION,
-    VERBOSE_LOGGING
+    VERBOSE_LOGGING,
+    RETRIEVAL_TOP_K
 )
 
 
@@ -276,7 +277,7 @@ class SessionManager:
                 print(f"  └─ {e}")
             return False
 
-    def query(self, question: str, top_k: int = 5) -> List[Dict]:
+    def query(self, question: str, top_k: int = RETRIEVAL_TOP_K) -> List[Dict]:
         """
         Query session files for relevant context.
 

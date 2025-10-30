@@ -46,7 +46,7 @@ HF_HOME = os.getenv('HF_HOME', None)  # None means use default ~/.cache/huggingf
 
 DEFAULT_SPEED = os.getenv('DEFAULT_SPEED', 'fast')
 DEFAULT_MODE = os.getenv('DEFAULT_MODE', 'full')
-DEFAULT_SCHEMA = os.getenv('DEFAULT_SCHEMA', 'all')
+DEFAULT_SCHEMA = os.getenv('DEFAULT_SCHEMA', 'v5')
 DEFAULT_EMBEDDING_FORMAT = os.getenv('DEFAULT_EMBEDDING_FORMAT', 'chroma')
 EMBEDDING_PRECISION = os.getenv('EMBEDDING_PRECISION', 'float16')
 
@@ -64,7 +64,7 @@ assert EMBEDDING_PRECISION in ['float32', 'float16'], f"Invalid EMBEDDING_PRECIS
 # RAG Configuration
 # =============================================================================
 
-CONVERSATION_HISTORY_LENGTH = int(os.getenv('CONVERSATION_HISTORY_LENGTH', '10'))
+CONVERSATION_HISTORY_LENGTH = int(os.getenv('CONVERSATION_HISTORY_LENGTH', '20'))
 RETRIEVAL_TOP_K = int(os.getenv('RETRIEVAL_TOP_K', '5'))
 CHUNK_SIZE = int(os.getenv('CHUNK_SIZE', '10'))
 CHUNK_OVERLAP_RATIO = float(os.getenv('CHUNK_OVERLAP_RATIO', '0.3'))
@@ -126,8 +126,8 @@ LLM_TOP_P = float(os.getenv('LLM_TOP_P', '0.9'))
 
 SUMMARY_CHUNK_TOKENS = int(os.getenv('SUMMARY_CHUNK_TOKENS', '1500'))
 SUMMARY_CHUNK_OVERLAP_TOKENS = int(os.getenv('SUMMARY_CHUNK_OVERLAP_TOKENS', '200'))
-SUMMARY_TOKENS_PER_CHUNK = int(os.getenv('SUMMARY_TOKENS_PER_CHUNK', '150'))
-SUMMARY_FINAL_TOKENS = int(os.getenv('SUMMARY_FINAL_TOKENS', '300'))
+SUMMARY_TOKENS_PER_CHUNK = int(os.getenv('SUMMARY_TOKENS_PER_CHUNK', '300'))
+SUMMARY_FINAL_TOKENS = int(os.getenv('SUMMARY_FINAL_TOKENS', '600'))
 SUMMARY_CHUNK_THRESHOLD_CHARS = int(os.getenv('SUMMARY_CHUNK_THRESHOLD_CHARS', '3000'))
 SUMMARY_ENABLE_SECOND_STAGE = os.getenv('SUMMARY_ENABLE_SECOND_STAGE', 'True').lower() == 'true'
 
@@ -137,10 +137,10 @@ SUMMARY_ENABLE_SECOND_STAGE = os.getenv('SUMMARY_ENABLE_SECOND_STAGE', 'True').l
 
 VALIDATION_CHUNK_TOKENS = int(os.getenv('VALIDATION_CHUNK_TOKENS', '1500'))
 VALIDATION_CHUNK_OVERLAP_TOKENS = int(os.getenv('VALIDATION_CHUNK_OVERLAP_TOKENS', '200'))
-VALIDATION_TOKENS_PER_CHUNK = int(os.getenv('VALIDATION_TOKENS_PER_CHUNK', '300'))
+VALIDATION_TOKENS_PER_CHUNK = int(os.getenv('VALIDATION_TOKENS_PER_CHUNK', '500'))
 VALIDATION_CHUNK_THRESHOLD_CHARS = int(os.getenv('VALIDATION_CHUNK_THRESHOLD_CHARS', '3000'))
 VALIDATION_ENABLE_CVE_FILTERING = os.getenv('VALIDATION_ENABLE_CVE_FILTERING', 'True').lower() == 'true'
-VALIDATION_FINAL_TOKENS = int(os.getenv('VALIDATION_FINAL_TOKENS', '500'))
+VALIDATION_FINAL_TOKENS = int(os.getenv('VALIDATION_FINAL_TOKENS', '800'))
 VALIDATION_ENABLE_SECOND_STAGE = os.getenv('VALIDATION_ENABLE_SECOND_STAGE', 'True').lower() == 'true'
 
 # =============================================================================
@@ -149,9 +149,9 @@ VALIDATION_ENABLE_SECOND_STAGE = os.getenv('VALIDATION_ENABLE_SECOND_STAGE', 'Tr
 
 QA_CHUNK_TOKENS = int(os.getenv('QA_CHUNK_TOKENS', '1500'))
 QA_CHUNK_OVERLAP_TOKENS = int(os.getenv('QA_CHUNK_OVERLAP_TOKENS', '200'))
-QA_TOKENS_PER_CHUNK = int(os.getenv('QA_TOKENS_PER_CHUNK', '200'))
+QA_TOKENS_PER_CHUNK = int(os.getenv('QA_TOKENS_PER_CHUNK', '500'))
 QA_CHUNK_THRESHOLD_CHARS = int(os.getenv('QA_CHUNK_THRESHOLD_CHARS', '3000'))
-QA_FINAL_TOKENS = int(os.getenv('QA_FINAL_TOKENS', '400'))
+QA_FINAL_TOKENS = int(os.getenv('QA_FINAL_TOKENS', '1000'))
 QA_ENABLE_SECOND_STAGE = os.getenv('QA_ENABLE_SECOND_STAGE', 'True').lower() == 'true'
 
 # =============================================================================

@@ -11,7 +11,8 @@ from sentence_transformers import SentenceTransformer, util
 from config import (
     EMBEDDING_MODEL_NAME,
     CUDA_DEVICE,
-    VERBOSE_LOGGING
+    VERBOSE_LOGGING,
+    RETRIEVAL_TOP_K
 )
 
 
@@ -138,7 +139,7 @@ class EmbeddingModel:
         self,
         query: str,
         embeddings: torch.Tensor,
-        top_k: int = 5
+        top_k: int = RETRIEVAL_TOP_K
     ) -> tuple:
         """
         Retrieve top-k most similar embeddings using dot product.

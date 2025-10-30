@@ -52,7 +52,7 @@ This file tracks completed changes and upcoming features for the project.
 ### Added (Tools and Web UI)
 - **add_to_embeddings.py**: Incremental knowledge base updates
   - Add PDFs: `--source=pdf --files=report.pdf,report2.pdf`
-  - Add CVE data: `--source=cve --year=2024 --schema=v5`
+  - Add CVE data: `--source=cve --year=2025 --schema=v5`
   - Configurable chunk size and batch size
   - Automatic metadata tagging
   - Progress bars and error handling
@@ -69,47 +69,7 @@ This file tracks completed changes and upcoming features for the project.
 - **.gitignore**: Added `.env` and `temp_uploads/` exclusions
 - **requirements.txt**: Added `python-dotenv` and `gradio`
 - Repository structure: Added `core/`, `rag/`, `web/` directories
-
-### Repository Structure (Updated)
-```
-RAG_LLM_CVE/
-├── core/                  # Shared modules (Phase 1)
-│   ├── models.py          # Llama loading
-│   ├── embeddings.py      # SentenceTransformer
-│   ├── chroma_manager.py  # Chroma CRUD
-│   ├── cve_lookup.py      # CVE parsing
-│   └── pdf_processor.py   # PDF extraction
-├── rag/                   # RAG implementations
-│   └── pure_python.py     # Phase 1: Pure Python RAG
-├── web/                   # Web interfaces
-│   └── webUI.py           # Phase 1: Gradio UI
-├── validate_report.py     # CLI application (original)
-├── build_embeddings.py    # Generate embeddings
-├── add_to_embeddings.py   # Incremental updates (new)
-├── extract_cve.py         # Export CVE descriptions
-├── config.py              # Configuration loader (new)
-├── .env.example           # Config template (new)
-├── .env                   # Local config (gitignored)
-├── FEATURE_PLAN.md        # Planning document (new)
-├── CLAUDE.md              # User guide
-├── ARCHITECTURE.md        # Technical details
-└── PROGRESS.md            # This file
-```
-
-### Usage Examples
-```bash
-# Web UI (recommended for demos)
-python web/web_ui.py
-
-# Add PDFs to knowledge base
-python cli/add_to_embeddings.py --source=pdf --files=report1.pdf,report2.pdf
-
-# Add CVE data to knowledge base
-python cli/add_to_embeddings.py --source=cve --year=2024 --schema=v5
-
-# Original CLI (still works)
-python cli/validate_report.py --speed=fast --extension=chroma
-```
+- See CLAUDE.md for complete directory structure
 
 ### Phase 1 Goals Achieved
 ✅ Core modules created and tested (all imports successful)
@@ -196,30 +156,6 @@ python web/web_ui.py
 python web/web_ui_langchain.py
 
 # Both can run simultaneously for A/B comparison
-```
-
-### Repository Structure (Final)
-```
-RAG_LLM_CVE/
-├── core/                  # Shared modules
-│   ├── models.py          # Llama loading
-│   ├── embeddings.py      # SentenceTransformer
-│   ├── chroma_manager.py  # Chroma CRUD
-│   ├── cve_lookup.py      # CVE parsing
-│   └── pdf_processor.py   # PDF extraction
-├── rag/                   # RAG implementations
-│   ├── pure_python.py     # Phase 1: Manual implementation
-│   └── langchain_impl.py  # Phase 2: LangChain (new)
-├── web/                   # Web interfaces
-│   ├── web_ui.py          # Phase 1: Pure Python
-│   └── web_ui_langchain.py # Phase 2: LangChain (new)
-├── validate_report.py     # CLI application (original)
-├── build_embeddings.py    # Generate embeddings
-├── add_to_embeddings.py   # Incremental updates
-├── extract_cve.py         # Export CVE descriptions
-├── config.py              # Configuration loader
-├── .env.example           # Config template
-└── FEATURE_PLAN.md        # Planning document
 ```
 
 ### Phase 2 Goals Achieved
@@ -532,25 +468,7 @@ RAG_LLM_CVE/
 - CVE JSON feed support (V4 schema)
 - PyMuPDF text extraction
 - CPU and CUDA support
-
-### Repository Structure
-```
-RAG_LLM_CVE/
-├── validate_report.py     # Main application (optimized)
-├── build_embeddings.py    # Generate embedding database
-├── extract_cve.py         # Export CVE descriptions (optional)
-├── cleanup_cache.py       # Clean model cache
-├── CLAUDE.md              # Project documentation and user guide
-├── ARCHITECTURE.md        # Technical details and system architecture
-├── PROGRESS.md            # This file (completed changes and upcoming features)
-├── requirements.txt       # Python dependencies
-├── scripts/               # Environment setup scripts
-│   └── windows/           # Windows PowerShell scripts
-│       ├── Setup-CPU.ps1
-│       ├── Setup-CUDA118.ps1
-│       └── Setup-CUDA124.ps1
-└── .venv-*/               # Virtual environments (gitignored)
-```
+- See CLAUDE.md for complete directory structure
 
 ## [2025-01-18] Phase 2 LangChain Query Fix
 

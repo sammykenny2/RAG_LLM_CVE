@@ -23,7 +23,7 @@ def extract_cve_numbers(cve_string: str) -> Tuple[int, str]:
     Extract year and ID from CVE string.
 
     Args:
-        cve_string: CVE identifier (e.g., "CVE-2024-12345")
+        cve_string: CVE identifier (e.g., "CVE-2025-12345")
 
     Returns:
         tuple: (year, id) where year is int and id is str
@@ -71,8 +71,8 @@ def load_cve_record(
     Load CVE JSON record based on schema configuration.
 
     Args:
-        cve: CVE identifier (e.g., "CVE-2024-12345")
-        first_set: Year (e.g., 2024)
+        cve: CVE identifier (e.g., "CVE-2025-12345")
+        first_set: Year (e.g., 2025)
         second_set: ID (e.g., "12345")
         schema: 'v5', 'v4', or 'all' (default from config)
 
@@ -156,7 +156,7 @@ def lookup_cve(cve: str, schema: str = None) -> Optional[Dict[str, str]]:
     Lookup CVE and return structured information.
 
     Args:
-        cve: CVE identifier (e.g., "CVE-2024-12345")
+        cve: CVE identifier (e.g., "CVE-2025-12345")
         schema: 'v5', 'v4', or 'all' (default from config)
 
     Returns:

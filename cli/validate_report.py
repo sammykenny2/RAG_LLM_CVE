@@ -72,7 +72,8 @@ from config import (
     CVE_V4_PATH,
     SUMMARY_ENABLE_SECOND_STAGE,
     VALIDATION_ENABLE_SECOND_STAGE,
-    QA_ENABLE_SECOND_STAGE
+    QA_ENABLE_SECOND_STAGE,
+    RETRIEVAL_TOP_K
 )
 
 # Parse command-line arguments
@@ -125,7 +126,7 @@ else:
     MAX_PAGES = None  # Process all pages
     MAX_TEXT_LENGTH = None  # No truncation
     MAX_EMBEDDING_ROWS = None  # Read all rows
-    TOP_K_RETRIEVAL = 5
+    TOP_K_RETRIEVAL = RETRIEVAL_TOP_K  # Use config value
     CVE_EXTRACT_TOKENS = 150
     SUMMARY_TOKENS = 700
     VALIDATION_TOKENS = 700

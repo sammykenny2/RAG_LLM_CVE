@@ -83,7 +83,7 @@ Examples:
     parser.add_argument(
         '--source',
         type=str,
-        help='Source name to remove (e.g., "report.pdf" or "CVE_2024_v5")'
+        help='Source name to remove (e.g., "report.pdf" or "CVE_2025_v5")'
     )
     parser.add_argument(
         '--list',
