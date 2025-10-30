@@ -234,7 +234,7 @@ pip install -r requirements.txt
 
 ```powershell
 # 確保虛擬環境已啟動
-huggingface-cli login
+hf auth login
 ```
 
 系統會提示你輸入 Access Token：

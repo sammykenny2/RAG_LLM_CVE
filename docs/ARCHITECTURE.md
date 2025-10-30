@@ -436,7 +436,7 @@ metadata = {
      - Parquet: Requires `pyarrow` (in requirements.txt)
      - Chroma: Requires `chromadb` (in requirements.txt)
 2. **CVE JSON Feeds**: External directories `../cvelistV5/` (primary) and `../cvelist/` (fallback) must be synced
-3. **Hugging Face Access**: Llama model requires approval + `huggingface-cli login`
+3. **Hugging Face Access**: Llama model requires approval + `hf auth login`
 4. **Python Environment**: One of `.venv-cpu`, `.venv-cuda118`, or `.venv-cuda124` activated
 5. **CUDA Toolkit** (for GPU): Version must match venv (11.8 or 12.4)
 
