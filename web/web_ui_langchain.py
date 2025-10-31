@@ -341,8 +341,14 @@ def chat_respond(message: str, history: list):
             elif intent == 'validate':
                 response = process_uploaded_report(current_file, action='validate', schema=DEFAULT_SCHEMA, mode=current_mode)
             else:
-                # Default to Q&A on file content (Plan A approach)
-                response = process_uploaded_report(current_file, action='qa', question=message, mode=current_mode)
+                # In session mode, use RAG query on embedded content (much faster!)
+                # Otherwise, fall back to Q&A on file content (slower, processes whole PDF)
+                if ENABLE_SESSION_AUTO_EMBED and session_manager and len(session_manager.files) > 0:
+                    # Use RAG query - file is already embedded in SessionManager
+                    response = rag_system.query(question=message)
+                else:
+                    # Non-session mode: Process PDF directly
+                    response = process_uploaded_report(current_file, action='qa', question=message, mode=current_mode)
         else:
             # Normal RAG query (no file attached)
             response = rag_system.query(question=message)
