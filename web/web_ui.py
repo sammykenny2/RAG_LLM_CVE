@@ -283,23 +283,39 @@ def chat_respond(message: str, history: list):
         yield "", gr.update(), history, "", gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
         return
 
+    # CRITICAL: Save file path to local variable and immediately clear global
+    # This prevents race condition when user uploads new file during processing
+    current_file = chat_uploaded_file
+    chat_uploaded_file = None  # Clear immediately to allow new uploads
+
     # Build user message with file attachment if present
     user_content = message
-    if chat_uploaded_file:
-        file_name = Path(chat_uploaded_file).name
-        user_content = f"{message}\n\n📎 **Attached:** {file_name}"
+    if current_file:
+        # Extract original filename (remove UUID suffix from unique filename)
+        # Format: original_name_UUID.ext → original_name.ext
+        import re
+        full_filename = Path(current_file).name
+        match = re.match(r'(.+)_[0-9a-f]{8}(\.\w+)$', full_filename)
+        if match:
+            # Restore original filename for display
+            display_name = match.group(1) + match.group(2)
+        else:
+            # Fallback to full filename if pattern doesn't match
+            display_name = full_filename
+        user_content = f"{message}\n\n📎 **Attached:** {display_name}"
 
-    # Immediately show user message with "Thinking..." placeholder and disable all UI elements (including input box)
+    # Immediately show user message with "Thinking..." placeholder and disable critical controls
+    # Note: Allow user to type next message and manage files while waiting for response
     history.append({"role": "user", "content": user_content})
     history.append({"role": "assistant", "content": "💭 Thinking..."})
     yield (
-        "",  # msg_input (clear)
-        gr.update(interactive=False),  # msg_input (disable - prevent typing during processing)
+        "",  # msg_input (clear but keep interactive for typing next message)
+        gr.update(interactive=True),   # msg_input (enable - allow typing during processing)
         history,  # history (with thinking message)
         "",  # chat_file_status (clear)
-        gr.update(interactive=False),  # remove_file_btn (disable)
-        gr.update(interactive=False),  # send_btn (disable)
-        gr.update(interactive=False),  # upload_file_btn (disable)
+        gr.update(),  # remove_file_btn (let it manage its own state based on file presence)
+        gr.update(interactive=False),  # send_btn (disable - prevent sending)
+        gr.update(interactive=True),   # upload_file_btn (enable - allow file management)
         gr.update(interactive=False),  # speed_dropdown (disable)
         gr.update(interactive=False),  # mode_dropdown (disable)
         gr.update(interactive=False),  # delete_btn (disable)
@@ -313,17 +329,17 @@ def chat_respond(message: str, history: list):
         import os
 
         # Detect user intent using natural language processing
-        intent = detect_user_intent(message, has_file=bool(chat_uploaded_file))
+        intent = detect_user_intent(message, has_file=bool(current_file))
 
         # Handle file-specific actions based on detected intent
-        if chat_uploaded_file:
+        if current_file:
             if intent == 'summarize':
-                response = process_uploaded_report(chat_uploaded_file, action='summarize', mode=current_mode)
+                response = process_uploaded_report(current_file, action='summarize', mode=current_mode)
             elif intent == 'validate':
-                response = process_uploaded_report(chat_uploaded_file, action='validate', schema=DEFAULT_SCHEMA, mode=current_mode)
+                response = process_uploaded_report(current_file, action='validate', schema=DEFAULT_SCHEMA, mode=current_mode)
             else:
                 # Default to Q&A on file content (Plan A approach)
-                response = process_uploaded_report(chat_uploaded_file, action='qa', question=message, mode=current_mode)
+                response = process_uploaded_report(current_file, action='qa', question=message, mode=current_mode)
         else:
             # Normal RAG query (no file attached)
             response = rag_system.query(
@@ -332,25 +348,23 @@ def chat_respond(message: str, history: list):
                 max_tokens=1000
             )
 
-        # Delete uploaded file from disk if exists
-        if chat_uploaded_file and os.path.exists(chat_uploaded_file):
+        # Delete uploaded file from disk if exists (use local variable, not global)
+        if current_file and os.path.exists(current_file):
             try:
-                os.remove(chat_uploaded_file)
+                os.remove(current_file)
             except Exception as e:
-                print(f"Warning: Could not delete file {chat_uploaded_file}: {e}")
-
-        # Clear uploaded file reference after sending
-        chat_uploaded_file = None
+                print(f"Warning: Could not delete file {current_file}: {e}")
 
         # Update history with actual response and re-enable all UI elements
+        # Note: Send button state depends on whether user typed something during processing
         history[-1]["content"] = response
         yield (
-            "",  # msg_input (clear)
-            gr.update(interactive=True),   # msg_input (enable - allow typing again)
+            "",  # msg_input (clear - user may have typed during processing, now cleared)
+            gr.update(interactive=True),   # msg_input (enable - allow typing)
             history,  # history (with response)
             "",  # chat_file_status (clear)
-            gr.update(interactive=False),  # remove_file_btn (disable - no file)
-            gr.update(interactive=False),  # send_btn (disable - input empty)
+            gr.update(),  # remove_file_btn (will auto-update based on file presence)
+            gr.update(interactive=False),  # send_btn (disable - input just cleared)
             gr.update(interactive=True),   # upload_file_btn (enable)
             gr.update(interactive=True),   # speed_dropdown (enable)
             gr.update(interactive=True),   # mode_dropdown (enable)
@@ -365,24 +379,21 @@ def chat_respond(message: str, history: list):
         error_msg = f"❌ Error: {str(e)}"
         history[-1]["content"] = error_msg
 
-        # Delete uploaded file from disk if exists (even on error)
+        # Delete uploaded file from disk if exists (even on error, use local variable)
         import os
-        if chat_uploaded_file and os.path.exists(chat_uploaded_file):
+        if current_file and os.path.exists(current_file):
             try:
-                os.remove(chat_uploaded_file)
+                os.remove(current_file)
             except Exception as e:
-                print(f"Warning: Could not delete file {chat_uploaded_file}: {e}")
-
-        # Clear uploaded file reference even on error
-        chat_uploaded_file = None
+                print(f"Warning: Could not delete file {current_file}: {e}")
 
         yield (
             "",  # msg_input (clear)
-            gr.update(interactive=True),   # msg_input (enable - allow typing again)
+            gr.update(interactive=True),   # msg_input (enable - allow typing)
             history,  # history (with error)
             "",  # chat_file_status (clear)
-            gr.update(interactive=False),  # remove_file_btn (disable - no file)
-            gr.update(interactive=False),  # send_btn (disable - input empty)
+            gr.update(),  # remove_file_btn (will auto-update based on file presence)
+            gr.update(interactive=False),  # send_btn (disable - input just cleared)
             gr.update(interactive=True),   # upload_file_btn (enable)
             gr.update(interactive=True),   # speed_dropdown (enable)
             gr.update(interactive=True),   # mode_dropdown (enable)
@@ -426,12 +437,12 @@ def handle_chat_file_upload(file):
 
         # Get source file path
         source_path = Path(file)
-        file_name = source_path.name
+        original_name = source_path.name
 
         # Show uploading status
         uploading_html = f"""
         <div style='padding: 10px; background-color: #fff3cd; border-radius: 5px; border-left: 4px solid #ffc107;'>
-            <p style='margin: 0;'><b>📄 {file_name}</b></p>
+            <p style='margin: 0;'><b>📄 {original_name}</b></p>
             <p style='margin: 5px 0 0 0; color: #856404;'>🔄 Uploading...</p>
         </div>
         """
@@ -439,8 +450,15 @@ def handle_chat_file_upload(file):
         # Simulate upload delay (for demo purposes, can remove in production)
         time.sleep(0.5)
 
-        # Copy file to temp_upload directory
-        dest_path = TEMP_UPLOAD_DIR / file_name
+        # Generate unique filename to prevent overwriting files being processed
+        # Format: original_name_UUID.ext (e.g., "report_a1b2c3d4.pdf")
+        import uuid
+        file_stem = source_path.stem  # filename without extension
+        file_ext = source_path.suffix  # extension including dot
+        unique_id = str(uuid.uuid4())[:8]  # Short UUID for readability
+        unique_filename = f"{file_stem}_{unique_id}{file_ext}"
+        dest_path = TEMP_UPLOAD_DIR / unique_filename
+
         shutil.copy2(source_path, dest_path)
 
         # Update global state
@@ -450,17 +468,17 @@ def handle_chat_file_upload(file):
         if session_manager and ENABLE_SESSION_AUTO_EMBED:
             try:
                 file_info = session_manager.add_file(str(dest_path))
-                print(f"[OK] File added to session: {file_name} ({file_info['chunks']} chunks)")
+                print(f"[OK] File added to session: {original_name} (saved as {unique_filename}, {file_info['chunks']} chunks)")
             except Exception as e:
                 print(f"[WARNING] Failed to add file to session: {e}")
 
         chat_file_uploading = False
 
-        # Show success status with file count
+        # Show success status with file count (display original name to user)
         file_count = len(session_manager.files) if (session_manager and ENABLE_SESSION_AUTO_EMBED) else 1
         success_html = f"""
         <div style='padding: 10px; background-color: #d4edda; border-radius: 5px; border-left: 4px solid #28a745;'>
-            <p style='margin: 0;'><b>📄 {file_name}</b></p>
+            <p style='margin: 0;'><b>📄 {original_name}</b></p>
             <p style='margin: 5px 0 0 0; color: #155724;'>✅ Ready (Session: {file_count} file{'s' if file_count != 1 else ''})</p>
         </div>
         """
@@ -666,17 +684,25 @@ def handle_kb_file_upload(file):
 
         # Get source file path
         source_path = Path(file)
-        file_name = source_path.name
+        original_name = source_path.name
 
-        # Copy file to kb_uploads directory
-        dest_path = KB_UPLOAD_DIR / file_name
+        # Generate unique filename to prevent overwriting files being processed
+        # Format: original_name_UUID.ext (e.g., "manual_a1b2c3d4.pdf")
+        import uuid
+        file_stem = source_path.stem  # filename without extension
+        file_ext = source_path.suffix  # extension including dot
+        unique_id = str(uuid.uuid4())[:8]  # Short UUID for readability
+        unique_filename = f"{file_stem}_{unique_id}{file_ext}"
+        dest_path = KB_UPLOAD_DIR / unique_filename
+
+        # Copy file to kb_uploads directory with unique name
         shutil.copy2(source_path, dest_path)
 
         # Update global state
         kb_uploaded_file = str(dest_path)
 
         # Immediately process the file
-        print(f"Adding {file_name} to knowledge base...")
+        print(f"Adding {original_name} to knowledge base (saved as {unique_filename})...")
 
         # Extract text
         pdf_processor = PDFProcessor()
@@ -704,11 +730,11 @@ def handle_kb_file_upload(file):
         # Convert to list
         embeddings_list = [emb.tolist() for emb in embeddings]
 
-        # Prepare metadata
+        # Prepare metadata (use original_name for user-facing display)
         metadata = [
             {
                 'source_type': 'pdf',
-                'source_name': file_name,
+                'source_name': original_name,  # Use original name, not UUID filename
                 'added_date': datetime.now().isoformat(),
                 'chunk_index': i,
                 'precision': EMBEDDING_PRECISION
@@ -723,11 +749,20 @@ def handle_kb_file_upload(file):
             metadata=metadata
         )
 
+        print(f"[OK] Added {n_added} chunks from {original_name} to knowledge base")
+
+        # Delete the temporary file after processing (embeddings already in Chroma)
+        import os
+        if dest_path.exists():
+            try:
+                os.remove(dest_path)
+                print(f"[OK] Deleted temporary file: {unique_filename}")
+            except Exception as e:
+                print(f"[WARNING] Could not delete temporary file: {e}")
+
         # Clear uploaded file after processing
         kb_uploaded_file = None
         kb_file_uploading = False
-
-        print(f"[OK] Added {n_added} chunks from {file_name} to knowledge base")
 
         # Return empty status (hide immediately), updated KB display, dropdown, and clear file input
         return "", format_kb_display(), gr.update(choices=get_source_names()), None
@@ -735,6 +770,15 @@ def handle_kb_file_upload(file):
     except Exception as e:
         kb_file_uploading = False
         print(f"[ERROR] Error adding {file.name if file else 'file'} to knowledge base: {str(e)}")
+
+        # Delete the temporary file even on error
+        import os
+        try:
+            if 'dest_path' in locals() and dest_path.exists():
+                os.remove(dest_path)
+                print(f"[OK] Deleted temporary file after error: {unique_filename}")
+        except Exception as cleanup_error:
+            print(f"[WARNING] Could not delete temporary file: {cleanup_error}")
 
         # Return empty status even on error (hide immediately), and clear file input
         return "", format_kb_display(), gr.update(choices=get_source_names()), None
@@ -1243,13 +1287,20 @@ def create_interface():
             updated_status = get_current_status()
             return updated_status
 
-        def handle_msg_input_change(msg):
-            """Handle message input change - enable/disable send button based on input."""
-            # Enable send button only if message has content
-            if msg and msg.strip():
-                return gr.update(interactive=True)
-            else:
+        def handle_msg_input_change(msg, history):
+            """Handle message input change - enable/disable send button based on input and processing state."""
+            # Disable if no input
+            if not msg or not msg.strip():
                 return gr.update(interactive=False)
+
+            # Check if LLM is currently processing (last message is "Thinking...")
+            if history and len(history) > 0:
+                last_message = history[-1]
+                if last_message.get('role') == 'assistant' and '💭 Thinking...' in last_message.get('content', ''):
+                    return gr.update(interactive=False)  # Keep disabled during LLM processing
+
+            # Has input and LLM not processing - enable
+            return gr.update(interactive=True)
 
         # Connect events - chat
         msg_input.submit(
@@ -1266,7 +1317,7 @@ def create_interface():
              upload_file_btn, speed_dropdown, mode_dropdown, delete_btn, refresh_kb_btn,
              source_dropdown, add_file, kb_upload_btn]
         )
-        msg_input.change(handle_msg_input_change, [msg_input], [send_btn])
+        msg_input.change(handle_msg_input_change, [msg_input, chatbot], [send_btn])
 
         # File upload handlers - left side (chat)
         upload_file_btn.upload(
