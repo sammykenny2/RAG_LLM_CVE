@@ -376,12 +376,27 @@ def chat_respond(message: str, history: list):
         # Update history with actual response and re-enable all UI elements
         # Note: Send button state depends on whether user typed something during processing
         history[-1]["content"] = response
+
+        # In session mode, show file count and keep remove button enabled if files exist
+        if ENABLE_SESSION_AUTO_EMBED and session_manager and len(session_manager.files) > 0:
+            file_count = len(session_manager.files)
+            session_status_html = f"""
+            <div style='padding: 10px; background-color: #d4edda; border-radius: 5px; border-left: 4px solid #28a745;'>
+                <p style='margin: 0;'><b>📚 Session Files</b></p>
+                <p style='margin: 5px 0 0 0; color: #155724;'>✅ {file_count} file{'s' if file_count != 1 else ''} in context</p>
+            </div>
+            """
+            remove_btn_state = gr.update(interactive=True)
+        else:
+            session_status_html = ""
+            remove_btn_state = gr.update(interactive=False)
+
         yield (
             "",  # msg_input (clear - user may have typed during processing, now cleared)
             gr.update(interactive=True),   # msg_input (enable - allow typing)
             history,  # history (with response)
-            "",  # chat_file_status (clear)
-            gr.update(interactive=False),  # remove_file_btn (disable - file already processed/cleared)
+            session_status_html,  # chat_file_status (show session files or clear)
+            remove_btn_state,  # remove_file_btn (enable if session has files, disable otherwise)
             gr.update(interactive=False),  # send_btn (disable - input just cleared)
             gr.update(interactive=True),   # upload_file_btn (enable)
             gr.update(interactive=True),   # speed_dropdown (enable)
@@ -405,12 +420,26 @@ def chat_respond(message: str, history: list):
             except Exception as e:
                 print(f"Warning: Could not delete file {current_file}: {e}")
 
+        # In session mode, show file count and keep remove button enabled if files exist
+        if ENABLE_SESSION_AUTO_EMBED and session_manager and len(session_manager.files) > 0:
+            file_count = len(session_manager.files)
+            session_status_html = f"""
+            <div style='padding: 10px; background-color: #d4edda; border-radius: 5px; border-left: 4px solid #28a745;'>
+                <p style='margin: 0;'><b>📚 Session Files</b></p>
+                <p style='margin: 5px 0 0 0; color: #155724;'>✅ {file_count} file{'s' if file_count != 1 else ''} in context</p>
+            </div>
+            """
+            remove_btn_state = gr.update(interactive=True)
+        else:
+            session_status_html = ""
+            remove_btn_state = gr.update(interactive=False)
+
         yield (
             "",  # msg_input (clear)
             gr.update(interactive=True),   # msg_input (enable - allow typing)
             history,  # history (with error)
-            "",  # chat_file_status (clear)
-            gr.update(interactive=False),  # remove_file_btn (disable - file already processed/cleared)
+            session_status_html,  # chat_file_status (show session files or clear)
+            remove_btn_state,  # remove_file_btn (enable if session has files, disable otherwise)
             gr.update(interactive=False),  # send_btn (disable - input just cleared)
             gr.update(interactive=True),   # upload_file_btn (enable)
             gr.update(interactive=True),   # speed_dropdown (enable)
@@ -523,26 +552,51 @@ def handle_chat_file_upload(file):
 def handle_remove_chat_file():
     """
     Remove uploaded file from chat (left side).
+    In session mode, removes the last file from SessionManager.
 
     Returns:
-        tuple: (Empty HTML to clear status display, button update to disable)
+        tuple: (Status HTML or empty, button update based on remaining files)
     """
     global chat_uploaded_file, chat_file_uploading
     import os
 
-    # Delete file if exists
-    if chat_uploaded_file and os.path.exists(chat_uploaded_file):
+    # In session mode, remove last file from SessionManager
+    if ENABLE_SESSION_AUTO_EMBED and session_manager and len(session_manager.files) > 0:
         try:
-            os.remove(chat_uploaded_file)
+            # Remove the most recent file
+            last_file = list(session_manager.files.keys())[-1]
+            session_manager.remove_file(last_file)
+            print(f"[OK] Removed file from session: {last_file}")
+
+            # Update status based on remaining files
+            remaining_count = len(session_manager.files)
+            if remaining_count > 0:
+                status_html = f"""
+                <div style='padding: 10px; background-color: #d4edda; border-radius: 5px; border-left: 4px solid #28a745;'>
+                    <p style='margin: 0;'><b>📚 Session Files</b></p>
+                    <p style='margin: 5px 0 0 0; color: #155724;'>✅ {remaining_count} file{'s' if remaining_count != 1 else ''} in context</p>
+                </div>
+                """
+                return status_html, gr.update(interactive=True)
+            else:
+                return "", gr.update(interactive=False)
         except Exception as e:
-            print(f"Warning: Could not delete file {chat_uploaded_file}: {e}")
+            print(f"Warning: Could not remove file from session: {e}")
+            return "", gr.update(interactive=False)
+    else:
+        # Non-session mode: delete single file
+        if chat_uploaded_file and os.path.exists(chat_uploaded_file):
+            try:
+                os.remove(chat_uploaded_file)
+            except Exception as e:
+                print(f"Warning: Could not delete file {chat_uploaded_file}: {e}")
 
-    # Clear global state
-    chat_uploaded_file = None
-    chat_file_uploading = False
+        # Clear global state
+        chat_uploaded_file = None
+        chat_file_uploading = False
 
-    # Return empty HTML to clear display and disable button
-    return "", gr.update(interactive=False)
+        # Return empty HTML to clear display and disable button
+        return "", gr.update(interactive=False)
 
 def process_uploaded_report(
     file,
