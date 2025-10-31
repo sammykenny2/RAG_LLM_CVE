@@ -402,7 +402,7 @@ Batches: 100%|████████████| 14/14 [00:08<00:00,  1.65it/
 Storing embeddings in Chroma database...
   └─ Stored 847 embeddings in Chroma database
 
-[OK] Generated: .\embeddings\CVEEmbeddings.chroma
+[OK] Generated: .\embeddings\cve_embeddings.chroma
 [INFO] To use this with validate_report.py, run:
    python validate_report.py --extension=chroma
 ```
@@ -419,12 +419,12 @@ Storing embeddings in Chroma database...
 ls .\embeddings\
 
 # 應該會看到：
-# CVEEmbeddings.chroma\  (目錄)
+# cve_embeddings.chroma\  (目錄)
 ```
 
 進一步檢查內容：
 ```powershell
-ls .\embeddings\CVEEmbeddings.chroma\
+ls .\embeddings\cve_embeddings.chroma\
 
 # 應該會看到 Chroma 資料庫的檔案，如：
 # chroma.sqlite3

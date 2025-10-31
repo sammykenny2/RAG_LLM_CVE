@@ -50,8 +50,8 @@ class ChromaManager:
             self.db_path = Path(db_path)
         else:
             # Use EMBEDDING_PATH + .chroma suffix for consistency
-            # EMBEDDING_PATH is base path (e.g., ./CVEEmbeddings)
-            # Chroma database should be ./CVEEmbeddings.chroma/
+            # EMBEDDING_PATH is base path (e.g., ./embeddings/cve_embeddings)
+            # Chroma database should be ./embeddings/cve_embeddings.chroma/
             base_path = Path(EMBEDDING_PATH)
             self.db_path = Path(f"{base_path}.chroma")
 

@@ -291,7 +291,7 @@ python web/web_ui_langchain.py
 
 ### Added (validate_report.py)
 - **Embedding format support** via `--extension` parameter:
-  - Reads `CVEEmbeddings.{extension}` (or directory for chroma) based on parameter
+  - Reads `cve_embeddings.{extension}` (or directory for chroma) based on parameter
   - Supports csv, pkl (default), parquet, chroma formats
   - File/directory existence check with helpful error messages
 - **Format-specific loading**: Optimized readers for each format
@@ -443,7 +443,7 @@ python web/web_ui_langchain.py
 - `PROGRESS.md`: This file, tracking completed changes and upcoming features
 
 ### Changed
-- Renamed `cveEmbeddings.csv` → `CVEEmbeddings.csv` for naming consistency
+- Renamed `cveEmbeddings.csv` → `cve_embeddings.csv` for naming consistency
 - Standardized virtual environment naming: `venv-*` → `.venv-*` (dot prefix)
 - All setup scripts now create dot-prefixed venvs
 

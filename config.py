@@ -21,7 +21,7 @@ def get_path(env_var: str, default: str) -> Path:
 
 # Embedding base path (without extension)
 # Usage: f"{EMBEDDING_PATH}.{extension}" where extension is csv, pkl, parquet, or chroma
-EMBEDDING_PATH = get_path('EMBEDDING_PATH', './embeddings/CVEEmbeddings')
+EMBEDDING_PATH = get_path('EMBEDDING_PATH', './embeddings/cve_embeddings')
 
 CVE_V5_PATH = get_path('CVE_V5_PATH', '../cvelistV5/cves')
 CVE_V4_PATH = get_path('CVE_V4_PATH', '../cvelist')

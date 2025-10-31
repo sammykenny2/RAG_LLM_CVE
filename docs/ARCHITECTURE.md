@@ -375,7 +375,7 @@ metadata = {
    - Full: 1500-char window around CVE mention (capped at 2000 chars)
 2. **LLM Call 1**: Ask Llama to paraphrase CVE usage in 2 sentences (64-700 tokens)
 3. **LLM Call 2**: Call `asking_llama_for_advice()`:
-   - Load `CVEEmbeddings.csv` (embedding database)
+   - Load `cve_embeddings.csv` (embedding database)
    - Use SentenceTransformer to find top-3/5 similar CVE descriptions
    - Ask Llama to recommend similar CVE based on retrieved context (128-700 tokens)
 4. Cleanup: Clear CUDA cache, run garbage collection
