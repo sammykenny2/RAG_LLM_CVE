@@ -326,12 +326,20 @@ def chat_respond(message: str, history: list):
     # Note: Allow user to type next message and manage files while waiting for response
     history.append({"role": "user", "content": user_content})
     history.append({"role": "assistant", "content": "💭 Thinking..."})
+
+    # Determine remove_file_btn state based on session mode
+    # In session mode: keep enabled if files exist, in non-session mode: disable (file already consumed)
+    if ENABLE_SESSION_AUTO_EMBED and session_manager and len(session_manager.files) > 0:
+        remove_btn_thinking_state = gr.update(interactive=True)
+    else:
+        remove_btn_thinking_state = gr.update(interactive=False)
+
     yield (
         "",  # msg_input (clear but keep interactive for typing next message)
         gr.update(interactive=True),   # msg_input (enable - allow typing during processing)
         history,  # history (with thinking message)
         "",  # chat_file_status (clear)
-        gr.update(),  # remove_file_btn (let it manage its own state based on file presence)
+        remove_btn_thinking_state,  # remove_file_btn (disable in non-session mode, enable if session has files)
         gr.update(interactive=False),  # send_btn (disable - prevent sending)
         gr.update(interactive=True),   # upload_file_btn (enable - allow file management)
         gr.update(interactive=False),  # speed_dropdown (disable)
