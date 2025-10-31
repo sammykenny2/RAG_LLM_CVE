@@ -664,7 +664,7 @@ def handle_kb_file_upload(file):
         file: Gradio File object (path string)
 
     Returns:
-        tuple: (status_html, updated_kb_display, updated_dropdown_choices, cleared_file_input, kb_upload_btn_state, msg_send_btn_state)
+        tuple: (status_html, updated_kb_display, updated_dropdown_choices, cleared_file_input, kb_upload_btn_state, send_btn_state)
     """
     global kb_file_processing
     import shutil
@@ -1179,12 +1179,12 @@ def create_interface():
         add_file.upload(
             handle_kb_file_upload,
             inputs=[add_file],
-            outputs=[kb_file_status, kb_display, source_dropdown, add_file, kb_upload_btn, msg_send_btn]
+            outputs=[kb_file_status, kb_display, source_dropdown, add_file, kb_upload_btn, send_btn]
         )
         kb_upload_btn.upload(
             handle_kb_file_upload,
             inputs=[kb_upload_btn],
-            outputs=[kb_file_status, kb_display, source_dropdown, add_file, kb_upload_btn, msg_send_btn]
+            outputs=[kb_file_status, kb_display, source_dropdown, add_file, kb_upload_btn, send_btn]
         )
 
         # Knowledge base handlers
