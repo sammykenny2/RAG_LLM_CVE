@@ -232,8 +232,8 @@ def detect_user_intent(message: str, has_file: bool) -> str:
     # Summarize intent keywords (Chinese + English)
     summarize_keywords = [
         # Chinese
-        'summary_zh', 'summary_zh', 'summary_zh', 'summary_zh', 'summary_zh', 'content_zh', 'whatisit_zh', 'whatisit_zh',
-        'maincontent_zh', 'maincontent_zh', 'keypoint_zh', 'keypoint_zh', 'gist_zh',
+        '總結', '摘要', '概括', '整理', '歸納', '內容', '講什麼', '說什麼',
+        '主要內容', '主旨', '重點', '要點', '大意',
         # English
         'summarize', 'summary', 'summarise', 'what is this', 'what does',
         'content', 'about', 'main point', 'key point', 'overview'
@@ -242,7 +242,7 @@ def detect_user_intent(message: str, has_file: bool) -> str:
     # Validate intent keywords (Chinese + English)
     validate_keywords = [
         # Chinese
-        'validate_zh', 'validate_zh', 'check_zh', 'check_zh', 'verify_zh', 'verify_zh', 'confirm_zh', 'confirm_zh',
+        '驗證', '檢驗', '檢查', '查核', '確認', '核實', '校驗', '審核',
         # English
         'validate', 'verify', 'check', 'correct', 'accuracy'
     ]
