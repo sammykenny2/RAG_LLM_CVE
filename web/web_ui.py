@@ -93,6 +93,7 @@ current_mode = DEFAULT_MODE
 chat_uploaded_file = None  # Left side: for chat validation (current file display)
 chat_file_uploading = False  # Left side upload status
 kb_file_processing = False  # Right side: KB processing lock (True = processing, False = ready)
+settings_changing = False  # Right side: Settings change lock (True = changing, False = ready)
 
 # Files directory structure (from config)
 # KB files: files/knowledge_base/ (permanent, original filenames)
@@ -276,6 +277,13 @@ def chat_respond(message: str, history: list):
     global chat_uploaded_file, chat_file_uploading
 
     if not message.strip():
+        yield "", gr.update(), history, "", gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
+        return
+
+    # Check if settings are being changed
+    if settings_changing:
+        history.append({"role": "user", "content": message})
+        history.append({"role": "assistant", "content": "⏳ Please wait, settings are being changed..."})
         yield "", gr.update(), history, "", gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
         return
 
@@ -692,6 +700,17 @@ def handle_kb_file_upload(file):
 
     if file is None:
         return "", format_kb_display(), gr.update(choices=get_source_names()), None, gr.update(interactive=True), gr.update(interactive=True)
+
+    # Check if settings are being changed
+    if settings_changing:
+        return (
+            "⚠️ Settings are being changed. Please wait...",
+            format_kb_display(),
+            gr.update(choices=get_source_names()),
+            None,
+            gr.update(interactive=False),
+            gr.update(interactive=False)
+        )
 
     # Check if already processing
     if kb_file_processing:
@@ -1309,21 +1328,59 @@ def create_interface():
 
         def handle_speed_change(new_speed):
             """Handle speed dropdown change - reload model."""
+            global settings_changing
+
+            # Lock all operations
+            settings_changing = True
+
+            # Perform reload
             reload_model(new_speed)
             updated_status = get_current_status()
-            return updated_status
+
+            # Unlock operations
+            settings_changing = False
+
+            # Return: status, add_file, kb_upload_btn, delete_btn, send_btn
+            return (
+                updated_status,
+                gr.update(interactive=True),  # add_file enabled
+                gr.update(interactive=True),  # kb_upload_btn enabled
+                gr.update(interactive=True if source_dropdown.value else False),  # delete_btn depends on selection
+                gr.update(interactive=True if msg_input.value and msg_input.value.strip() else False)  # send_btn depends on input
+            )
 
         def handle_mode_change(new_mode):
             """Handle mode dropdown change - no reload needed."""
+            global settings_changing
+
+            # Lock all operations
+            settings_changing = True
+
+            # Perform mode change
             update_mode(new_mode)
             updated_status = get_current_status()
-            return updated_status
+
+            # Unlock operations
+            settings_changing = False
+
+            # Return: status, add_file, kb_upload_btn, delete_btn, send_btn
+            return (
+                updated_status,
+                gr.update(interactive=True),  # add_file enabled
+                gr.update(interactive=True),  # kb_upload_btn enabled
+                gr.update(interactive=True if source_dropdown.value else False),  # delete_btn depends on selection
+                gr.update(interactive=True if msg_input.value and msg_input.value.strip() else False)  # send_btn depends on input
+            )
 
         def handle_msg_input_change(msg, history):
             """Handle message input change - enable/disable send button based on input and processing state."""
             # Disable if no input
             if not msg or not msg.strip():
                 return gr.update(interactive=False)
+
+            # Check if settings are being changed
+            if settings_changing:
+                return gr.update(interactive=False)  # Keep disabled during settings change
 
             # Check if KB is currently processing
             if kb_file_processing:
@@ -1335,7 +1392,7 @@ def create_interface():
                 if last_message.get('role') == 'assistant' and '💭 Thinking...' in last_message.get('content', ''):
                     return gr.update(interactive=False)  # Keep disabled during LLM processing
 
-            # Has input and neither KB nor LLM processing - enable
+            # Has input and no processing - enable
             return gr.update(interactive=True)
 
         # Connect events - chat
@@ -1383,12 +1440,12 @@ def create_interface():
         speed_dropdown.change(
             handle_speed_change,
             inputs=[speed_dropdown],
-            outputs=[status_display]
+            outputs=[status_display, add_file, kb_upload_btn, delete_btn, send_btn]
         )
         mode_dropdown.change(
             handle_mode_change,
             inputs=[mode_dropdown],
-            outputs=[status_display]
+            outputs=[status_display, add_file, kb_upload_btn, delete_btn, send_btn]
         )
 
         # Knowledge base handlers
