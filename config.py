@@ -98,7 +98,7 @@ SESSION_MAX_FILE_SIZE_MB = int(os.getenv('SESSION_MAX_FILE_SIZE_MB', '10'))
 SESSION_TIMEOUT_HOURS = int(os.getenv('SESSION_TIMEOUT_HOURS', '1'))
 
 # Backward compatibility: control whether uploaded files are auto-embedded
-# True: Uploaded files are automatically embedded and searchable in RAG queries (requires temp_uploads/ directory)
+# True: Uploaded files are automatically embedded and searchable in RAG queries (requires files/sessions/ and embeddings/sessions/ directories)
 # False: Uploaded files only used for special commands like summarize/validate (resource-efficient, no session database)
 ENABLE_SESSION_AUTO_EMBED = os.getenv('ENABLE_SESSION_AUTO_EMBED', 'False').lower() == 'true'
 

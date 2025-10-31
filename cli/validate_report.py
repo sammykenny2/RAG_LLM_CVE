@@ -571,7 +571,7 @@ def asking_llama_for_advice(cveDesp: str) -> str:
     if EMBEDDING_EXTENSION == 'chroma':
         # Chroma vector database
         client = chromadb.PersistentClient(path=EMBEDDING_FILE)
-        collection = client.get_collection("cve_embeddings")
+        collection = client.get_collection("knowledge_base")
 
         # Query Chroma directly (no need to load all embeddings)
         n_results = TOP_K_RETRIEVAL if MAX_EMBEDDING_ROWS is None else min(TOP_K_RETRIEVAL, MAX_EMBEDDING_ROWS)

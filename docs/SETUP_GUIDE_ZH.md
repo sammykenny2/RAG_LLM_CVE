@@ -402,7 +402,7 @@ Batches: 100%|████████████| 14/14 [00:08<00:00,  1.65it/
 Storing embeddings in Chroma database...
   └─ Stored 847 embeddings in Chroma database
 
-[OK] Generated: .\embeddings\cve_embeddings.chroma
+[OK] Generated: .\embeddings\knowledge_base.chroma
 [INFO] To use this with validate_report.py, run:
    python validate_report.py --extension=chroma
 ```
@@ -419,12 +419,12 @@ Storing embeddings in Chroma database...
 ls .\embeddings\
 
 # 應該會看到：
-# cve_embeddings.chroma\  (目錄)
+# knowledge_base.chroma\  (目錄)
 ```
 
 進一步檢查內容：
 ```powershell
-ls .\embeddings\cve_embeddings.chroma\
+ls .\embeddings\knowledge_base.chroma\
 
 # 應該會看到 Chroma 資料庫的檔案，如：
 # chroma.sqlite3
@@ -456,7 +456,7 @@ Loading embedding model: sentence-transformers/all-mpnet-base-v2
 [OK] Embedding model loaded on cuda
 
 Connecting to Chroma database...
-[OK] Loaded existing collection: cve_embeddings
+[OK] Loaded existing collection: knowledge_base
 
 [OK] SessionManager initialized (session_id=abc12345...)
 [OK] RAG system ready (speed=fast)

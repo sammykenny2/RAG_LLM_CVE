@@ -104,7 +104,7 @@ This file tracks completed changes and upcoming features for the project.
   - Auto-launch browser on startup
 
 ### Changed
-- **.gitignore**: Added `.env` and `temp_uploads/` exclusions
+- **.gitignore**: Added `.env` and session directories exclusions
 - **requirements.txt**: Added `python-dotenv` and `gradio`
 - Repository structure: Added `core/`, `rag/`, `web/` directories
 
@@ -291,7 +291,7 @@ python web/web_ui_langchain.py
 
 ### Added (validate_report.py)
 - **Embedding format support** via `--extension` parameter:
-  - Reads `cve_embeddings.{extension}` (or directory for chroma) based on parameter
+  - Reads `knowledge_base.{extension}` (or directory for chroma) based on parameter
   - Supports csv, pkl (default), parquet, chroma formats
   - File/directory existence check with helpful error messages
 - **Format-specific loading**: Optimized readers for each format
@@ -308,7 +308,7 @@ python web/web_ui_langchain.py
 - **validate_report.py**: Default embedding format changed to `.pkl` (from `.csv`)
 - **requirements.txt**: Added `pyarrow` for parquet support, `chromadb` for vector database support
 - User input flow: Now asks for base filename without extension (for file-based formats)
-- Chroma format creates directory instead of file (e.g., `cve_embeddings/` instead of `cve_embeddings.pkl`)
+- Chroma format creates directory instead of file (e.g., `knowledge_base.chroma/` instead of `knowledge_base.pkl`)
 
 ### Performance Impact (build_embeddings.py)
 - **Batch encoding speedup**:
@@ -330,15 +330,15 @@ python web/web_ui_langchain.py
 
 ### Verified Configurations
 ✅ **Tested and verified working (2025-01-13)**:
-- `build_embeddings.py --speed=fast --extension=pkl` → cve_embeddings.pkl (~33 MB)
-- `build_embeddings.py --speed=fastest --extension=parquet` → cve_embeddings.parquet (~24 MB)
+- `build_embeddings.py --speed=fast --extension=pkl` → knowledge_base.pkl (~33 MB)
+- `build_embeddings.py --speed=fastest --extension=parquet` → knowledge_base.parquet (~24 MB)
 - `validate_report.py --speed=fast --extension=pkl` → Successfully loaded and processed
 - `validate_report.py --speed=fastest --extension=parquet` → Successfully loaded and processed
 - All combinations tested on CUDA 11.8 (GTX 1660 Ti) without issues
 
 ✅ **Chroma integration (2025-01-14)**:
 - Added chromadb to requirements.txt
-- `build_embeddings.py --extension=chroma` → Creates cve_embeddings/ directory with vector database
+- `build_embeddings.py --extension=chroma` → Creates knowledge_base.chroma/ directory with vector database
 - `validate_report.py --extension=chroma` → Direct query from Chroma database (no memory loading)
 - Persistent client mode (no server required)
 
@@ -443,7 +443,7 @@ python web/web_ui_langchain.py
 - `PROGRESS.md`: This file, tracking completed changes and upcoming features
 
 ### Changed
-- Renamed `cveEmbeddings.csv` → `cve_embeddings.csv` for naming consistency
+- Renamed embeddings: `cveEmbeddings.csv` → `cve_embeddings.csv` → `knowledge_base.*` for naming consistency
 - Standardized virtual environment naming: `venv-*` → `.venv-*` (dot prefix)
 - All setup scripts now create dot-prefixed venvs
 
@@ -846,10 +846,10 @@ ENABLE_SESSION_AUTO_EMBED=False  # Backward compatibility control (default: Fals
 - **Problem**: v2 auto-embeds uploaded files (different from main branch behavior)
 - **Solution**: `ENABLE_SESSION_AUTO_EMBED` configuration flag
   - `False` (default): Resource-efficient - no session database, files only for special commands (summarize/validate)
-  - `True`: Multi-file context - files auto-embedded and searchable, requires temp_uploads/ directory creation
+  - `True`: Multi-file context - files auto-embedded and searchable, requires files/sessions/ and embeddings/sessions/ directories
 - **Implementation**: Conditional SessionManager initialization in `web_ui.py` and `web_ui_langchain.py`
   ```python
-  # Only create SessionManager if enabled (avoids unnecessary temp_uploads/ directory)
+  # Only create SessionManager if enabled (avoids unnecessary session directories)
   if session_manager is None and ENABLE_SESSION_AUTO_EMBED:
       session_manager = SessionManager(session_id=session_id)
 
@@ -857,7 +857,7 @@ ENABLE_SESSION_AUTO_EMBED=False  # Backward compatibility control (default: Fals
   if session_manager and ENABLE_SESSION_AUTO_EMBED:
       file_info = session_manager.add_file(str(dest_path))
   ```
-- **Benefits**: Resource efficiency (no temp_uploads/ creation when disabled), non-breaking change, easy testing
+- **Benefits**: Resource efficiency (no session directories creation when disabled), non-breaking change, easy testing
 
 ### Success Criteria
 

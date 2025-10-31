@@ -38,7 +38,7 @@ class ChromaManager:
         manager.delete_by_source("report.pdf")
     """
 
-    def __init__(self, db_path: Union[str, Path] = None, collection_name: str = "cve_embeddings"):
+    def __init__(self, db_path: Union[str, Path] = None, collection_name: str = "knowledge_base"):
         """
         Initialize Chroma manager.
 
@@ -50,8 +50,8 @@ class ChromaManager:
             self.db_path = Path(db_path)
         else:
             # Use EMBEDDING_PATH + .chroma suffix for consistency
-            # EMBEDDING_PATH is base path (e.g., ./embeddings/cve_embeddings)
-            # Chroma database should be ./embeddings/cve_embeddings.chroma/
+            # EMBEDDING_PATH is base path (e.g., ./embeddings/knowledge_base)
+            # Chroma database should be ./embeddings/knowledge_base.chroma/
             base_path = Path(EMBEDDING_PATH)
             self.db_path = Path(f"{base_path}.chroma")
 
@@ -405,7 +405,7 @@ class ChromaManager:
 # Utility functions (backward compatible)
 # =============================================================================
 
-def get_chroma_collection(db_path: Union[str, Path] = None, collection_name: str = "cve_embeddings"):
+def get_chroma_collection(db_path: Union[str, Path] = None, collection_name: str = "knowledge_base"):
     """
     Get Chroma collection (backward compatible function).
 

@@ -423,14 +423,14 @@ def process_pdf(pdf_path, sentence_size, output_path, batch_size, precision, ext
 
         # Delete existing collection if it exists (to allow re-creation)
         try:
-            client.delete_collection("cve_embeddings")
+            client.delete_collection("knowledge_base")
         except:
             pass
 
         # Create new collection
         collection = client.create_collection(
-            name="cve_embeddings",
-            metadata={"description": "CVE embeddings for RAG system"}
+            name="knowledge_base",
+            metadata={"description": "Knowledge base embeddings for RAG system"}
         )
 
         # Prepare data for Chroma
@@ -693,12 +693,12 @@ Examples:
         elif args.extension == 'chroma':
             client = chromadb.PersistentClient(path=output_path)
             try:
-                client.delete_collection("cve_embeddings")
+                client.delete_collection("knowledge_base")
             except:
                 pass
             collection = client.create_collection(
-                name="cve_embeddings",
-                metadata={"description": "CVE embeddings for RAG system"}
+                name="knowledge_base",
+                metadata={"description": "Knowledge base embeddings for RAG system"}
             )
             ids = [f"chunk_{i}" for i in range(len(dic_chunks))]
             embeddings_list = [item["embedding"].tolist() for item in dic_chunks]
@@ -773,12 +773,12 @@ Examples:
         elif args.extension == 'chroma':
             client = chromadb.PersistentClient(path=output_path)
             try:
-                client.delete_collection("cve_embeddings")
+                client.delete_collection("knowledge_base")
             except:
                 pass
             collection = client.create_collection(
-                name="cve_embeddings",
-                metadata={"description": "CVE embeddings for RAG system"}
+                name="knowledge_base",
+                metadata={"description": "Knowledge base embeddings for RAG system"}
             )
             ids = [f"chunk_{i}" for i in range(len(dic_chunks))]
             embeddings_list = [item["embedding"].tolist() for item in dic_chunks]
