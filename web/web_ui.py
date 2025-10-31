@@ -1405,6 +1405,21 @@ def create_interface():
             # Lock all operations
             settings_changing = True
 
+            # First yield: Disable all buttons and show processing status
+            processing_status = """
+            <div style='padding: 10px; background-color: #fff3cd; border-radius: 5px; border-left: 4px solid #ffc107;'>
+                <p style='margin: 0;'><b>⚙️ Changing Speed Setting...</b></p>
+                <p style='margin: 5px 0 0 0;'>Please wait while the model is reloading...</p>
+            </div>
+            """
+            yield (
+                processing_status,
+                gr.update(interactive=False),  # add_file disabled
+                gr.update(interactive=False),  # kb_upload_btn disabled
+                gr.update(interactive=False),  # delete_btn disabled
+                gr.update(interactive=False)   # send_btn disabled
+            )
+
             # Perform reload
             reload_model(new_speed)
             updated_status = get_current_status()
@@ -1412,8 +1427,8 @@ def create_interface():
             # Unlock operations
             settings_changing = False
 
-            # Return: status, add_file, kb_upload_btn, delete_btn, send_btn
-            return (
+            # Second yield: Re-enable buttons and show updated status
+            yield (
                 updated_status,
                 gr.update(interactive=True),  # add_file enabled
                 gr.update(interactive=True),  # kb_upload_btn enabled
@@ -1428,6 +1443,21 @@ def create_interface():
             # Lock all operations
             settings_changing = True
 
+            # First yield: Disable all buttons and show processing status
+            processing_status = """
+            <div style='padding: 10px; background-color: #fff3cd; border-radius: 5px; border-left: 4px solid #ffc107;'>
+                <p style='margin: 0;'><b>⚙️ Changing Mode Setting...</b></p>
+                <p style='margin: 5px 0 0 0;'>Updating mode configuration...</p>
+            </div>
+            """
+            yield (
+                processing_status,
+                gr.update(interactive=False),  # add_file disabled
+                gr.update(interactive=False),  # kb_upload_btn disabled
+                gr.update(interactive=False),  # delete_btn disabled
+                gr.update(interactive=False)   # send_btn disabled
+            )
+
             # Perform mode change
             update_mode(new_mode)
             updated_status = get_current_status()
@@ -1435,8 +1465,8 @@ def create_interface():
             # Unlock operations
             settings_changing = False
 
-            # Return: status, add_file, kb_upload_btn, delete_btn, send_btn
-            return (
+            # Second yield: Re-enable buttons and show updated status
+            yield (
                 updated_status,
                 gr.update(interactive=True),  # add_file enabled
                 gr.update(interactive=True),  # kb_upload_btn enabled
