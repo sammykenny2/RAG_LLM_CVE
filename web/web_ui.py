@@ -1361,7 +1361,7 @@ def create_interface():
                     const chatbot = document.querySelector('#chatbot');
                     if (!chatbot) return;
 
-                    // Find all buttons in chatbot (including clear button)
+                    // Find all buttons in chatbot
                     const chatbotButtons = chatbot.querySelectorAll('button');
 
                     // Check if last message contains "Thinking..."
@@ -1369,8 +1369,20 @@ def create_interface():
                     const lastMessage = messages[messages.length - 1];
                     const isThinking = lastMessage && lastMessage.textContent.includes('💭 Thinking...');
 
-                    // Disable/enable all chatbot buttons based on thinking state
+                    // Disable/enable only clear button, keep copy buttons enabled
                     chatbotButtons.forEach(function(btn) {
+                        // Check if this is a copy button (has copy icon or title)
+                        const isCopyButton = btn.querySelector('svg') &&
+                            (btn.title && btn.title.toLowerCase().includes('copy')) ||
+                            btn.getAttribute('aria-label') && btn.getAttribute('aria-label').toLowerCase().includes('copy') ||
+                            btn.classList.contains('copy-button');
+
+                        // Skip copy buttons - keep them enabled
+                        if (isCopyButton) {
+                            return;
+                        }
+
+                        // Disable/enable other buttons (like clear)
                         if (isThinking) {
                             btn.disabled = true;
                             btn.style.pointerEvents = 'none';
