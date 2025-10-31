@@ -225,6 +225,15 @@ class SessionManager:
             if VERBOSE_LOGGING:
                 print(f"[OK] File added successfully: {filename} ({len(chunks)} chunks)")
 
+            # Clear GPU cache after embedding to free VRAM for subsequent LLM operations
+            import torch
+            import gc
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                gc.collect()
+                if VERBOSE_LOGGING:
+                    print(f"[OK] GPU cache cleared after embedding")
+
             return file_info
 
         except Exception as e:

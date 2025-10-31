@@ -652,6 +652,14 @@ class LangChainRAG:
             summary = llm_stage1.invoke(prompt)
             chunk_summaries.append(summary)
 
+        # Clear GPU cache after Stage 1 to free VRAM before Stage 2
+        import gc
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            gc.collect()
+            if VERBOSE_LOGGING:
+                print(f"[OK] GPU cache cleared after Stage 1 ({len(chunks)} chunks)")
+
         # Stage 2: Optional final condensing
         if SUMMARY_ENABLE_SECOND_STAGE:
             if VERBOSE_LOGGING:
@@ -890,6 +898,14 @@ class LangChainRAG:
             result = llm.invoke(prompt)
             chunk_results.append(result)
 
+        # Clear GPU cache after Stage 1 to free VRAM before Stage 2
+        import gc
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            gc.collect()
+            if VERBOSE_LOGGING:
+                print(f"[OK] GPU cache cleared after Stage 1 ({len(chunks)} chunks)")
+
         # Stage 2: Optional final consolidation
         if VALIDATION_ENABLE_SECOND_STAGE:
             if VERBOSE_LOGGING:
@@ -1063,6 +1079,14 @@ class LangChainRAG:
 
             answer = self.llm.invoke(prompt)
             chunk_answers.append(f"Section {i}: {answer}")
+
+        # Clear GPU cache after Stage 1 to free VRAM before Stage 2
+        import gc
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            gc.collect()
+            if VERBOSE_LOGGING:
+                print(f"[OK] GPU cache cleared after Stage 1 ({len(chunks)} chunks)")
 
         # Stage 2: Optional consolidation
         if QA_ENABLE_SECOND_STAGE:

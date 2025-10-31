@@ -82,9 +82,22 @@ chat_file_uploading = False  # Left side upload status
 TEMP_UPLOAD_DIR = Path("temp_uploads")  # For chat files (temporary, no embeddings)
 KB_UPLOAD_DIR = Path("kb_uploads")  # For KB files (backup, generate embeddings)
 
-# Ensure upload directories exist
+# Ensure upload directories exist and clean up old temp files
 TEMP_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 KB_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+# Clean up leftover temp files from previous sessions (avoid disk space waste)
+if TEMP_UPLOAD_DIR.exists():
+    import glob
+    temp_files = list(TEMP_UPLOAD_DIR.glob("*"))
+    if temp_files:
+        print(f"[INFO] Cleaning up {len(temp_files)} leftover temp file(s) from previous session...")
+        for temp_file in temp_files:
+            try:
+                if temp_file.is_file():
+                    temp_file.unlink()
+            except Exception as e:
+                print(f"[WARNING] Could not delete {temp_file.name}: {e}")
 
 def initialize_system(speed_level: str = DEFAULT_SPEED, force_reload: bool = False):
     """Initialize LangChain RAG system based on speed level."""
@@ -235,19 +248,19 @@ def chat_respond(message: str, history: list):
         history: Gradio chat history (messages format: list of dicts with 'role' and 'content')
 
     Yields:
-        tuple: (empty string for input clear, updated history, empty string to clear file status, button update to disable)
+        tuple: (empty string for input clear, updated history, empty string to clear file status, remove_btn update, send_btn update)
     """
     global chat_uploaded_file, chat_file_uploading
 
     if not message.strip():
-        yield "", history, "", gr.update()
+        yield "", history, "", gr.update(), gr.update()
         return
 
     # Check if file is still uploading
     if chat_file_uploading:
         history.append({"role": "user", "content": message})
         history.append({"role": "assistant", "content": "⏳ Please wait, file is still uploading..."})
-        yield "", history, "", gr.update()
+        yield "", history, "", gr.update(), gr.update()
         return
 
     # Build user message with file attachment if present
@@ -259,7 +272,7 @@ def chat_respond(message: str, history: list):
     # Immediately show user message with "Thinking..." placeholder
     history.append({"role": "user", "content": user_content})
     history.append({"role": "assistant", "content": "💭 Thinking..."})
-    yield "", history, "", gr.update()
+    yield "", history, "", gr.update(), gr.update(interactive=False)
 
     try:
         import os
@@ -290,9 +303,9 @@ def chat_respond(message: str, history: list):
         # Clear uploaded file reference after sending
         chat_uploaded_file = None
 
-        # Update history with actual response, clear file status, and disable remove button
+        # Update history with actual response, clear file status, disable remove button, and disable send button (input is empty)
         history[-1]["content"] = response
-        yield "", history, "", gr.update(interactive=False)
+        yield "", history, "", gr.update(interactive=False), gr.update(interactive=False)
 
     except Exception as e:
         error_msg = f"❌ Error: {str(e)}"
@@ -309,21 +322,23 @@ def chat_respond(message: str, history: list):
         # Clear uploaded file reference even on error
         chat_uploaded_file = None
 
-        yield "", history, "", gr.update(interactive=False)
+        yield "", history, "", gr.update(interactive=False), gr.update(interactive=False)
 
 def handle_chat_file_upload(file):
     """
     Handle file upload for chat (left side).
+    If a file already exists, delete it before uploading the new one (only support 1 file at a time).
 
     Args:
         file: Gradio File object (path string)
 
     Returns:
-        tuple: (HTML status display, button update to enable)
+        tuple: (HTML status display, remove_btn update to enable)
     """
     global chat_uploaded_file, chat_file_uploading
     import shutil
     import time
+    import os
 
     if file is None:
         return "", gr.update(interactive=False)
@@ -331,6 +346,14 @@ def handle_chat_file_upload(file):
     try:
         # Set uploading status
         chat_file_uploading = True
+
+        # Delete existing file if present (only support one file at a time)
+        if chat_uploaded_file and os.path.exists(chat_uploaded_file):
+            try:
+                os.remove(chat_uploaded_file)
+                print(f"[INFO] Deleted previous file: {Path(chat_uploaded_file).name}")
+            except Exception as e:
+                print(f"[WARNING] Could not delete previous file: {e}")
 
         # Get source file path
         source_path = Path(file)
@@ -465,18 +488,50 @@ def process_uploaded_report(
             from core.pdf_processor import PDFProcessor
             pdf_processor = PDFProcessor()
             text = pdf_processor.extract_text(file_path, max_pages=max_pages)
-            summary = rag_system.summarize_report(text)  # Let RAG class use .env config
-            return f"📝 Summary:\n\n{summary}"
+
+            try:
+                summary = rag_system.summarize_report(text)  # Let RAG class use .env config
+                return f"📝 Summary:\n\n{summary}"
+            except RuntimeError as e:
+                # Catch CUDA out-of-memory errors
+                if "out of memory" in str(e).lower() or "cuda" in str(e).lower():
+                    return (
+                        "❌ GPU Memory Error\n\n"
+                        "GPU ran out of memory during summarization. This can happen when:\n"
+                        "- ENABLE_SESSION_AUTO_EMBED=True (embedding model + LLM model on GPU)\n"
+                        "- Large PDF files requiring multiple processing chunks\n"
+                        "- GTX 1660 Ti (6GB VRAM) is at its limit\n\n"
+                        "**Solutions:**\n"
+                        "1. Set ENABLE_SESSION_AUTO_EMBED=False in .env (recommended for 6GB VRAM)\n"
+                        "2. Use smaller PDF files or demo mode (--mode=demo)\n"
+                        "3. Restart the web UI to clear all GPU memory\n"
+                        "4. Use CPU mode by setting CUDA_DEVICE=-1 in .env (slower but stable)\n\n"
+                        f"Technical details: {str(e)}"
+                    )
+                else:
+                    raise
 
         elif action == 'validate':
             # Process report and validate CVE usage
-            report_text, cves, cve_descriptions = rag_system.process_report_for_cve_validation(
-                str(file_path),
-                schema=schema,
-                max_pages=max_pages
-            )
-            validation = rag_system.validate_cve_usage(report_text, cve_descriptions, max_tokens=validation_tokens)
-            return f"✅ Validation Result:\n\n{validation}\n\n📋 Found CVEs: {', '.join(cves)}"
+            try:
+                report_text, cves, cve_descriptions = rag_system.process_report_for_cve_validation(
+                    str(file_path),
+                    schema=schema,
+                    max_pages=max_pages
+                )
+                validation = rag_system.validate_cve_usage(report_text, cve_descriptions, max_tokens=validation_tokens)
+                return f"✅ Validation Result:\n\n{validation}\n\n📋 Found CVEs: {', '.join(cves)}"
+            except RuntimeError as e:
+                # Catch CUDA out-of-memory errors
+                if "out of memory" in str(e).lower() or "cuda" in str(e).lower():
+                    return (
+                        "❌ GPU Memory Error\n\n"
+                        "GPU ran out of memory during CVE validation. "
+                        "Try setting ENABLE_SESSION_AUTO_EMBED=False in .env or using demo mode.\n\n"
+                        f"Technical details: {str(e)}"
+                    )
+                else:
+                    raise
 
         elif action == 'qa':
             # Answer question about report (uses .env QA_* configuration)
@@ -486,8 +541,21 @@ def process_uploaded_report(
             from core.pdf_processor import PDFProcessor
             pdf_processor = PDFProcessor()
             text = pdf_processor.extract_text(file_path, max_pages=max_pages)
-            answer = rag_system.answer_question_about_report(text, question)  # Let RAG class use .env config
-            return f"💬 Answer:\n\n{answer}"
+
+            try:
+                answer = rag_system.answer_question_about_report(text, question)  # Let RAG class use .env config
+                return f"💬 Answer:\n\n{answer}"
+            except RuntimeError as e:
+                # Catch CUDA out-of-memory errors
+                if "out of memory" in str(e).lower() or "cuda" in str(e).lower():
+                    return (
+                        "❌ GPU Memory Error\n\n"
+                        "GPU ran out of memory during Q&A. "
+                        "Try setting ENABLE_SESSION_AUTO_EMBED=False in .env or using demo mode.\n\n"
+                        f"Technical details: {str(e)}"
+                    )
+                else:
+                    raise
 
         elif action == 'add':
             # Add to knowledge base
@@ -769,7 +837,7 @@ def create_interface():
                         scale=1
                     )
                     remove_file_btn = gr.Button("🗑️", size="sm", scale=0, min_width=40, interactive=False)
-                    send_btn = gr.Button("Send →", size="sm", scale=1, variant="primary", elem_id="send_btn")
+                    send_btn = gr.Button("Send →", size="sm", scale=1, variant="primary", elem_id="send_btn", interactive=False)
                     with gr.Column(scale=8):
                         pass  # Spacer
 
@@ -816,9 +884,10 @@ def create_interface():
                     source_dropdown = gr.Dropdown(
                         choices=[],
                         label="Remove",
-                        interactive=True
+                        interactive=True,
+                        value=None
                     )
-                    delete_btn = gr.Button("🗑️ Delete Selected Source", size="sm", variant="stop")
+                    delete_btn = gr.Button("🗑️ Delete Selected Source", size="sm", variant="stop", interactive=False)
 
                     # Add section
                     add_file = gr.File(
@@ -841,13 +910,26 @@ def create_interface():
             """Refresh knowledge base display and source dropdown."""
             updated_display = format_kb_display()
             updated_sources = get_source_names()
-            return updated_display, gr.update(choices=updated_sources)
+            # Disable delete button since dropdown will be reset to None
+            return updated_display, gr.update(choices=updated_sources, value=None), gr.update(interactive=False)
 
         def handle_delete_source(source_name):
             """Handle delete source button click."""
+            if not source_name:
+                return format_kb_display(), gr.update(), gr.update(interactive=False)
+
             status, updated_display, updated_sources = delete_source(source_name)
             print(status)  # Print to console instead of UI
-            return updated_display, gr.update(choices=updated_sources, value=None)
+            # After deletion, reset dropdown to None and disable delete button
+            return updated_display, gr.update(choices=updated_sources, value=None), gr.update(interactive=False)
+
+        def handle_source_dropdown_change(source_name):
+            """Handle source dropdown selection change - enable/disable delete button."""
+            # Enable delete button only if a source is selected
+            if source_name:
+                return gr.update(interactive=True)
+            else:
+                return gr.update(interactive=False)
 
         def handle_speed_change(new_speed):
             """Handle speed dropdown change - reload model."""
@@ -861,9 +943,18 @@ def create_interface():
             updated_status = get_current_status()
             return updated_status
 
+        def handle_msg_input_change(msg):
+            """Handle message input change - enable/disable send button based on input."""
+            # Enable send button only if message has content
+            if msg and msg.strip():
+                return gr.update(interactive=True)
+            else:
+                return gr.update(interactive=False)
+
         # Connect events - chat
-        msg_input.submit(chat_respond, [msg_input, chatbot], [msg_input, chatbot, chat_file_status, remove_file_btn])
-        send_btn.click(chat_respond, [msg_input, chatbot], [msg_input, chatbot, chat_file_status, remove_file_btn])
+        msg_input.submit(chat_respond, [msg_input, chatbot], [msg_input, chatbot, chat_file_status, remove_file_btn, send_btn])
+        send_btn.click(chat_respond, [msg_input, chatbot], [msg_input, chatbot, chat_file_status, remove_file_btn, send_btn])
+        msg_input.change(handle_msg_input_change, [msg_input], [send_btn])
 
         # File upload handlers - left side (chat)
         upload_file_btn.upload(
@@ -902,24 +993,28 @@ def create_interface():
         )
 
         # Knowledge base handlers
-        refresh_kb_btn.click(handle_refresh_kb, outputs=[kb_display, source_dropdown])
-        delete_btn.click(handle_delete_source, [source_dropdown], [kb_display, source_dropdown])
+        refresh_kb_btn.click(handle_refresh_kb, outputs=[kb_display, source_dropdown, delete_btn])
+        delete_btn.click(handle_delete_source, [source_dropdown], [kb_display, source_dropdown, delete_btn])
+        source_dropdown.change(handle_source_dropdown_change, [source_dropdown], [delete_btn])
 
         # Auto-refresh knowledge base on page load
-        demo.load(handle_refresh_kb, outputs=[kb_display, source_dropdown])
+        demo.load(handle_refresh_kb, outputs=[kb_display, source_dropdown, delete_btn])
 
         # Custom JavaScript for Enter to submit and hide empty containers
         demo.load(None, None, None, js="""
         function() {
             setTimeout(function() {
-                // Enter to submit
+                // Enter to submit (only if send button is enabled)
                 const textarea = document.querySelector('#msg_input textarea');
                 if (textarea) {
                     textarea.addEventListener('keydown', function(e) {
                         if (e.key === 'Enter' && !e.shiftKey) {
                             e.preventDefault();
                             const submitBtn = document.querySelector('#send_btn');
-                            if (submitBtn) submitBtn.click();
+                            // Only click if button exists and is not disabled
+                            if (submitBtn && !submitBtn.disabled && !submitBtn.classList.contains('disabled')) {
+                                submitBtn.click();
+                            }
                         }
                     });
                 }
