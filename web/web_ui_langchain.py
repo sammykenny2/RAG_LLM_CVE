@@ -33,7 +33,9 @@ from config import (
     EMBEDDING_BATCH_SIZE,
     EMBEDDING_PRECISION,
     ENABLE_SESSION_AUTO_EMBED,
-    RETRIEVAL_TOP_K
+    RETRIEVAL_TOP_K,
+    KB_FILES_DIR,
+    SESSION_FILES_BASE
 )
 
 # =============================================================================
@@ -77,27 +79,31 @@ current_mode = DEFAULT_MODE
 # Track uploaded files
 chat_uploaded_file = None  # Left side: for chat validation (current file display)
 chat_file_uploading = False  # Left side upload status
+kb_file_processing = False  # Right side: KB processing lock (True = processing, False = ready)
 
-# Upload directories
-TEMP_UPLOAD_DIR = Path("temp_uploads")  # For chat files (temporary, no embeddings)
-KB_UPLOAD_DIR = Path("kb_uploads")  # For KB files (backup, generate embeddings)
+# Files directory structure (from config)
+# KB files: files/knowledge_base/ (permanent, original filenames)
+# Session files: files/sessions/session_{id}/ (temporary, UUID filenames)
+KB_UPLOAD_DIR = Path(KB_FILES_DIR)
+SESSION_UPLOAD_DIR = Path(SESSION_FILES_BASE) / f"session_{session_id}"
 
-# Ensure upload directories exist and clean up old temp files
-TEMP_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+# Ensure upload directories exist
 KB_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+SESSION_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-# Clean up leftover temp files from previous sessions (avoid disk space waste)
-if TEMP_UPLOAD_DIR.exists():
+# Clean up leftover session files from previous sessions (avoid disk space waste)
+# Note: Only clean this specific session's directory
+if SESSION_UPLOAD_DIR.exists():
     import glob
-    temp_files = list(TEMP_UPLOAD_DIR.glob("*"))
-    if temp_files:
-        print(f"[INFO] Cleaning up {len(temp_files)} leftover temp file(s) from previous session...")
-        for temp_file in temp_files:
+    session_files = list(SESSION_UPLOAD_DIR.glob("*"))
+    if session_files:
+        print(f"[INFO] Cleaning up {len(session_files)} leftover file(s) from previous session...")
+        for session_file in session_files:
             try:
-                if temp_file.is_file():
-                    temp_file.unlink()
+                if session_file.is_file():
+                    session_file.unlink()
             except Exception as e:
-                print(f"[WARNING] Could not delete {temp_file.name}: {e}")
+                print(f"[WARNING] Could not delete {session_file.name}: {e}")
 
 def initialize_system(speed_level: str = DEFAULT_SPEED, force_reload: bool = False):
     """Initialize LangChain RAG system based on speed level."""
@@ -435,7 +441,7 @@ def handle_chat_file_upload(file):
         file_ext = source_path.suffix  # extension including dot
         unique_id = str(uuid.uuid4())[:8]  # Short UUID for readability
         unique_filename = f"{file_stem}_{unique_id}{file_ext}"
-        dest_path = TEMP_UPLOAD_DIR / unique_filename
+        dest_path = SESSION_UPLOAD_DIR / unique_filename
 
         shutil.copy2(source_path, dest_path)
 
@@ -642,36 +648,60 @@ def handle_kb_file_upload(file):
     Handle file upload for Knowledge Base (right side).
     Uploads file and immediately processes it to generate embeddings.
 
+    New behavior:
+    - Uses original filename (no UUID)
+    - Permanently stores file in files/knowledge_base/
+    - Locks upload during processing (kb_file_processing flag)
+
     Args:
         file: Gradio File object (path string)
 
     Returns:
-        tuple: (status_html, updated_kb_display, updated_dropdown_choices, cleared_file_input)
+        tuple: (status_html, updated_kb_display, updated_dropdown_choices, cleared_file_input, kb_upload_btn_state)
     """
+    global kb_file_processing
     import shutil
 
     if file is None:
-        return "", format_kb_display(), gr.update(choices=get_source_names()), None
+        return "", format_kb_display(), gr.update(choices=get_source_names()), None, gr.update(interactive=True)
+
+    # Check if already processing
+    if kb_file_processing:
+        return (
+            "⚠️ Another file is being processed. Please wait...",
+            format_kb_display(),
+            gr.update(choices=get_source_names()),
+            None,
+            gr.update(interactive=False)
+        )
 
     try:
+        # Set processing lock
+        kb_file_processing = True
+
         # Get source file path
         source_path = Path(file)
         original_name = source_path.name
 
-        # Generate unique filename to prevent overwriting files being processed
-        # Format: original_name_UUID.ext (e.g., "manual_a1b2c3d4.pdf")
-        import uuid
-        file_stem = source_path.stem  # filename without extension
-        file_ext = source_path.suffix  # extension including dot
-        unique_id = str(uuid.uuid4())[:8]  # Short UUID for readability
-        unique_filename = f"{file_stem}_{unique_id}{file_ext}"
-        dest_path = KB_UPLOAD_DIR / unique_filename
+        # Use original filename (permanent storage in KB)
+        dest_path = KB_UPLOAD_DIR / original_name
 
-        # Copy file to kb_uploads directory with unique name
+        # Check if file already exists in KB
+        if dest_path.exists():
+            kb_file_processing = False
+            return (
+                f"❌ File '{original_name}' already exists in knowledge base. Please remove it first or use a different filename.",
+                format_kb_display(),
+                gr.update(choices=get_source_names()),
+                None,
+                gr.update(interactive=True)
+            )
+
+        # Copy file to files/knowledge_base/ with original name
         shutil.copy2(source_path, dest_path)
 
         # Immediately process the file
-        print(f"Adding {original_name} to knowledge base (saved as {unique_filename})...")
+        print(f"Adding {original_name} to knowledge base...")
 
         # Extract text
         from core.pdf_processor import PDFProcessor
@@ -688,11 +718,11 @@ def handle_kb_file_upload(file):
             if chunk:
                 chunks.append(chunk)
 
-        # Prepare metadata (use original_name for user-facing display)
+        # Prepare metadata
         metadatas = [
             {
                 'source_type': 'pdf',
-                'source_name': original_name,  # Use original name, not UUID filename
+                'source_name': original_name,
                 'added_date': datetime.now().isoformat(),
                 'chunk_index': i,
                 'precision': EMBEDDING_PRECISION
@@ -705,32 +735,29 @@ def handle_kb_file_upload(file):
 
         print(f"[OK] Added {len(chunks)} chunks from {original_name} to knowledge base")
 
-        # Delete the temporary file after processing (embeddings already in Chroma)
-        import os
-        if dest_path.exists():
-            try:
-                os.remove(dest_path)
-                print(f"[OK] Deleted temporary file: {unique_filename}")
-            except Exception as e:
-                print(f"[WARNING] Could not delete temporary file: {e}")
+        # Release processing lock
+        kb_file_processing = False
 
         # Return empty status (hide immediately), updated KB display, dropdown, and clear file input
-        return "", format_kb_display(), gr.update(choices=get_source_names()), None
+        return "", format_kb_display(), gr.update(choices=get_source_names()), None, gr.update(interactive=True)
 
     except Exception as e:
         print(f"[ERROR] Error adding {file.name if file else 'file'} to knowledge base: {str(e)}")
 
-        # Delete the temporary file even on error
+        # Delete the file on error (rollback)
         import os
         try:
             if 'dest_path' in locals() and dest_path.exists():
                 os.remove(dest_path)
-                print(f"[OK] Deleted temporary file after error: {unique_filename}")
+                print(f"[OK] Rolled back file after error: {original_name}")
         except Exception as cleanup_error:
-            print(f"[WARNING] Could not delete temporary file: {cleanup_error}")
+            print(f"[WARNING] Could not delete file: {cleanup_error}")
+
+        # Release processing lock
+        kb_file_processing = False
 
         # Return empty status even on error (hide immediately), and clear file input
-        return "", format_kb_display(), gr.update(choices=get_source_names()), None
+        return "", format_kb_display(), gr.update(choices=get_source_names()), None, gr.update(interactive=True)
 
 def add_pdf_to_kb(file, source_name: str = None) -> str:
     """
@@ -858,6 +885,7 @@ def get_source_names() -> list:
 def delete_source(source_name: str) -> tuple:
     """
     Delete a single source from knowledge base.
+    Also deletes the original file from files/knowledge_base/ if it exists.
 
     Args:
         source_name: Name of source to delete
@@ -869,11 +897,21 @@ def delete_source(source_name: str) -> tuple:
         return "⚠️ No source selected", format_kb_display(), get_source_names()
 
     try:
-        # Delete the source using chroma_manager
+        # Delete the source embeddings using chroma_manager
         n_deleted = rag_system.chroma_manager.delete_by_source(source_name)
 
         if n_deleted > 0:
             status = f"✅ Deleted {n_deleted} chunks from '{source_name}'"
+
+            # Also delete the original file if it exists in KB files directory
+            file_path = KB_UPLOAD_DIR / source_name
+            if file_path.exists() and file_path.is_file():
+                try:
+                    import os
+                    os.remove(file_path)
+                    print(f"[OK] Deleted original file: {source_name}")
+                except Exception as e:
+                    print(f"[WARNING] Could not delete original file {source_name}: {e}")
         else:
             status = f"⚠️ Source '{source_name}' not found"
 
@@ -1128,12 +1166,12 @@ def create_interface():
         add_file.upload(
             handle_kb_file_upload,
             inputs=[add_file],
-            outputs=[kb_file_status, kb_display, source_dropdown, add_file]
+            outputs=[kb_file_status, kb_display, source_dropdown, add_file, kb_upload_btn]
         )
         kb_upload_btn.upload(
             handle_kb_file_upload,
             inputs=[kb_upload_btn],
-            outputs=[kb_file_status, kb_display, source_dropdown, add_file]
+            outputs=[kb_file_status, kb_display, source_dropdown, add_file, kb_upload_btn]
         )
 
         # Knowledge base handlers

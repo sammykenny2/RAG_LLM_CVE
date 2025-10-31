@@ -19,10 +19,18 @@ def get_path(env_var: str, default: str) -> Path:
     path_str = os.getenv(env_var, default)
     return Path(path_str)
 
-# Embedding base path (without extension)
-# Usage: f"{EMBEDDING_PATH}.{extension}" where extension is csv, pkl, parquet, or chroma
-EMBEDDING_PATH = get_path('EMBEDDING_PATH', './embeddings/cve_embeddings')
+# Files directory structure
+FILES_BASE_DIR = get_path('FILES_BASE_DIR', './files')
+KB_FILES_DIR = get_path('KB_FILES_DIR', './files/knowledge_base')
+SESSION_FILES_BASE = get_path('SESSION_FILES_BASE', './files/sessions')
 
+# Embeddings directory structure
+# KB embedding base path (without extension)
+# Usage: f"{EMBEDDING_PATH}.{extension}" where extension is csv, pkl, parquet, or chroma
+EMBEDDING_PATH = get_path('EMBEDDING_PATH', './embeddings/knowledge_base')
+SESSION_EMBEDDINGS_BASE = get_path('SESSION_EMBEDDINGS_BASE', './embeddings/sessions')
+
+# CVE data paths
 CVE_V5_PATH = get_path('CVE_V5_PATH', '../cvelistV5/cves')
 CVE_V4_PATH = get_path('CVE_V4_PATH', '../cvelist')
 
@@ -30,7 +38,8 @@ CVE_V4_PATH = get_path('CVE_V4_PATH', '../cvelist')
 # Usage: f"{CVE_DESCRIPTION_PATH}.{extension}" where extension is txt or jsonl
 CVE_DESCRIPTION_PATH = get_path('CVE_DESCRIPTION_PATH', './output/CVEDescription')
 
-TEMP_UPLOAD_DIR = get_path('TEMP_UPLOAD_DIR', './temp_uploads')
+# Backward compatibility: TEMP_UPLOAD_DIR now maps to SESSION_FILES_BASE
+TEMP_UPLOAD_DIR = SESSION_FILES_BASE
 
 # =============================================================================
 # Model Configuration

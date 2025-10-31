@@ -379,7 +379,8 @@ if ENABLE_SESSION_AUTO_EMBED:
 
         if file_info['status'] == 'ready':
             print(f"[OK] PDF embedded: {file_info['chunks']} chunks in session")
-            print(f"   └─ Session embeddings: ./temp_uploads/session_{session_id}/chroma_db/")
+            print(f"   └─ Session files: ./files/sessions/session_{session_id}/")
+            print(f"   └─ Session embeddings: ./embeddings/sessions/session_{session_id}.chroma/")
 
             # Attach session_manager to rag_system for dual-source queries
             rag_system.session_manager = session_manager

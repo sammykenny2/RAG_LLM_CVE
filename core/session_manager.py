@@ -18,7 +18,8 @@ from core.embeddings import EmbeddingModel
 
 # Import configuration
 from config import (
-    TEMP_UPLOAD_DIR,
+    SESSION_FILES_BASE,
+    SESSION_EMBEDDINGS_BASE,
     SESSION_MAX_FILES,
     SESSION_MAX_FILE_SIZE_MB,
     CHUNK_SIZE,
@@ -35,8 +36,8 @@ class SessionManager:
 
     Architecture:
         - Each session has a unique ID
-        - Files are stored in temp_uploads/session_{id}/
-        - Embeddings stored in session-scoped Chroma collection
+        - Files stored in: files/sessions/session_{id}/
+        - Embeddings stored in: embeddings/sessions/session_{id}.chroma/
         - Automatic cleanup on session end
 
     Example usage:
@@ -50,27 +51,33 @@ class SessionManager:
     def __init__(
         self,
         session_id: str,
-        db_base_path: Path = None
+        files_base_path: Path = None,
+        embeddings_base_path: Path = None
     ):
         """
         Initialize session manager.
 
         Args:
             session_id: Unique session identifier
-            db_base_path: Base path for Chroma databases (default: TEMP_UPLOAD_DIR)
+            files_base_path: Base path for session files (default: SESSION_FILES_BASE)
+            embeddings_base_path: Base path for session embeddings (default: SESSION_EMBEDDINGS_BASE)
         """
         self.session_id = session_id
         self.collection_name = f"session_{session_id}"
 
         # Set up paths
-        if db_base_path is None:
-            db_base_path = TEMP_UPLOAD_DIR
+        if files_base_path is None:
+            files_base_path = SESSION_FILES_BASE
+        if embeddings_base_path is None:
+            embeddings_base_path = SESSION_EMBEDDINGS_BASE
 
-        self.session_dir = Path(db_base_path) / f"session_{session_id}"
-        self.db_path = self.session_dir / "chroma_db"
+        # Files directory: files/sessions/session_{id}/
+        self.files_dir = Path(files_base_path) / f"session_{session_id}"
+        self.files_dir.mkdir(parents=True, exist_ok=True)
 
-        # Create session directory
-        self.session_dir.mkdir(parents=True, exist_ok=True)
+        # Embeddings directory: embeddings/sessions/session_{id}.chroma/
+        self.db_path = Path(embeddings_base_path) / f"session_{session_id}.chroma"
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Initialize Chroma client
         self.client = chromadb.PersistentClient(path=str(self.db_path))
@@ -102,7 +109,8 @@ class SessionManager:
             print(f"SessionManager initialized:")
             print(f"  └─ Session ID: {self.session_id}")
             print(f"  └─ Collection: {self.collection_name}")
-            print(f"  └─ Session directory: {self.session_dir}")
+            print(f"  └─ Files directory: {self.files_dir}")
+            print(f"  └─ Embeddings database: {self.db_path}")
 
     def add_file(self, file_path: str) -> Dict:
         """
@@ -350,7 +358,7 @@ class SessionManager:
 
     def cleanup(self):
         """
-        Clean up session: delete collection and temporary files.
+        Clean up session: delete collection, embeddings, and temporary files.
         """
         try:
             # Delete Chroma collection
@@ -362,14 +370,24 @@ class SessionManager:
                 print(f"[WARNING] Error deleting collection: {e}")
 
         try:
-            # Delete session directory
-            if self.session_dir.exists():
-                shutil.rmtree(self.session_dir)
+            # Delete session files directory
+            if self.files_dir.exists():
+                shutil.rmtree(self.files_dir)
                 if VERBOSE_LOGGING:
-                    print(f"[OK] Deleted session directory: {self.session_dir}")
+                    print(f"[OK] Deleted session files: {self.files_dir}")
         except Exception as e:
             if VERBOSE_LOGGING:
-                print(f"[WARNING] Error deleting session directory: {e}")
+                print(f"[WARNING] Error deleting session files: {e}")
+
+        try:
+            # Delete session embeddings directory
+            if self.db_path.exists():
+                shutil.rmtree(self.db_path)
+                if VERBOSE_LOGGING:
+                    print(f"[OK] Deleted session embeddings: {self.db_path}")
+        except Exception as e:
+            if VERBOSE_LOGGING:
+                print(f"[WARNING] Error deleting session embeddings: {e}")
 
         # Clean up embedding model
         try:

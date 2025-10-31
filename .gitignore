@@ -52,19 +52,19 @@ MANIFEST
 .env
 
 # Project specific
-# Temporary upload directories (web UI)
-temp_uploads/
-kb_uploads/
-# Generated CVE description files (root directory only, not output/)
-/CVEDescription*
-
-# Temporary files directory (test reports and demo data)
-temp/
+# Files directory (uploaded files and session files)
+files/
 
 # Embedding files and output directory (auto-generated, large files)
 # Note: Existing files on GitHub will remain, but future changes won't be tracked
 embeddings/
 output/
+
+# Generated CVE description files (root directory only, not output/)
+/CVEDescription*
+
+# Temporary files directory (test reports and demo data)
+temp/
 
 # Project documentation (local copy only)
 CLAUDE.md

@@ -238,7 +238,7 @@ Both phases use consistent metadata structure for vector database:
 
 ```python
 metadata = {
-    "source_type": "pdf",           # "pdf" or "cve"
+    "source_type": "pdf",           # "pdf", "cve", or "session"
     "source_name": "CVEpdf2024.pdf", # Filename or "CVE List 2025"
     "added_date": "2025-01-14",     # ISO format (YYYY-MM-DD)
     "chunk_index": 1234,            # Sequential index
@@ -248,8 +248,8 @@ metadata = {
 ```
 
 **Purpose**:
-- **source_type**: Filter by document type (PDF reports vs CVE data)
-- **source_name**: Track and delete specific documents
+- **source_type**: Filter by document type ("pdf" for KB files, "cve" for CVE data, "session" for temporary uploads)
+- **source_name**: Track and delete specific documents (original filename for KB, UUID filename for sessions)
 - **added_date**: Audit trail for knowledge base updates
 - **chunk_index**: Order chunks within same document
 - **page_number**: Source tracing for PDFs
@@ -299,7 +299,11 @@ metadata = {
   - Watches DOM changes to detect empty HTML containers
   - Automatically applies `display: none` to prevent visible layout artifacts
   - Gradio filters inline `<script>` tags, requires global injection via `demo.load(..., js=...)`
-- **File Management**: Temporary storage in `temp_uploads/` (chat) and `kb_uploads/` (knowledge base)
+- **File Management**:
+  - KB files: Permanent storage in `files/knowledge_base/` with original filenames
+  - Session files: Temporary storage in `files/sessions/session_{id}/` with UUID filenames
+  - KB embeddings: Persistent in `embeddings/knowledge_base.chroma/`
+  - Session embeddings: Temporary in `embeddings/sessions/session_{id}.chroma/`
   - Chat files deleted after send or manual removal
   - KB files persist with embeddings in Chroma database
 
