@@ -47,6 +47,7 @@ MANIFEST
 
 # Claude Code
 .claude/
+CLAUDE.md
 
 # Environment configuration
 .env
@@ -60,14 +61,8 @@ files/
 embeddings/
 output/
 
-# Generated CVE description files (root directory only, not output/)
-/CVEDescription*
-
 # Temporary files directory (test reports and demo data)
 temp/
-
-# Project documentation (local copy only)
-CLAUDE.md
 
 # Model cache
 .cache/

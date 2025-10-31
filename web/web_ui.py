@@ -279,6 +279,13 @@ def chat_respond(message: str, history: list):
         yield "", gr.update(), history, "", gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
         return
 
+    # Check if KB is being processed
+    if kb_file_processing:
+        history.append({"role": "user", "content": message})
+        history.append({"role": "assistant", "content": "⏳ Please wait, knowledge base is being updated..."})
+        yield "", gr.update(), history, "", gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
+        return
+
     # Check if file is still uploading
     if chat_file_uploading:
         history.append({"role": "user", "content": message})
@@ -678,13 +685,13 @@ def handle_kb_file_upload(file):
         file: Gradio File object (path string)
 
     Returns:
-        tuple: (status_html, updated_kb_display, updated_dropdown_choices, cleared_file_input, kb_upload_btn_state)
+        tuple: (status_html, updated_kb_display, updated_dropdown_choices, cleared_file_input, kb_upload_btn_state, msg_send_btn_state)
     """
     global kb_file_processing
     import shutil
 
     if file is None:
-        return "", format_kb_display(), gr.update(choices=get_source_names()), None, gr.update(interactive=True)
+        return "", format_kb_display(), gr.update(choices=get_source_names()), None, gr.update(interactive=True), gr.update(interactive=True)
 
     # Check if already processing
     if kb_file_processing:
@@ -693,7 +700,8 @@ def handle_kb_file_upload(file):
             format_kb_display(),
             gr.update(choices=get_source_names()),
             None,
-            gr.update(interactive=False)
+            gr.update(interactive=False),
+            gr.update(interactive=False)  # Also disable left side Send button
         )
 
     try:
@@ -715,7 +723,8 @@ def handle_kb_file_upload(file):
                 format_kb_display(),
                 gr.update(choices=get_source_names()),
                 None,
-                gr.update(interactive=True)
+                gr.update(interactive=True),
+                gr.update(interactive=True)  # Re-enable left side Send button
             )
 
         # Copy file to files/knowledge_base/ with original name
@@ -775,7 +784,7 @@ def handle_kb_file_upload(file):
         kb_file_processing = False
 
         # Return empty status (hide immediately), updated KB display, dropdown, and clear file input
-        return "", format_kb_display(), gr.update(choices=get_source_names()), None, gr.update(interactive=True)
+        return "", format_kb_display(), gr.update(choices=get_source_names()), None, gr.update(interactive=True), gr.update(interactive=True)
 
     except Exception as e:
         print(f"[ERROR] Error adding {file.name if file else 'file'} to knowledge base: {str(e)}")
@@ -793,7 +802,7 @@ def handle_kb_file_upload(file):
         kb_file_processing = False
 
         # Return empty status even on error (hide immediately), and clear file input
-        return "", format_kb_display(), gr.update(choices=get_source_names()), None, gr.update(interactive=True)
+        return "", format_kb_display(), gr.update(choices=get_source_names()), None, gr.update(interactive=True), gr.update(interactive=True)
 
 def get_kb_sources() -> list:
     """
@@ -1316,13 +1325,17 @@ def create_interface():
             if not msg or not msg.strip():
                 return gr.update(interactive=False)
 
+            # Check if KB is currently processing
+            if kb_file_processing:
+                return gr.update(interactive=False)  # Keep disabled during KB processing
+
             # Check if LLM is currently processing (last message is "Thinking...")
             if history and len(history) > 0:
                 last_message = history[-1]
                 if last_message.get('role') == 'assistant' and '💭 Thinking...' in last_message.get('content', ''):
                     return gr.update(interactive=False)  # Keep disabled during LLM processing
 
-            # Has input and LLM not processing - enable
+            # Has input and neither KB nor LLM processing - enable
             return gr.update(interactive=True)
 
         # Connect events - chat
@@ -1358,12 +1371,12 @@ def create_interface():
         add_file.upload(
             handle_kb_file_upload,
             inputs=[add_file],
-            outputs=[kb_file_status, kb_display, source_dropdown, add_file, kb_upload_btn]
+            outputs=[kb_file_status, kb_display, source_dropdown, add_file, kb_upload_btn, msg_send_btn]
         )
         kb_upload_btn.upload(
             handle_kb_file_upload,
             inputs=[kb_upload_btn],
-            outputs=[kb_file_status, kb_display, source_dropdown, add_file, kb_upload_btn]
+            outputs=[kb_file_status, kb_display, source_dropdown, add_file, kb_upload_btn, msg_send_btn]
         )
 
         # Settings change handlers
