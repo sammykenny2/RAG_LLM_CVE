@@ -45,6 +45,7 @@ import fitz
 import json
 import gc
 import os
+import uuid
 import numpy as np
 import pandas as pd
 import pickle
@@ -58,6 +59,7 @@ from sentence_transformers import util, SentenceTransformer
 # Import RAG classes
 from rag.pure_python import PureRAG
 from core.models import LlamaModel
+from core.session_manager import SessionManager
 
 # Import configuration
 from config import (
@@ -73,7 +75,9 @@ from config import (
     SUMMARY_ENABLE_SECOND_STAGE,
     VALIDATION_ENABLE_SECOND_STAGE,
     QA_ENABLE_SECOND_STAGE,
-    RETRIEVAL_TOP_K
+    RETRIEVAL_TOP_K,
+    ENABLE_SESSION_AUTO_EMBED,
+    VERBOSE_LOGGING
 )
 
 # Parse command-line arguments
@@ -352,6 +356,42 @@ def extract_text_from_pdf(pdf_name):
 
 userPDFName = input("Please Enter the name of the pdf that you would like to analyze (please include the .pdf at the end as well).")
 all_text = extract_text_from_pdf(userPDFName)
+
+# ============================================================================
+# Session-based embeddings (optional, follows Web UI behavior)
+# ============================================================================
+
+session_manager = None
+
+if ENABLE_SESSION_AUTO_EMBED:
+    print("\n[Session Auto-Embed] Creating temporary session for PDF analysis...")
+
+    # Generate unique session ID
+    session_id = str(uuid.uuid4())[:8]
+
+    # Create SessionManager
+    session_manager = SessionManager(session_id=session_id)
+
+    # Add PDF to session (auto-embeds)
+    try:
+        print(f"[Session Auto-Embed] Embedding PDF: {userPDFName}")
+        file_info = session_manager.add_file(userPDFName)
+
+        if file_info['status'] == 'ready':
+            print(f"[OK] PDF embedded: {file_info['chunks']} chunks in session")
+            print(f"   └─ Session embeddings: ./temp_uploads/session_{session_id}/chroma_db/")
+
+            # Attach session_manager to rag_system for dual-source queries
+            rag_system.session_manager = session_manager
+            print("[OK] RAG system configured for dual-source (session + KB) queries")
+        else:
+            print(f"[WARNING] Failed to embed PDF: {file_info.get('error', 'Unknown error')}")
+            session_manager = None
+
+    except Exception as e:
+        print(f"[ERROR] Session embedding failed: {e}")
+        print("[INFO] Continuing with KB-only queries...")
+        session_manager = None
 
 # ============================================================================
 # CVE extraction (optimized: direct regex instead of LLM)
@@ -1016,3 +1056,9 @@ while user_continue == "1":
 
 # Cleanup
 cleanup_model(model)
+
+# Cleanup session if it was created
+if session_manager is not None:
+    print("\n[Session Auto-Embed] Cleaning up temporary session...")
+    session_manager.cleanup()
+    print("[OK] Session cleaned up")
