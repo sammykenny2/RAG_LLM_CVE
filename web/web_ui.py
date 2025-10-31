@@ -266,19 +266,21 @@ def chat_respond(message: str, history: list):
         history: Gradio chat history (messages format: list of dicts with 'role' and 'content')
 
     Yields:
-        tuple: (empty string for input clear, updated history, empty string to clear file status, remove_btn update, send_btn update)
+        tuple: (msg_input, msg_input_interactive, history, chat_file_status, remove_file_btn, send_btn,
+                upload_file_btn, speed_dropdown, mode_dropdown, delete_btn, refresh_kb_btn,
+                source_dropdown, add_file, kb_upload_btn)
     """
     global chat_uploaded_file, chat_file_uploading
 
     if not message.strip():
-        yield "", history, "", gr.update(), gr.update()
+        yield "", gr.update(), history, "", gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
         return
 
     # Check if file is still uploading
     if chat_file_uploading:
         history.append({"role": "user", "content": message})
         history.append({"role": "assistant", "content": "⏳ Please wait, file is still uploading..."})
-        yield "", history, "", gr.update(), gr.update()
+        yield "", gr.update(), history, "", gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
         return
 
     # Build user message with file attachment if present
@@ -287,10 +289,25 @@ def chat_respond(message: str, history: list):
         file_name = Path(chat_uploaded_file).name
         user_content = f"{message}\n\n📎 **Attached:** {file_name}"
 
-    # Immediately show user message with "Thinking..." placeholder
+    # Immediately show user message with "Thinking..." placeholder and disable all UI elements (including input box)
     history.append({"role": "user", "content": user_content})
     history.append({"role": "assistant", "content": "💭 Thinking..."})
-    yield "", history, "", gr.update(), gr.update(interactive=False)
+    yield (
+        "",  # msg_input (clear)
+        gr.update(interactive=False),  # msg_input (disable - prevent typing during processing)
+        history,  # history (with thinking message)
+        "",  # chat_file_status (clear)
+        gr.update(interactive=False),  # remove_file_btn (disable)
+        gr.update(interactive=False),  # send_btn (disable)
+        gr.update(interactive=False),  # upload_file_btn (disable)
+        gr.update(interactive=False),  # speed_dropdown (disable)
+        gr.update(interactive=False),  # mode_dropdown (disable)
+        gr.update(interactive=False),  # delete_btn (disable)
+        gr.update(interactive=False),  # refresh_kb_btn (disable)
+        gr.update(interactive=False),  # source_dropdown (disable)
+        gr.update(interactive=False),  # add_file (disable)
+        gr.update(interactive=False)   # kb_upload_btn (disable)
+    )
 
     try:
         import os
@@ -325,9 +342,24 @@ def chat_respond(message: str, history: list):
         # Clear uploaded file reference after sending
         chat_uploaded_file = None
 
-        # Update history with actual response, clear file status, disable remove button, and disable send button (input is empty)
+        # Update history with actual response and re-enable all UI elements
         history[-1]["content"] = response
-        yield "", history, "", gr.update(interactive=False), gr.update(interactive=False)
+        yield (
+            "",  # msg_input (clear)
+            gr.update(interactive=True),   # msg_input (enable - allow typing again)
+            history,  # history (with response)
+            "",  # chat_file_status (clear)
+            gr.update(interactive=False),  # remove_file_btn (disable - no file)
+            gr.update(interactive=False),  # send_btn (disable - input empty)
+            gr.update(interactive=True),   # upload_file_btn (enable)
+            gr.update(interactive=True),   # speed_dropdown (enable)
+            gr.update(interactive=True),   # mode_dropdown (enable)
+            gr.update(interactive=False),  # delete_btn (disable - safe default)
+            gr.update(interactive=True),   # refresh_kb_btn (enable)
+            gr.update(interactive=True),   # source_dropdown (enable)
+            gr.update(interactive=True),   # add_file (enable)
+            gr.update(interactive=True)    # kb_upload_btn (enable)
+        )
 
     except Exception as e:
         error_msg = f"❌ Error: {str(e)}"
@@ -344,7 +376,22 @@ def chat_respond(message: str, history: list):
         # Clear uploaded file reference even on error
         chat_uploaded_file = None
 
-        yield "", history, "", gr.update(interactive=False), gr.update(interactive=False)
+        yield (
+            "",  # msg_input (clear)
+            gr.update(interactive=True),   # msg_input (enable - allow typing again)
+            history,  # history (with error)
+            "",  # chat_file_status (clear)
+            gr.update(interactive=False),  # remove_file_btn (disable - no file)
+            gr.update(interactive=False),  # send_btn (disable - input empty)
+            gr.update(interactive=True),   # upload_file_btn (enable)
+            gr.update(interactive=True),   # speed_dropdown (enable)
+            gr.update(interactive=True),   # mode_dropdown (enable)
+            gr.update(interactive=False),  # delete_btn (disable - safe default)
+            gr.update(interactive=True),   # refresh_kb_btn (enable)
+            gr.update(interactive=True),   # source_dropdown (enable)
+            gr.update(interactive=True),   # add_file (enable)
+            gr.update(interactive=True)    # kb_upload_btn (enable)
+        )
 
 def handle_chat_file_upload(file):
     """
@@ -1021,7 +1068,40 @@ def add_cve_data_to_kb(
 def create_interface():
     """Create and configure Gradio interface."""
 
-    with gr.Blocks(title="RAG CVE Validation System", theme=gr.themes.Soft()) as demo:
+    with gr.Blocks(title="RAG CVE Validation System", theme=gr.themes.Soft(), css="""
+        /* Remove blue outline/border from disabled components */
+        .disabled, [disabled], :disabled {
+            outline: none !important;
+            border-color: transparent !important;
+            box-shadow: none !important;
+        }
+        /* Specifically target Gradio input components when disabled */
+        .gr-textbox:disabled, .gr-textbox[disabled],
+        .gr-dropdown:disabled, .gr-dropdown[disabled],
+        .gr-file:disabled, .gr-file[disabled] {
+            outline: none !important;
+            border-color: transparent !important;
+            box-shadow: none !important;
+        }
+        /* Remove focus outline from disabled components */
+        *:disabled:focus, *[disabled]:focus {
+            outline: none !important;
+            box-shadow: none !important;
+        }
+        /* Target Gradio block containers that contain disabled elements */
+        .block:has(textarea:disabled),
+        .block:has(input:disabled),
+        .block:has(select:disabled),
+        #msg_input:has(textarea:disabled) {
+            border-color: transparent !important;
+            outline: none !important;
+            box-shadow: none !important;
+        }
+        /* Remove generating state blue border */
+        .generating {
+            border-color: transparent !important;
+        }
+    """) as demo:
         # Title
         gr.Markdown("# 🛡️ RAG CVE Validation System")
         gr.Markdown("Conversational AI for threat intelligence report analysis")
@@ -1035,7 +1115,8 @@ def create_interface():
                     label="Chat History",
                     height=500,
                     show_copy_button=True,
-                    type='messages'  # Use OpenAI-style message format
+                    type='messages',  # Use OpenAI-style message format
+                    elem_id="chatbot"
                 )
 
                 msg_input = gr.Textbox(
@@ -1171,8 +1252,20 @@ def create_interface():
                 return gr.update(interactive=False)
 
         # Connect events - chat
-        msg_input.submit(chat_respond, [msg_input, chatbot], [msg_input, chatbot, chat_file_status, remove_file_btn, send_btn])
-        send_btn.click(chat_respond, [msg_input, chatbot], [msg_input, chatbot, chat_file_status, remove_file_btn, send_btn])
+        msg_input.submit(
+            chat_respond,
+            [msg_input, chatbot],
+            [msg_input, msg_input, chatbot, chat_file_status, remove_file_btn, send_btn,
+             upload_file_btn, speed_dropdown, mode_dropdown, delete_btn, refresh_kb_btn,
+             source_dropdown, add_file, kb_upload_btn]
+        )
+        send_btn.click(
+            chat_respond,
+            [msg_input, chatbot],
+            [msg_input, msg_input, chatbot, chat_file_status, remove_file_btn, send_btn,
+             upload_file_btn, speed_dropdown, mode_dropdown, delete_btn, refresh_kb_btn,
+             source_dropdown, add_file, kb_upload_btn]
+        )
         msg_input.change(handle_msg_input_change, [msg_input], [send_btn])
 
         # File upload handlers - left side (chat)
@@ -1219,7 +1312,7 @@ def create_interface():
         # Auto-refresh knowledge base on page load
         demo.load(handle_refresh_kb, outputs=[kb_display, source_dropdown, delete_btn])
 
-        # Custom JavaScript for Enter to submit and hide empty containers
+        # Custom JavaScript for Enter to submit, hide empty containers, and manage chatbot buttons
         demo.load(None, None, None, js="""
         function() {
             setTimeout(function() {
@@ -1259,6 +1352,72 @@ def create_interface():
                 });
 
                 observer.observe(document.body, {
+                    childList: true,
+                    subtree: true
+                });
+
+                // Monitor chatbot for "Thinking..." message and disable/enable clear button
+                const chatbotObserver = new MutationObserver(function() {
+                    const chatbot = document.querySelector('#chatbot');
+                    if (!chatbot) return;
+
+                    // Find all buttons in chatbot (including clear button)
+                    const chatbotButtons = chatbot.querySelectorAll('button');
+
+                    // Check if last message contains "Thinking..."
+                    const messages = chatbot.querySelectorAll('.message');
+                    const lastMessage = messages[messages.length - 1];
+                    const isThinking = lastMessage && lastMessage.textContent.includes('💭 Thinking...');
+
+                    // Disable/enable all chatbot buttons based on thinking state
+                    chatbotButtons.forEach(function(btn) {
+                        if (isThinking) {
+                            btn.disabled = true;
+                            btn.style.pointerEvents = 'none';
+                            btn.style.opacity = '0.5';
+                            btn.blur(); // Remove focus to eliminate blue outline
+                        } else {
+                            btn.disabled = false;
+                            btn.style.pointerEvents = '';
+                            btn.style.opacity = '';
+                        }
+                    });
+                });
+
+                chatbotObserver.observe(document.body, {
+                    childList: true,
+                    subtree: true
+                });
+
+                // Remove focus and blue outlines from disabled elements
+                const disabledObserver = new MutationObserver(function() {
+                    // Target all potentially disabled input elements
+                    const disabledElements = document.querySelectorAll('input:disabled, textarea:disabled, select:disabled, button:disabled, .disabled');
+                    disabledElements.forEach(function(el) {
+                        el.blur(); // Remove focus
+                        el.style.outline = 'none';
+                        el.style.boxShadow = 'none';
+                        el.style.borderColor = 'transparent';
+
+                        // Also handle parent containers (Gradio wraps inputs in .block divs)
+                        let parent = el.closest('.block');
+                        if (parent) {
+                            parent.style.borderColor = 'transparent';
+                            parent.style.outline = 'none';
+                            parent.style.boxShadow = 'none';
+                        }
+                    });
+
+                    // Specifically target generating state containers
+                    const generatingElements = document.querySelectorAll('.generating');
+                    generatingElements.forEach(function(el) {
+                        el.style.borderColor = 'transparent';
+                    });
+                });
+
+                disabledObserver.observe(document.body, {
+                    attributes: true,
+                    attributeFilter: ['disabled', 'class'],
                     childList: true,
                     subtree: true
                 });
