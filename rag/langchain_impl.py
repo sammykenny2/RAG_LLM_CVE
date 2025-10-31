@@ -587,7 +587,8 @@ class LangChainRAG:
             str: Summary
         """
         llm = self._create_pipeline(max_new_tokens=max_tokens)
-        prompt = (
+
+        system_prompt = (
             "You are a senior threat intelligence analyst specializing in cybersecurity incident analysis and vulnerability assessment. "
             "Your role is to synthesize complex security reports into clear, actionable executive summaries for SOC teams and security leadership.\n\n"
             "Summary Requirements:\n"
@@ -597,9 +598,15 @@ class LangChainRAG:
             "- Use clear structure: Overview → Key Findings → Impact Assessment → Recommendations\n"
             "- Maintain technical accuracy while ensuring accessibility for non-technical stakeholders\n"
             "- Preserve critical details (CVE IDs, affected versions, patch information)\n\n"
-            "Provide a professional, concise, and actionable executive summary.\n\n"
-            f"Report:\n{text}"
+            "Provide a professional, concise, and actionable executive summary."
         )
+
+        # Use chat template for Llama 3.2 (same as Pure Python version)
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": f"Please summarize the following Threat Intelligence Report:\n\n{text}"}
+        ]
+        prompt = self.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
         response = llm.invoke(prompt)
         return response
 
@@ -637,7 +644,7 @@ class LangChainRAG:
             if VERBOSE_LOGGING:
                 print(f"[INFO] Processing chunk {i}/{len(chunks)}...")
 
-            prompt = (
+            system_prompt = (
                 "You are a senior threat intelligence analyst specializing in cybersecurity incident analysis. "
                 "Your task is to extract and summarize the key security findings from this section of a threat intelligence report.\n\n"
                 "Focus on:\n"
@@ -646,9 +653,15 @@ class LangChainRAG:
                 "- Vulnerabilities and exploitation techniques\n"
                 "- Indicators of Compromise (IoCs)\n"
                 "- Mitigation or remediation guidance\n\n"
-                "Provide a concise, technically accurate summary of the key security points in this section.\n\n"
-                f"Section:\n{chunk}"
+                "Provide a concise, technically accurate summary of the key security points in this section."
             )
+
+            # Use chat template for Llama 3.2 (same as Pure Python version)
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"Summarize this section:\n\n{chunk}"}
+            ]
+            prompt = self.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
             summary = llm_stage1.invoke(prompt)
             chunk_summaries.append(summary)
 
@@ -674,7 +687,7 @@ class LangChainRAG:
             # Create pipeline for second stage
             llm_stage2 = self._create_pipeline(max_new_tokens=SUMMARY_FINAL_TOKENS)
 
-            prompt = (
+            system_prompt = (
                 "You are a senior threat intelligence analyst creating an executive summary for security leadership. "
                 "Your task is to synthesize multiple section summaries into a unified, coherent executive summary.\n\n"
                 "Executive Summary Structure:\n"
@@ -688,9 +701,15 @@ class LangChainRAG:
                 "- Prioritize high-severity findings and active threats\n"
                 "- Use clear, professional language suitable for executive audiences\n"
                 "- Maintain technical accuracy and actionable insights\n\n"
-                "Create a comprehensive, well-structured executive summary.\n\n"
-                f"Section Summaries:\n{combined_summaries}"
+                "Create a comprehensive, well-structured executive summary."
             )
+
+            # Use chat template for Llama 3.2 (same as Pure Python version)
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"Please synthesize these section summaries:\n\n{combined_summaries}"}
+            ]
+            prompt = self.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
 
             final_summary = llm_stage2.invoke(prompt)
             return final_summary
